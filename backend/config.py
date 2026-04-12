@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     # SQLite file path
     DATABASE_URL: str = "sqlite+aiosqlite:///./database.sqlite"
 
+    # File upload root directory
+    UPLOAD_DIR: str = "./uploads"
+
     model_config = SettingsConfigDict(env_file="../.env", extra="ignore")
 
 
