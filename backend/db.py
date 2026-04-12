@@ -804,9 +804,11 @@ async def create_db_and_tables() -> None:
     WARNING: The current implementation also calls drop_all — remove drop_all
     before production use. Only call create_all in normal startup.
     """
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-        await conn.run_sync(Base.metadata.create_all)
+    if __name__ == "__main__":
+        if input("Drop and recreate database? (y/n): ").lower() == "y":
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.drop_all)
+                await conn.run_sync(Base.metadata.create_all)
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
