@@ -3,19 +3,19 @@ SQLite database setup via SQLAlchemy async.
 Stores a local user record keyed by the Auth0 `sub` claim.
 Auth0 owns authentication – we only store what we need for our app.
 """
-from datetime import datetime
+from datetime import datetime, timezone
 
 from collections.abc import AsyncGenerator
 from sqlalchemy import (
     String, Integer, ForeignKey, event, DateTime, func,
-    BigInteger, UniqueConstraint, Index, Boolean, Table, Column, Text,
+    BigInteger, UniqueConstraint, Index, Boolean, Table, Column, Text, select,
 )
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
     create_async_engine,
 )
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, Session
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, Session, selectinload
 from backend.config import settings
 
 engine = create_async_engine(settings.DATABASE_URL, echo=False)
@@ -221,46 +221,611 @@ def sync_recipient_name(target: Receipt, value: int | None, oldvalue, initiator)
             target.recipient_name = r.name
 
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
-def create_recipient(session: Session, name: str, members: list[User]) -> Recipient:
-    r = Recipient(name=name, members=members)
-    session.add(r)
-    return r
+# ── User Methods ──────────────────────────────────────────────────────────────
+
+async def get_or_create_user(
+    session: AsyncSession,
+    sub: str,
+    email: str | None,
+    name: str | None,
+    avatar_url: str | None,
+) -> "User":
+    """Upsert by Auth0 `sub`. Updates profile fields on every login."""
+    result = await session.execute(select(User).where(User.sub == sub))
+    user = result.scalar_one_or_none()
+    if user is None:
+        user = User(sub=sub, email=email, name=name, avatar_url=avatar_url)
+        session.add(user)
+        await session.flush()
+    else:
+        if email is not None:
+            user.email = email
+        if name is not None:
+            user.name = name
+        if avatar_url is not None:
+            user.avatar_url = avatar_url
+        await session.flush()
+    return user
 
 
-def recipient_for_user(session: Session, user: User) -> Recipient:
-    """Convenience: wrap a single user as a one-member recipient."""
-    return create_recipient(
-        session,
-        name=user.name or user.email or str(user.id),
-        members=[user],
+async def get_user_by_sub(session: AsyncSession, sub: str) -> "User | None":
+    """Primary lookup used after JWT validation."""
+    result = await session.execute(select(User).where(User.sub == sub))
+    return result.scalar_one_or_none()
+
+
+async def get_user_by_id(session: AsyncSession, user_id: int) -> "User | None":
+    """Internal PK lookup."""
+    return await session.get(User, user_id)
+
+
+async def update_user_profile(
+    session: AsyncSession,
+    user_id: int,
+    email: str | None = None,
+    name: str | None = None,
+    avatar_url: str | None = None,
+) -> "User":
+    """Partial update of profile fields. Only updates provided (non-None) fields."""
+    user = await session.get(User, user_id)
+    if user is None:
+        raise ValueError(f"User {user_id} not found")
+    if email is not None:
+        user.email = email
+    if name is not None:
+        user.name = name
+    if avatar_url is not None:
+        user.avatar_url = avatar_url
+    await session.flush()
+    return user
+
+
+async def delete_user(session: AsyncSession, user_id: int) -> list[str]:
+    """
+    Deletes the user row. DB cascade removes owned receipts and their file rows.
+    Returns all storage_key paths of deleted ReceiptFiles so the caller can
+    remove the actual files from disk.
+    """
+    # Collect all storage keys before deletion
+    result = await session.execute(
+        select(ReceiptFile.storage_key)
+        .join(Receipt, Receipt.id == ReceiptFile.receipt_id)
+        .where(Receipt.owner_id == user_id)
     )
+    storage_keys = list(result.scalars().all())
+
+    user = await session.get(User, user_id)
+    if user is not None:
+        await session.delete(user)
+        await session.flush()
+    return storage_keys
 
 
-def create_receipt(
-    session: Session,
+# ── Recipient Methods ─────────────────────────────────────────────────────────
+
+async def create_recipient(
+    session: AsyncSession,
     owner_id: int,
-    recipient: Recipient | None = None,
-) -> Receipt:
+    name: str,
+    description: str | None,
+    member_ids: list[int],
+) -> "Recipient":
+    """Creates a recipient and adds all listed users as members."""
+    recipient = Recipient(owner_id=owner_id, name=name, description=description)
+    session.add(recipient)
+    await session.flush()  # get recipient.id
+
+    if member_ids:
+        result = await session.execute(select(User).where(User.id.in_(member_ids)))
+        members = list(result.scalars().all())
+        recipient.members = members
+        await session.flush()
+    return recipient
+
+
+async def get_recipient_by_id(
+    session: AsyncSession,
+    recipient_id: int,
+) -> "Recipient | None":
+    """Eager-loads `members` via selectinload."""
+    result = await session.execute(
+        select(Recipient)
+        .where(Recipient.id == recipient_id)
+        .options(selectinload(Recipient.members))
+    )
+    return result.scalar_one_or_none()
+
+
+async def list_recipients_for_user(
+    session: AsyncSession,
+    user_id: int,
+) -> "list[Recipient]":
+    """Returns recipients the user owns OR is a member of."""
+    owned = await session.execute(
+        select(Recipient)
+        .where(Recipient.owner_id == user_id)
+        .options(selectinload(Recipient.members))
+    )
+    owned_set = {r.id: r for r in owned.scalars().all()}
+
+    member_of = await session.execute(
+        select(Recipient)
+        .join(recipient_members, recipient_members.c.recipient_id == Recipient.id)
+        .where(recipient_members.c.user_id == user_id)
+        .options(selectinload(Recipient.members))
+    )
+    for r in member_of.scalars().all():
+        owned_set.setdefault(r.id, r)
+
+    return list(owned_set.values())
+
+
+async def update_recipient(
+    session: AsyncSession,
+    recipient_id: int,
+    name: str | None = None,
+    description: str | None = None,
+) -> "Recipient":
+    """Partial update. Only updates provided (non-None) fields."""
+    recipient = await session.get(Recipient, recipient_id)
+    if recipient is None:
+        raise ValueError(f"Recipient {recipient_id} not found")
+    if name is not None:
+        recipient.name = name
+    if description is not None:
+        recipient.description = description
+    await session.flush()
+    return recipient
+
+
+async def add_member_to_recipient(
+    session: AsyncSession,
+    recipient_id: int,
+    user_id: int,
+) -> None:
+    """Appends a user to `recipient_members`. No-op if already a member."""
+    recipient = await get_recipient_by_id(session, recipient_id)
+    if recipient is None:
+        raise ValueError(f"Recipient {recipient_id} not found")
+    user = await session.get(User, user_id)
+    if user is None:
+        raise ValueError(f"User {user_id} not found")
+    if user not in recipient.members:
+        recipient.members.append(user)
+        await session.flush()
+
+
+async def remove_member_from_recipient(
+    session: AsyncSession,
+    recipient_id: int,
+    user_id: int,
+) -> None:
+    recipient = await get_recipient_by_id(session, recipient_id)
+    if recipient is None:
+        raise ValueError(f"Recipient {recipient_id} not found")
+    recipient.members = [m for m in recipient.members if m.id != user_id]
+    await session.flush()
+
+
+async def delete_recipient(session: AsyncSession, recipient_id: int) -> None:
+    """
+    Deletes recipient row. DB sets Receipt.recipient_id = NULL (SET NULL).
+    The receipt_name snapshot on existing receipts is preserved.
+    """
+    recipient = await session.get(Recipient, recipient_id)
+    if recipient is not None:
+        await session.delete(recipient)
+        await session.flush()
+
+
+# ── Receipt Methods ───────────────────────────────────────────────────────────
+
+async def create_receipt(
+    session: AsyncSession,
+    owner_id: int,
+    title: str,
+    amount_owed: float,
+    currency: str = "EUR",
+    recipient_id: int | None = None,
+    description: str | None = None,
+    due_date: datetime | None = None,
+    notes: str | None = None,
+) -> "Receipt":
     receipt = Receipt(
         owner_id=owner_id,
-        recipient_id=recipient.id if recipient else None,
-        recipient_name=recipient.name if recipient else None,
+        title=title,
+        amount_owed=amount_owed,
+        currency=currency,
+        recipient_id=recipient_id,
+        description=description,
+        due_date=due_date,
+        notes=notes,
     )
     session.add(receipt)
+    await session.flush()
     return receipt
 
 
-# ── DB lifecycle ──────────────────────────────────────────────────────────────
+async def get_receipt_by_id(
+    session: AsyncSession,
+    receipt_id: int,
+) -> "Receipt | None":
+    """Eager-loads `recipient`, `files`, and `tags` via selectinload."""
+    result = await session.execute(
+        select(Receipt)
+        .where(Receipt.id == receipt_id)
+        .options(
+            selectinload(Receipt.recipient),
+            selectinload(Receipt.files),
+            selectinload(Receipt.tags),
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+async def list_receipts_for_owner(
+    session: AsyncSession,
+    owner_id: int,
+    is_paid: bool | None = None,
+    tag_ids: list[int] | None = None,
+    cursor: int | None = None,
+    limit: int = 20,
+) -> "list[Receipt]":
+    """
+    Cursor-paginated (keyset on `id`). Optionally filter by payment status
+    and/or a list of tag IDs (AND logic — receipt must have all listed tags).
+    """
+    stmt = select(Receipt).where(Receipt.owner_id == owner_id)
+
+    if is_paid is not None:
+        stmt = stmt.where(Receipt.is_paid == is_paid)
+
+    if tag_ids:
+        # AND logic: receipt must have ALL listed tags
+        for tag_id in tag_ids:
+            stmt = stmt.where(
+                Receipt.id.in_(
+                    select(TaggedReceipt.receipt_id).where(TaggedReceipt.tag_id == tag_id)
+                )
+            )
+
+    if cursor is not None:
+        stmt = stmt.where(Receipt.id > cursor)
+
+    stmt = stmt.order_by(Receipt.id).limit(limit)
+    stmt = stmt.options(
+        selectinload(Receipt.recipient),
+        selectinload(Receipt.files),
+        selectinload(Receipt.tags),
+    )
+
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
+async def update_receipt(
+    session: AsyncSession,
+    receipt_id: int,
+    title: str | None = None,
+    description: str | None = None,
+    amount_owed: float | None = None,
+    amount_paid: float | None = None,
+    due_date: datetime | None = None,
+    notes: str | None = None,
+    currency: str | None = None,
+) -> "Receipt":
+    """Partial update. Only updates provided (non-None) fields."""
+    receipt = await session.get(Receipt, receipt_id)
+    if receipt is None:
+        raise ValueError(f"Receipt {receipt_id} not found")
+    if title is not None:
+        receipt.title = title
+    if description is not None:
+        receipt.description = description
+    if amount_owed is not None:
+        receipt.amount_owed = amount_owed
+    if amount_paid is not None:
+        receipt.amount_paid = amount_paid
+    if due_date is not None:
+        receipt.due_date = due_date
+    if notes is not None:
+        receipt.notes = notes
+    if currency is not None:
+        receipt.currency = currency
+    await session.flush()
+    return receipt
+
+
+async def mark_receipt_paid(
+    session: AsyncSession,
+    receipt_id: int,
+    amount_paid: float | None = None,
+) -> "Receipt":
+    """Sets is_paid=True, paid_at=now(). Optionally records amount_paid."""
+    receipt = await session.get(Receipt, receipt_id)
+    if receipt is None:
+        raise ValueError(f"Receipt {receipt_id} not found")
+    receipt.is_paid = True
+    receipt.paid_at = datetime.now(tz=timezone.utc)
+    if amount_paid is not None:
+        receipt.amount_paid = amount_paid
+    await session.flush()
+    return receipt
+
+
+async def mark_receipt_unpaid(
+    session: AsyncSession,
+    receipt_id: int,
+) -> "Receipt":
+    """Reverses payment: is_paid=False, paid_at=None."""
+    receipt = await session.get(Receipt, receipt_id)
+    if receipt is None:
+        raise ValueError(f"Receipt {receipt_id} not found")
+    receipt.is_paid = False
+    receipt.paid_at = None
+    await session.flush()
+    return receipt
+
+
+async def delete_receipt(
+    session: AsyncSession,
+    receipt_id: int,
+) -> list[str]:
+    """
+    Deletes receipt row. DB cascades to ReceiptFile and TaggedReceipt rows.
+    Returns all storage_key paths of deleted ReceiptFiles so the caller can
+    remove the actual files from disk.
+    """
+    result = await session.execute(
+        select(ReceiptFile.storage_key).where(ReceiptFile.receipt_id == receipt_id)
+    )
+    storage_keys = list(result.scalars().all())
+
+    receipt = await session.get(Receipt, receipt_id)
+    if receipt is not None:
+        await session.delete(receipt)
+        await session.flush()
+    return storage_keys
+
+
+# ── ReceiptFile Methods ───────────────────────────────────────────────────────
+
+async def attach_file(
+    session: AsyncSession,
+    receipt_id: int,
+    storage_key: str,
+    original_filename: str,
+    content_type: str | None = None,
+    size_bytes: int | None = None,
+    sha256: str | None = None,
+) -> "ReceiptFile":
+    """
+    Inserts a ReceiptFile metadata row after the file has been written to disk.
+    storage_key must be globally unique (UNIQUE constraint in DB).
+    """
+    file_record = ReceiptFile(
+        receipt_id=receipt_id,
+        storage_key=storage_key,
+        original_filename=original_filename,
+        content_type=content_type,
+        size_bytes=size_bytes,
+        sha256=sha256,
+    )
+    session.add(file_record)
+    await session.flush()
+    return file_record
+
+
+async def get_file_by_id(
+    session: AsyncSession,
+    file_id: int,
+) -> "ReceiptFile | None":
+    return await session.get(ReceiptFile, file_id)
+
+
+async def list_files_for_receipt(
+    session: AsyncSession,
+    receipt_id: int,
+) -> "list[ReceiptFile]":
+    result = await session.execute(
+        select(ReceiptFile).where(ReceiptFile.receipt_id == receipt_id)
+    )
+    return list(result.scalars().all())
+
+
+async def delete_file_record(
+    session: AsyncSession,
+    file_id: int,
+) -> str:
+    """
+    Deletes the DB row. Returns storage_key so the caller can delete the
+    actual file from disk (e.g. os.remove / aiofiles).
+    """
+    file_record = await session.get(ReceiptFile, file_id)
+    if file_record is None:
+        raise ValueError(f"ReceiptFile {file_id} not found")
+    storage_key = file_record.storage_key
+    await session.delete(file_record)
+    await session.flush()
+    return storage_key
+
+
+async def get_file_by_storage_key(
+    session: AsyncSession,
+    storage_key: str,
+) -> "ReceiptFile | None":
+    """Deduplication check before writing a file to disk."""
+    result = await session.execute(
+        select(ReceiptFile).where(ReceiptFile.storage_key == storage_key)
+    )
+    return result.scalar_one_or_none()
+
+
+# ── Tag Methods ───────────────────────────────────────────────────────────────
+
+async def get_or_create_tag(
+    session: AsyncSession,
+    text: str,
+    icon: str,
+    color: str,
+) -> "TagIndex":
+    """
+    `text` is UNIQUE + indexed. Returns existing tag if text already exists.
+    icon/color are only applied on creation, not on lookup.
+    """
+    result = await session.execute(select(TagIndex).where(TagIndex.text == text))
+    tag = result.scalar_one_or_none()
+    if tag is None:
+        tag = TagIndex(text=text, icon=icon, color=color)
+        session.add(tag)
+        await session.flush()
+    return tag
+
+
+async def get_tag_by_id(session: AsyncSession, tag_id: int) -> "TagIndex | None":
+    return await session.get(TagIndex, tag_id)
+
+
+async def get_tag_by_text(session: AsyncSession, text: str) -> "TagIndex | None":
+    result = await session.execute(select(TagIndex).where(TagIndex.text == text))
+    return result.scalar_one_or_none()
+
+
+async def list_all_tags(session: AsyncSession) -> "list[TagIndex]":
+    result = await session.execute(select(TagIndex))
+    return list(result.scalars().all())
+
+
+async def update_tag(
+    session: AsyncSession,
+    tag_id: int,
+    icon: str | None = None,
+    color: str | None = None,
+) -> "TagIndex":
+    """
+    Updates icon and/or color. `text` is intentionally NOT updatable
+    because it is the unique business key referenced by the UI.
+    """
+    tag = await session.get(TagIndex, tag_id)
+    if tag is None:
+        raise ValueError(f"TagIndex {tag_id} not found")
+    if icon is not None:
+        tag.icon = icon
+    if color is not None:
+        tag.color = color
+    await session.flush()
+    return tag
+
+
+async def delete_tag(session: AsyncSession, tag_id: int) -> None:
+    """Cascades to all TaggedReceipt rows for this tag."""
+    tag = await session.get(TagIndex, tag_id)
+    if tag is not None:
+        await session.delete(tag)
+        await session.flush()
+
+
+# ── TaggedReceipt Methods ─────────────────────────────────────────────────────
+
+async def tag_receipt(
+    session: AsyncSession,
+    receipt_id: int,
+    tag_id: int,
+) -> "TaggedReceipt":
+    """
+    Inserts association row. If the (receipt_id, tag_id) pair already exists
+    (UniqueConstraint), return the existing row instead of raising.
+    """
+    result = await session.execute(
+        select(TaggedReceipt).where(
+            TaggedReceipt.receipt_id == receipt_id,
+            TaggedReceipt.tag_id == tag_id,
+        )
+    )
+    existing = result.scalar_one_or_none()
+    if existing is not None:
+        return existing
+    tagged = TaggedReceipt(receipt_id=receipt_id, tag_id=tag_id)
+    session.add(tagged)
+    await session.flush()
+    return tagged
+
+
+async def untag_receipt(
+    session: AsyncSession,
+    receipt_id: int,
+    tag_id: int,
+) -> None:
+    result = await session.execute(
+        select(TaggedReceipt).where(
+            TaggedReceipt.receipt_id == receipt_id,
+            TaggedReceipt.tag_id == tag_id,
+        )
+    )
+    tagged = result.scalar_one_or_none()
+    if tagged is not None:
+        await session.delete(tagged)
+        await session.flush()
+
+
+async def set_receipt_tags(
+    session: AsyncSession,
+    receipt_id: int,
+    tag_ids: list[int],
+) -> None:
+    """
+    Atomic full replace: removes tags not in tag_ids, adds missing ones.
+    Preferred over calling tag_receipt/untag_receipt individually for bulk edits.
+    """
+    result = await session.execute(
+        select(TaggedReceipt).where(TaggedReceipt.receipt_id == receipt_id)
+    )
+    existing = {tr.tag_id: tr for tr in result.scalars().all()}
+    desired = set(tag_ids)
+
+    # Remove stale
+    for tag_id, tr in existing.items():
+        if tag_id not in desired:
+            await session.delete(tr)
+
+    # Add missing
+    for tag_id in desired:
+        if tag_id not in existing:
+            session.add(TaggedReceipt(receipt_id=receipt_id, tag_id=tag_id))
+
+    await session.flush()
+
+
+# ── DB Lifecycle & Utilities ──────────────────────────────────────────────────
+
 async def create_db_and_tables() -> None:
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-        await conn.run_sync(Base.metadata.create_all)
+    """
+    Creates all tables if they do not exist.
+    WARNING: The current implementation also calls drop_all — remove drop_all
+    before production use. Only call create_all in normal startup.
+    """
+    if __name__ == "__main__":
+        if input("Drop and recreate database? (y/n): ").lower() == "y":
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.drop_all)
+                await conn.run_sync(Base.metadata.create_all)
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
+    """FastAPI dependency. Use via Depends(get_session)."""
     async with async_session_maker() as session:
         yield session
+
+
+async def check_db_connection() -> bool:
+    """Executes SELECT 1. Returns True on success. Use for /health endpoint."""
+    from sqlalchemy import text
+    try:
+        async with async_session_maker() as session:
+            await session.execute(text("SELECT 1"))
+        return True
+    except Exception:
+        return False
 
 
 if __name__ == "__main__":
