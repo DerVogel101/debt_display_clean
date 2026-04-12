@@ -1,0 +1,14 @@
+[project]
+name = "debt-display"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.14"
+dependencies = [
+    "aiosqlite>=0.22.1",
+    "fastapi>=0.135.3",
+    "protobuf>=7.34.1",
+    "pydantic>=2.12.5",
+    "pydantic-settings>=2.13.1",
+    "pyjwt>=2.12.1",
+    "sqlalchemy>=2.0.49",
+]
