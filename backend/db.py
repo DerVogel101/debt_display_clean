@@ -396,14 +396,16 @@ async def add_member_to_recipient(
 
 
 async def remove_member_from_recipient(
-    session: AsyncSession,
-    recipient_id: int,
-    user_id: int,
+        session: AsyncSession,
+        recipient_id: int,
+        user_id: int,
 ) -> None:
     recipient = await get_recipient_by_id(session, recipient_id)
     if recipient is None:
         raise ValueError(f"Recipient {recipient_id} not found")
-    recipient.members = [m for m in recipient.members if m.id != user_id]
+    user = await session.get(User, user_id)
+    if user is not None and user in recipient.members:
+        recipient.members.remove(user)
     await session.flush()
 
 
@@ -644,7 +646,7 @@ async def delete_file_record(
     file_record = await session.get(ReceiptFile, file_id)
     if file_record is None:
         raise ValueError(f"ReceiptFile {file_id} not found")
-    storage_key = file_record.storage_key
+    storage_key: str = str(file_record.storage_key)  # unwrap Mapped[str]
     await session.delete(file_record)
     await session.flush()
     return storage_key
@@ -806,7 +808,7 @@ async def create_db_and_tables() -> None:
     """
     if __name__ == "__main__":
         if input("Drop and recreate database? (y/n): ").lower() == "y":
-            async with engine.begin() as conn:
+            async with engine.begin() as conn:  # type: ignore[arg-type]
                 await conn.run_sync(Base.metadata.drop_all)
                 await conn.run_sync(Base.metadata.create_all)
 
