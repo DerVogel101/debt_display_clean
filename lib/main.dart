@@ -83,6 +83,7 @@ class _MainViewState extends State<MainView> {
   Future<void> _login() async {
     await auth0Service.auth0Web.loginWithRedirect(
       redirectUrl: AppConfig.frontendUrl,
+      audience: AppConfig.auth0Audience.isNotEmpty ? AppConfig.auth0Audience : null,
     );
   }
 

@@ -10,9 +10,14 @@ proto:
 dev-backend:
 	cd backend && python main.py
 
-# Flutter web dev server on :3000, pointing at backend :3300
-# BACKEND_URL and FRONTEND_URL are passed as Dart compile-time constants.
+# Flutter web dev server on :3000, pointing at backend :3300.
+# AUTH0_* values must match your Auth0 Dashboard + backend .env.
+# AUTH0_AUDIENCE must be the API identifier (e.g. https://debt-display-api);
+# without it Auth0 issues opaque tokens that the backend cannot verify.
 dev-flutter:
 	flutter run -d chrome --web-port=3000 \
 		--dart-define=BACKEND_URL=http://localhost:3300 \
-		--dart-define=FRONTEND_URL=http://localhost:3000
+		--dart-define=FRONTEND_URL=http://localhost:3000 \
+		--dart-define=AUTH0_DOMAIN=$(AUTH0_DOMAIN) \
+		--dart-define=AUTH0_CLIENT_ID=$(AUTH0_CLIENT_ID) \
+		--dart-define=AUTH0_AUDIENCE=$(AUTH0_AUDIENCE)
