@@ -46,7 +46,9 @@ class _MainViewState extends State<MainView> {
 
   Future<void> _handleAuthCallback() async {
     try {
-      final credentials = await auth0Service.auth0Web.onLoad();
+      final credentials = await auth0Service.auth0Web.onLoad(
+        audience: AppConfig.auth0Audience.isNotEmpty ? AppConfig.auth0Audience : null,
+      );
       if (credentials != null) {
         // Sync user with backend via Protobuf
         final backendResp = await AuthBackendService().login(
