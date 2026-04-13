@@ -21,8 +21,6 @@ app.add_middleware(
     allow_headers=["Content-Type", "Authorization"],
 )
 
-app.mount("/", StaticFiles(directory="web/", html=True), name="frontend")
-
 api_app = FastAPI(title="api")
 
 
@@ -92,7 +90,10 @@ async def verify(request: Request) -> ProtobufResponse:
     return ProtobufResponse(content=resp.SerializeToString())
 
 
+# API must be mounted before the catch-all static mount — Starlette matches
+# mounts in registration order, so "/" would swallow "/api/*" if first.
 app.mount("/api", api_app)
+app.mount("/", StaticFiles(directory="web/", html=True), name="frontend")
 
 if __name__ == "__main__":
     uvicorn.run(app, host=settings.BACKEND_HOST, port=settings.BACKEND_PORT)
