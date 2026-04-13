@@ -1,35 +1,40 @@
+// This is a generated file - do not edit.
 //
-//  Generated code. Do not modify.
-//  source: auth.proto
-//
-// @dart = 2.12
+// Generated from auth.proto.
+
+// @dart = 3.3
 
 // ignore_for_file: annotate_overrides, camel_case_types, comment_references
-// ignore_for_file: constant_identifier_names, library_prefixes
-// ignore_for_file: non_constant_identifier_names, prefer_final_fields
-// ignore_for_file: unnecessary_import, unnecessary_this, unused_import
+// ignore_for_file: constant_identifier_names
+// ignore_for_file: curly_braces_in_flow_control_structures
+// ignore_for_file: deprecated_member_use_from_same_package, library_prefixes
+// ignore_for_file: non_constant_identifier_names, prefer_relative_imports
 
 import 'dart:core' as $core;
 
+import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
+export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
+
+/// Dart → Backend on login
 class LoginRequest extends $pb.GeneratedMessage {
   factory LoginRequest({
     $core.String? accessToken,
   }) {
-    final $result = create();
-    if (accessToken != null) {
-      $result.accessToken = accessToken;
-    }
-    return $result;
+    final result = create();
+    if (accessToken != null) result.accessToken = accessToken;
+    return result;
   }
-  LoginRequest._() : super();
-  factory LoginRequest.fromBuffer($core.List<$core.int> i,
-          [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(i, r);
-  factory LoginRequest.fromJson($core.String i,
-          [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(i, r);
+
+  LoginRequest._();
+
+  factory LoginRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory LoginRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'LoginRequest',
@@ -38,24 +43,20 @@ class LoginRequest extends $pb.GeneratedMessage {
     ..aOS(1, _omitFieldNames ? '' : 'accessToken')
     ..hasRequiredFields = false;
 
-  @$core.Deprecated('Using this can add significant overhead to your binary. '
-      'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
-      'Will be removed in next major version')
-  LoginRequest clone() => LoginRequest()..mergeFromMessage(this);
-  @$core.Deprecated('Using this can add significant overhead to your binary. '
-      'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
-      'Will be removed in next major version')
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LoginRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
   LoginRequest copyWith(void Function(LoginRequest) updates) =>
       super.copyWith((message) => updates(message as LoginRequest))
           as LoginRequest;
 
+  @$core.override
   $pb.BuilderInfo get info_ => _i;
 
   @$core.pragma('dart2js:noInline')
   static LoginRequest create() => LoginRequest._();
+  @$core.override
   LoginRequest createEmptyInstance() => create();
-  static $pb.PbList<LoginRequest> createRepeated() =>
-      $pb.PbList<LoginRequest>();
   @$core.pragma('dart2js:noInline')
   static LoginRequest getDefault() => _defaultInstance ??=
       $pb.GeneratedMessage.$_defaultFor<LoginRequest>(create);
@@ -64,16 +65,14 @@ class LoginRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   $core.String get accessToken => $_getSZ(0);
   @$pb.TagNumber(1)
-  set accessToken($core.String v) {
-    $_setString(0, v);
-  }
-
+  set accessToken($core.String value) => $_setString(0, value);
   @$pb.TagNumber(1)
   $core.bool hasAccessToken() => $_has(0);
   @$pb.TagNumber(1)
-  void clearAccessToken() => clearField(1);
+  void clearAccessToken() => $_clearField(1);
 }
 
+/// Backend → Dart on login
 class LoginResponse extends $pb.GeneratedMessage {
   factory LoginResponse({
     $core.bool? success,
@@ -82,31 +81,23 @@ class LoginResponse extends $pb.GeneratedMessage {
     $core.String? email,
     $core.String? message,
   }) {
-    final $result = create();
-    if (success != null) {
-      $result.success = success;
-    }
-    if (userId != null) {
-      $result.userId = userId;
-    }
-    if (auth0Sub != null) {
-      $result.auth0Sub = auth0Sub;
-    }
-    if (email != null) {
-      $result.email = email;
-    }
-    if (message != null) {
-      $result.message = message;
-    }
-    return $result;
+    final result = create();
+    if (success != null) result.success = success;
+    if (userId != null) result.userId = userId;
+    if (auth0Sub != null) result.auth0Sub = auth0Sub;
+    if (email != null) result.email = email;
+    if (message != null) result.message = message;
+    return result;
   }
-  LoginResponse._() : super();
-  factory LoginResponse.fromBuffer($core.List<$core.int> i,
-          [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(i, r);
-  factory LoginResponse.fromJson($core.String i,
-          [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(i, r);
+
+  LoginResponse._();
+
+  factory LoginResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory LoginResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'LoginResponse',
@@ -119,24 +110,20 @@ class LoginResponse extends $pb.GeneratedMessage {
     ..aOS(5, _omitFieldNames ? '' : 'message')
     ..hasRequiredFields = false;
 
-  @$core.Deprecated('Using this can add significant overhead to your binary. '
-      'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
-      'Will be removed in next major version')
-  LoginResponse clone() => LoginResponse()..mergeFromMessage(this);
-  @$core.Deprecated('Using this can add significant overhead to your binary. '
-      'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
-      'Will be removed in next major version')
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LoginResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
   LoginResponse copyWith(void Function(LoginResponse) updates) =>
       super.copyWith((message) => updates(message as LoginResponse))
           as LoginResponse;
 
+  @$core.override
   $pb.BuilderInfo get info_ => _i;
 
   @$core.pragma('dart2js:noInline')
   static LoginResponse create() => LoginResponse._();
+  @$core.override
   LoginResponse createEmptyInstance() => create();
-  static $pb.PbList<LoginResponse> createRepeated() =>
-      $pb.PbList<LoginResponse>();
   @$core.pragma('dart2js:noInline')
   static LoginResponse getDefault() => _defaultInstance ??=
       $pb.GeneratedMessage.$_defaultFor<LoginResponse>(create);
@@ -145,81 +132,67 @@ class LoginResponse extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   $core.bool get success => $_getBF(0);
   @$pb.TagNumber(1)
-  set success($core.bool v) {
-    $_setBool(0, v);
-  }
-
+  set success($core.bool value) => $_setBool(0, value);
   @$pb.TagNumber(1)
   $core.bool hasSuccess() => $_has(0);
   @$pb.TagNumber(1)
-  void clearSuccess() => clearField(1);
+  void clearSuccess() => $_clearField(1);
 
   @$pb.TagNumber(2)
   $core.String get userId => $_getSZ(1);
   @$pb.TagNumber(2)
-  set userId($core.String v) {
-    $_setString(1, v);
-  }
-
+  set userId($core.String value) => $_setString(1, value);
   @$pb.TagNumber(2)
   $core.bool hasUserId() => $_has(1);
   @$pb.TagNumber(2)
-  void clearUserId() => clearField(2);
+  void clearUserId() => $_clearField(2);
 
   @$pb.TagNumber(3)
   $core.String get auth0Sub => $_getSZ(2);
   @$pb.TagNumber(3)
-  set auth0Sub($core.String v) {
-    $_setString(2, v);
-  }
-
+  set auth0Sub($core.String value) => $_setString(2, value);
   @$pb.TagNumber(3)
   $core.bool hasAuth0Sub() => $_has(2);
   @$pb.TagNumber(3)
-  void clearAuth0Sub() => clearField(3);
+  void clearAuth0Sub() => $_clearField(3);
 
   @$pb.TagNumber(4)
   $core.String get email => $_getSZ(3);
   @$pb.TagNumber(4)
-  set email($core.String v) {
-    $_setString(3, v);
-  }
-
+  set email($core.String value) => $_setString(3, value);
   @$pb.TagNumber(4)
   $core.bool hasEmail() => $_has(3);
   @$pb.TagNumber(4)
-  void clearEmail() => clearField(4);
+  void clearEmail() => $_clearField(4);
 
   @$pb.TagNumber(5)
   $core.String get message => $_getSZ(4);
   @$pb.TagNumber(5)
-  set message($core.String v) {
-    $_setString(4, v);
-  }
-
+  set message($core.String value) => $_setString(4, value);
   @$pb.TagNumber(5)
   $core.bool hasMessage() => $_has(4);
   @$pb.TagNumber(5)
-  void clearMessage() => clearField(5);
+  void clearMessage() => $_clearField(5);
 }
 
+/// Dart → Backend to verify a stored token
 class TokenVerifyRequest extends $pb.GeneratedMessage {
   factory TokenVerifyRequest({
     $core.String? accessToken,
   }) {
-    final $result = create();
-    if (accessToken != null) {
-      $result.accessToken = accessToken;
-    }
-    return $result;
+    final result = create();
+    if (accessToken != null) result.accessToken = accessToken;
+    return result;
   }
-  TokenVerifyRequest._() : super();
-  factory TokenVerifyRequest.fromBuffer($core.List<$core.int> i,
-          [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(i, r);
-  factory TokenVerifyRequest.fromJson($core.String i,
-          [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(i, r);
+
+  TokenVerifyRequest._();
+
+  factory TokenVerifyRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory TokenVerifyRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'TokenVerifyRequest',
@@ -228,24 +201,20 @@ class TokenVerifyRequest extends $pb.GeneratedMessage {
     ..aOS(1, _omitFieldNames ? '' : 'accessToken')
     ..hasRequiredFields = false;
 
-  @$core.Deprecated('Using this can add significant overhead to your binary. '
-      'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
-      'Will be removed in next major version')
-  TokenVerifyRequest clone() => TokenVerifyRequest()..mergeFromMessage(this);
-  @$core.Deprecated('Using this can add significant overhead to your binary. '
-      'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
-      'Will be removed in next major version')
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TokenVerifyRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
   TokenVerifyRequest copyWith(void Function(TokenVerifyRequest) updates) =>
       super.copyWith((message) => updates(message as TokenVerifyRequest))
           as TokenVerifyRequest;
 
+  @$core.override
   $pb.BuilderInfo get info_ => _i;
 
   @$core.pragma('dart2js:noInline')
   static TokenVerifyRequest create() => TokenVerifyRequest._();
+  @$core.override
   TokenVerifyRequest createEmptyInstance() => create();
-  static $pb.PbList<TokenVerifyRequest> createRepeated() =>
-      $pb.PbList<TokenVerifyRequest>();
   @$core.pragma('dart2js:noInline')
   static TokenVerifyRequest getDefault() => _defaultInstance ??=
       $pb.GeneratedMessage.$_defaultFor<TokenVerifyRequest>(create);
@@ -254,49 +223,39 @@ class TokenVerifyRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   $core.String get accessToken => $_getSZ(0);
   @$pb.TagNumber(1)
-  set accessToken($core.String v) {
-    $_setString(0, v);
-  }
-
+  set accessToken($core.String value) => $_setString(0, value);
   @$pb.TagNumber(1)
   $core.bool hasAccessToken() => $_has(0);
   @$pb.TagNumber(1)
-  void clearAccessToken() => clearField(1);
+  void clearAccessToken() => $_clearField(1);
 }
 
+/// Backend → Dart on verify
 class TokenVerifyResponse extends $pb.GeneratedMessage {
   factory TokenVerifyResponse({
     $core.bool? valid,
     $core.String? auth0Sub,
     $core.String? email,
-    $core.int? expiresAt,
+    $fixnum.Int64? expiresAt,
     $core.String? message,
   }) {
-    final $result = create();
-    if (valid != null) {
-      $result.valid = valid;
-    }
-    if (auth0Sub != null) {
-      $result.auth0Sub = auth0Sub;
-    }
-    if (email != null) {
-      $result.email = email;
-    }
-    if (expiresAt != null) {
-      $result.expiresAt = expiresAt;
-    }
-    if (message != null) {
-      $result.message = message;
-    }
-    return $result;
+    final result = create();
+    if (valid != null) result.valid = valid;
+    if (auth0Sub != null) result.auth0Sub = auth0Sub;
+    if (email != null) result.email = email;
+    if (expiresAt != null) result.expiresAt = expiresAt;
+    if (message != null) result.message = message;
+    return result;
   }
-  TokenVerifyResponse._() : super();
-  factory TokenVerifyResponse.fromBuffer($core.List<$core.int> i,
-          [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(i, r);
-  factory TokenVerifyResponse.fromJson($core.String i,
-          [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(i, r);
+
+  TokenVerifyResponse._();
+
+  factory TokenVerifyResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory TokenVerifyResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'TokenVerifyResponse',
@@ -309,25 +268,20 @@ class TokenVerifyResponse extends $pb.GeneratedMessage {
     ..aOS(5, _omitFieldNames ? '' : 'message')
     ..hasRequiredFields = false;
 
-  @$core.Deprecated('Using this can add significant overhead to your binary. '
-      'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
-      'Will be removed in next major version')
-  TokenVerifyResponse clone() =>
-      TokenVerifyResponse()..mergeFromMessage(this);
-  @$core.Deprecated('Using this can add significant overhead to your binary. '
-      'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
-      'Will be removed in next major version')
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TokenVerifyResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
   TokenVerifyResponse copyWith(void Function(TokenVerifyResponse) updates) =>
       super.copyWith((message) => updates(message as TokenVerifyResponse))
           as TokenVerifyResponse;
 
+  @$core.override
   $pb.BuilderInfo get info_ => _i;
 
   @$core.pragma('dart2js:noInline')
   static TokenVerifyResponse create() => TokenVerifyResponse._();
+  @$core.override
   TokenVerifyResponse createEmptyInstance() => create();
-  static $pb.PbList<TokenVerifyResponse> createRepeated() =>
-      $pb.PbList<TokenVerifyResponse>();
   @$core.pragma('dart2js:noInline')
   static TokenVerifyResponse getDefault() => _defaultInstance ??=
       $pb.GeneratedMessage.$_defaultFor<TokenVerifyResponse>(create);
@@ -336,64 +290,50 @@ class TokenVerifyResponse extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   $core.bool get valid => $_getBF(0);
   @$pb.TagNumber(1)
-  set valid($core.bool v) {
-    $_setBool(0, v);
-  }
-
+  set valid($core.bool value) => $_setBool(0, value);
   @$pb.TagNumber(1)
   $core.bool hasValid() => $_has(0);
   @$pb.TagNumber(1)
-  void clearValid() => clearField(1);
+  void clearValid() => $_clearField(1);
 
   @$pb.TagNumber(2)
   $core.String get auth0Sub => $_getSZ(1);
   @$pb.TagNumber(2)
-  set auth0Sub($core.String v) {
-    $_setString(1, v);
-  }
-
+  set auth0Sub($core.String value) => $_setString(1, value);
   @$pb.TagNumber(2)
   $core.bool hasAuth0Sub() => $_has(1);
   @$pb.TagNumber(2)
-  void clearAuth0Sub() => clearField(2);
+  void clearAuth0Sub() => $_clearField(2);
 
   @$pb.TagNumber(3)
   $core.String get email => $_getSZ(2);
   @$pb.TagNumber(3)
-  set email($core.String v) {
-    $_setString(2, v);
-  }
-
+  set email($core.String value) => $_setString(2, value);
   @$pb.TagNumber(3)
   $core.bool hasEmail() => $_has(2);
   @$pb.TagNumber(3)
-  void clearEmail() => clearField(3);
+  void clearEmail() => $_clearField(3);
 
   @$pb.TagNumber(4)
-  $core.int get expiresAt => $_getIZ(3);
+  $fixnum.Int64 get expiresAt => $_getI64(3);
   @$pb.TagNumber(4)
-  set expiresAt($core.int v) {
-    $_setSignedInt32(3, v);
-  }
-
+  set expiresAt($fixnum.Int64 value) => $_setInt64(3, value);
   @$pb.TagNumber(4)
   $core.bool hasExpiresAt() => $_has(3);
   @$pb.TagNumber(4)
-  void clearExpiresAt() => clearField(4);
+  void clearExpiresAt() => $_clearField(4);
 
   @$pb.TagNumber(5)
   $core.String get message => $_getSZ(4);
   @$pb.TagNumber(5)
-  set message($core.String v) {
-    $_setString(4, v);
-  }
-
+  set message($core.String value) => $_setString(4, value);
   @$pb.TagNumber(5)
   $core.bool hasMessage() => $_has(4);
   @$pb.TagNumber(5)
-  void clearMessage() => clearField(5);
+  void clearMessage() => $_clearField(5);
 }
 
-const _omitFieldNames = $core.bool.fromEnvironment('protobuf.omit_field_names');
-const _omitMessageNames =
+const $core.bool _omitFieldNames =
+    $core.bool.fromEnvironment('protobuf.omit_field_names');
+const $core.bool _omitMessageNames =
     $core.bool.fromEnvironment('protobuf.omit_message_names');

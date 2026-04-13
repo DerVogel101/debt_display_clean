@@ -48,8 +48,9 @@ class _MainViewState extends State<MainView> {
       final credentials = await auth0Service.auth0Web.onLoad();
       if (credentials != null) {
         // Sync user with backend via Protobuf
-        final backendResp =
-            await AuthBackendService().login(credentials.accessToken);
+        final backendResp = await AuthBackendService().login(
+          credentials.accessToken,
+        );
         if (!backendResp.success) {
           setState(() {
             _backendError = backendResp.message;
@@ -85,19 +86,13 @@ class _MainViewState extends State<MainView> {
   }
 
   Future<void> _logout() async {
-    await auth0Service.auth0Web.logout(
-      returnToUrl: 'http://localhost:3000',
-    );
+    await auth0Service.auth0Web.logout(returnToUrl: 'http://localhost:3000');
   }
 
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     if (_backendError != null) {
@@ -158,8 +153,12 @@ class _MainViewState extends State<MainView> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          _credentials != null ? Icons.check_circle : Icons.cancel,
-                          color: _credentials != null ? Colors.green : Colors.red,
+                          _credentials != null
+                              ? Icons.check_circle
+                              : Icons.cancel,
+                          color: _credentials != null
+                              ? Colors.green
+                              : Colors.red,
                         ),
                         const SizedBox(width: 8),
                         Text(
@@ -209,9 +208,8 @@ class _MainViewState extends State<MainView> {
                         const SizedBox(height: 8),
                         Text(
                           _credentials!.user.email ?? '',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.grey.shade600,
-                          ),
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(color: Colors.grey.shade600),
                         ),
                         const SizedBox(height: 24),
                         Row(
@@ -222,9 +220,8 @@ class _MainViewState extends State<MainView> {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) => ProfileView(
-                                      credentials: _credentials!,
-                                    ),
+                                    builder: (context) =>
+                                        ProfileView(credentials: _credentials!),
                                   ),
                                 );
                               },
@@ -318,10 +315,7 @@ class ProfileView extends StatelessWidget {
                   const SizedBox(height: 32),
                   const Text(
                     'Profile Information',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
                   const Divider(height: 24),
                   _buildInfoRow('Email', credentials.user.email ?? 'N/A'),
@@ -331,10 +325,7 @@ class ProfileView extends StatelessWidget {
                   const SizedBox(height: 24),
                   const Text(
                     'Raw User Object',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 12),
                   Container(

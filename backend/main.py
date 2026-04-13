@@ -4,10 +4,11 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
+import uvicorn
 
-from backend.auth import verify_token
-from backend.db import get_session, get_or_create_user
-from backend.proto import auth_pb2
+from auth import verify_token
+from db import get_session, get_or_create_user
+from proto import auth_pb2
 
 app = FastAPI(title="root")
 
@@ -96,3 +97,6 @@ async def verify(request: Request) -> ProtobufResponse:
 
 
 app.mount("/api", api_app)
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=3300)

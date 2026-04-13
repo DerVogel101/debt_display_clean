@@ -1,13 +1,15 @@
+// This is a generated file - do not edit.
 //
-//  Generated code. Do not modify.
-//  source: auth.proto
-//
-// @dart = 2.12
+// Generated from auth.proto.
+
+// @dart = 3.3
 
 // ignore_for_file: annotate_overrides, camel_case_types, comment_references
-// ignore_for_file: constant_identifier_names, library_prefixes
-// ignore_for_file: non_constant_identifier_names, prefer_final_fields
-// ignore_for_file: unnecessary_import, unnecessary_this, unused_import
+// ignore_for_file: constant_identifier_names
+// ignore_for_file: curly_braces_in_flow_control_structures
+// ignore_for_file: deprecated_member_use_from_same_package, library_prefixes
+// ignore_for_file: non_constant_identifier_names, prefer_relative_imports
+// ignore_for_file: unused_import
 
 import 'dart:convert' as $convert;
 import 'dart:core' as $core;
@@ -39,7 +41,9 @@ const LoginResponse$json = {
 
 /// Descriptor for `LoginResponse`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List loginResponseDescriptor = $convert.base64Decode(
-    'Cg1Mb2dpblJlc3BvbnNlEhgKB3N1Y2Nlc3MYASABKAhSB3N1Y2Nlc3MSFwoHdXNlcl9pZBgCIAEoCVIGdXNlcklkEhsKCWF1dGgwX3N1YhgDIAEoCVIIYXV0aDBTdWISFAoFZW1haWwYBCABKAlSBWVtYWlsEhgKB21lc3NhZ2UYBSABKAlSB21lc3NhZ2U=');
+    'Cg1Mb2dpblJlc3BvbnNlEhgKB3N1Y2Nlc3MYASABKAhSB3N1Y2Nlc3MSFwoHdXNlcl9pZBgCIA'
+    'EoCVIGdXNlcklkEhsKCWF1dGgwX3N1YhgDIAEoCVIIYXV0aDBTdWISFAoFZW1haWwYBCABKAlS'
+    'BWVtYWlsEhgKB21lc3NhZ2UYBSABKAlSB21lc3NhZ2U=');
 
 @$core.Deprecated('Use tokenVerifyRequestDescriptor instead')
 const TokenVerifyRequest$json = {
@@ -51,7 +55,8 @@ const TokenVerifyRequest$json = {
 
 /// Descriptor for `TokenVerifyRequest`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List tokenVerifyRequestDescriptor = $convert.base64Decode(
-    'ChJUb2tlblZlcmlmeVJlcXVlc3QSIQoMYWNjZXNzX3Rva2VuGAEgASgJUgthY2Nlc3NUb2tlbg==');
+    'ChJUb2tlblZlcmlmeVJlcXVlc3QSIQoMYWNjZXNzX3Rva2VuGAEgASgJUgthY2Nlc3NUb2tlbg'
+    '==');
 
 @$core.Deprecated('Use tokenVerifyResponseDescriptor instead')
 const TokenVerifyResponse$json = {
@@ -67,4 +72,6 @@ const TokenVerifyResponse$json = {
 
 /// Descriptor for `TokenVerifyResponse`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List tokenVerifyResponseDescriptor = $convert.base64Decode(
-    'ChNUb2tlblZlcmlmeVJlc3BvbnNlEhQKBXZhbGlkGAEgASgIUgV2YWxpZBIbCglhdXRoMF9zdWIYAiABKAlSCGF1dGgwU3ViEhQKBWVtYWlsGAMgASgJUgVlbWFpbBIdCgpleHBpcmVzX2F0GAQgASgDUglleHBpcmVzQXQSGAoHbWVzc2FnZRgFIAEoCVIHbWVzc2FnZQ==');
+    'ChNUb2tlblZlcmlmeVJlc3BvbnNlEhQKBXZhbGlkGAEgASgIUgV2YWxpZBIbCglhdXRoMF9zdW'
+    'IYAiABKAlSCGF1dGgwU3ViEhQKBWVtYWlsGAMgASgJUgVlbWFpbBIdCgpleHBpcmVzX2F0GAQg'
+    'ASgDUglleHBpcmVzQXQSGAoHbWVzc2FnZRgFIAEoCVIHbWVzc2FnZQ==');
