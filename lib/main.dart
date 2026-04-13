@@ -65,10 +65,16 @@ class _MainViewState extends State<MainView> {
         _isLoading = false;
       });
     } catch (e) {
+      final msg = e.toString();
+      // consent_required / login_required come from onLoad()'s silent iframe
+      // check when no valid session exists — not a real error, just means the
+      // user needs to log in interactively.
+      if (msg.contains('consent_required') || msg.contains('login_required')) {
+        setState(() => _isLoading = false);
+        return;
+      }
       print('Error handling auth callback: $e');
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() => _isLoading = false);
     }
   }
 
