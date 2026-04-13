@@ -2,6 +2,7 @@ import 'package:auth0_flutter/auth0_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:auth0_flutter/auth0_flutter_web.dart';
 import 'auth0_service.dart';
+import 'services/auth_backend_service.dart';
 
 void main() {
   runApp(const MyApp());
@@ -34,6 +35,7 @@ class _MainViewState extends State<MainView> {
   final auth0Service = Auth0Service();
   Credentials? _credentials;
   bool _isLoading = true;
+  String? _backendError;
 
   @override
   void initState() {
@@ -44,6 +46,18 @@ class _MainViewState extends State<MainView> {
   Future<void> _handleAuthCallback() async {
     try {
       final credentials = await auth0Service.auth0Web.onLoad();
+      if (credentials != null) {
+        // Sync user with backend via Protobuf
+        final backendResp =
+            await AuthBackendService().login(credentials.accessToken);
+        if (!backendResp.success) {
+          setState(() {
+            _backendError = backendResp.message;
+            _isLoading = false;
+          });
+          return;
+        }
+      }
       setState(() {
         _credentials = credentials;
         _isLoading = false;
@@ -54,6 +68,14 @@ class _MainViewState extends State<MainView> {
         _isLoading = false;
       });
     }
+  }
+
+  /// Returns true if [token] is cryptographically valid and not expired.
+  Future<bool> isTokenValid(String token) async {
+    final resp = await AuthBackendService().verifyToken(token);
+    final notExpired =
+        resp.expiresAt > DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    return resp.valid && notExpired;
   }
 
   Future<void> _login() async {
@@ -74,6 +96,17 @@ class _MainViewState extends State<MainView> {
       return const Scaffold(
         body: Center(
           child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    if (_backendError != null) {
+      return Scaffold(
+        body: Center(
+          child: Text(
+            'Backend authentication failed: $_backendError',
+            style: const TextStyle(color: Colors.red),
+          ),
         ),
       );
     }

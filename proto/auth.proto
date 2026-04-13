@@ -1,0 +1,30 @@
+syntax = "proto3";
+package auth;
+
+// Dart → Backend on login
+message LoginRequest {
+  string access_token = 1;
+}
+
+// Backend → Dart on login
+message LoginResponse {
+  bool   success   = 1;
+  string user_id   = 2;  // internal DB integer ID as string
+  string auth0_sub = 3;  // e.g. "google-oauth2|123456"
+  string email     = 4;
+  string message   = 5;  // error detail on failure
+}
+
+// Dart → Backend to verify a stored token
+message TokenVerifyRequest {
+  string access_token = 1;
+}
+
+// Backend → Dart on verify
+message TokenVerifyResponse {
+  bool   valid      = 1;
+  string auth0_sub  = 2;
+  string email      = 3;
+  int64  expires_at = 4;  // Unix timestamp
+  string message    = 5;
+}
