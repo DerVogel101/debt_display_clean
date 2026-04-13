@@ -7,19 +7,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import uvicorn
 
 from auth import verify_token
+from config import settings
 from db import get_session, get_or_create_user
 from proto import auth_pb2
 
 app = FastAPI(title="root")
 
-origins = [
-    "http://localhost",
-    "http://127.0.0.1",
-]
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=settings.allowed_origins_list,
     allow_credentials=True,
     allow_methods=["GET", "POST"],
     allow_headers=["Content-Type", "Authorization"],
@@ -99,4 +95,4 @@ async def verify(request: Request) -> ProtobufResponse:
 app.mount("/api", api_app)
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=3300)
+    uvicorn.run(app, host=settings.BACKEND_HOST, port=settings.BACKEND_PORT)

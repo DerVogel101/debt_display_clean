@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:debt_display/generated/auth.pb.dart';
+import 'package:debt_display/config/app_config.dart';
 
 class AuthBackendService {
   static final AuthBackendService _instance = AuthBackendService._internal();
@@ -9,7 +10,7 @@ class AuthBackendService {
 
   AuthBackendService._internal() {
     _dio = Dio(BaseOptions(
-      baseUrl: const String.fromEnvironment('BACKEND_URL', defaultValue: ''),
+      baseUrl: AppConfig.backendUrl,
       headers: {'Content-Type': 'application/x-protobuf'},
       responseType: ResponseType.bytes,
     ));

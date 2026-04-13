@@ -2,6 +2,7 @@ import 'package:auth0_flutter/auth0_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:auth0_flutter/auth0_flutter_web.dart';
 import 'auth0_service.dart';
+import 'config/app_config.dart';
 import 'services/auth_backend_service.dart';
 
 void main() {
@@ -81,12 +82,12 @@ class _MainViewState extends State<MainView> {
 
   Future<void> _login() async {
     await auth0Service.auth0Web.loginWithRedirect(
-      redirectUrl: 'http://localhost:3000',
+      redirectUrl: AppConfig.frontendUrl,
     );
   }
 
   Future<void> _logout() async {
-    await auth0Service.auth0Web.logout(returnToUrl: 'http://localhost:3000');
+    await auth0Service.auth0Web.logout(returnToUrl: AppConfig.frontendUrl);
   }
 
   @override
