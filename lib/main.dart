@@ -2,6 +2,8 @@ import 'package:auth0_flutter/auth0_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:auth0_flutter/auth0_flutter_web.dart';
 import 'auth0_service.dart';
+import 'config/app_config.dart';
+import 'services/auth_backend_service.dart';
 
 void main() {
   runApp(const MyApp());
@@ -34,6 +36,7 @@ class _MainViewState extends State<MainView> {
   final auth0Service = Auth0Service();
   Credentials? _credentials;
   bool _isLoading = true;
+  String? _backendError;
 
   @override
   void initState() {
@@ -43,37 +46,77 @@ class _MainViewState extends State<MainView> {
 
   Future<void> _handleAuthCallback() async {
     try {
-      final credentials = await auth0Service.auth0Web.onLoad();
+      final credentials = await auth0Service.auth0Web.onLoad(
+        audience: AppConfig.auth0Audience.isNotEmpty
+            ? AppConfig.auth0Audience
+            : null,
+      );
+      if (credentials != null) {
+        // Sync user with backend via Protobuf
+        final backendResp = await AuthBackendService().login(
+          credentials.accessToken,
+          email: credentials.user.email,
+          name: credentials.user.name,
+          avatarUrl: credentials.user.pictureUrl?.toString(),
+        );
+        if (!backendResp.success) {
+          setState(() {
+            _backendError = backendResp.message;
+            _isLoading = false;
+          });
+          return;
+        }
+      }
       setState(() {
         _credentials = credentials;
         _isLoading = false;
       });
     } catch (e) {
+      final msg = e.toString();
+      // consent_required / login_required come from onLoad()'s silent iframe
+      // check when no valid session exists — not a real error, just means the
+      // user needs to log in interactively.
+      if (msg.contains('consent_required') || msg.contains('login_required')) {
+        setState(() => _isLoading = false);
+        return;
+      }
       print('Error handling auth callback: $e');
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() => _isLoading = false);
     }
+  }
+
+  /// Returns true if [token] is cryptographically valid and not expired.
+  Future<bool> isTokenValid(String token) async {
+    final resp = await AuthBackendService().verifyToken(token);
+    final notExpired =
+        resp.expiresAt > DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    return resp.valid && notExpired;
   }
 
   Future<void> _login() async {
     await auth0Service.auth0Web.loginWithRedirect(
-      redirectUrl: 'http://localhost:3000',
+      redirectUrl: AppConfig.frontendUrl,
+      audience: AppConfig.auth0Audience.isNotEmpty ? AppConfig.auth0Audience : null,
     );
   }
 
   Future<void> _logout() async {
-    await auth0Service.auth0Web.logout(
-      returnToUrl: 'http://localhost:3000',
-    );
+    await auth0Service.auth0Web.logout(returnToUrl: AppConfig.frontendUrl);
   }
 
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    if (_backendError != null) {
+      return Scaffold(
         body: Center(
-          child: CircularProgressIndicator(),
+          child: Text(
+            'Backend authentication failed: $_backendError',
+            style: const TextStyle(color: Colors.red),
+          ),
         ),
       );
     }
@@ -125,8 +168,12 @@ class _MainViewState extends State<MainView> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          _credentials != null ? Icons.check_circle : Icons.cancel,
-                          color: _credentials != null ? Colors.green : Colors.red,
+                          _credentials != null
+                              ? Icons.check_circle
+                              : Icons.cancel,
+                          color: _credentials != null
+                              ? Colors.green
+                              : Colors.red,
                         ),
                         const SizedBox(width: 8),
                         Text(
@@ -176,9 +223,8 @@ class _MainViewState extends State<MainView> {
                         const SizedBox(height: 8),
                         Text(
                           _credentials!.user.email ?? '',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.grey.shade600,
-                          ),
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(color: Colors.grey.shade600),
                         ),
                         const SizedBox(height: 24),
                         Row(
@@ -189,9 +235,8 @@ class _MainViewState extends State<MainView> {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) => ProfileView(
-                                      credentials: _credentials!,
-                                    ),
+                                    builder: (context) =>
+                                        ProfileView(credentials: _credentials!),
                                   ),
                                 );
                               },
@@ -285,10 +330,7 @@ class ProfileView extends StatelessWidget {
                   const SizedBox(height: 32),
                   const Text(
                     'Profile Information',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
                   const Divider(height: 24),
                   _buildInfoRow('Email', credentials.user.email ?? 'N/A'),
@@ -298,10 +340,7 @@ class ProfileView extends StatelessWidget {
                   const SizedBox(height: 24),
                   const Text(
                     'Raw User Object',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 12),
                   Container(
