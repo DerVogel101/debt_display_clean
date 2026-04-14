@@ -4,6 +4,9 @@ package auth;
 // Dart → Backend on login
 message LoginRequest {
   string access_token = 1;
+  string email = 2;
+  string name = 3;
+  string avatar_url = 4;
 }
 
 // Backend → Dart on login

@@ -17,8 +17,17 @@ class AuthBackendService {
   }
 
   /// Call after a successful Auth0 login to register/sync the user in the DB.
-  Future<LoginResponse> login(String accessToken) async {
-    final req = LoginRequest()..accessToken = accessToken;
+  Future<LoginResponse> login(
+    String accessToken, {
+    String? email,
+    String? name,
+    String? avatarUrl,
+  }) async {
+    final req = LoginRequest()
+      ..accessToken = accessToken
+      ..email = email ?? ''
+      ..name = name ?? ''
+      ..avatarUrl = avatarUrl ?? '';
     final response = await _dio.post(
       '/api/auth/login',
       data: req.writeToBuffer(),
