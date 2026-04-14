@@ -101,17 +101,16 @@ const ReceiptFile$json = {
   '2': [
     {'1': 'id', '3': 1, '4': 1, '5': 3, '10': 'id'},
     {'1': 'receipt_id', '3': 2, '4': 1, '5': 3, '10': 'receiptId'},
-    {'1': 'storage_key', '3': 3, '4': 1, '5': 9, '10': 'storageKey'},
     {
       '1': 'original_filename',
-      '3': 4,
+      '3': 3,
       '4': 1,
       '5': 9,
       '10': 'originalFilename'
     },
     {
       '1': 'content_type',
-      '3': 5,
+      '3': 4,
       '4': 1,
       '5': 9,
       '9': 0,
@@ -120,15 +119,15 @@ const ReceiptFile$json = {
     },
     {
       '1': 'size_bytes',
-      '3': 6,
+      '3': 5,
       '4': 1,
       '5': 3,
       '9': 1,
       '10': 'sizeBytes',
       '17': true
     },
-    {'1': 'sha256', '3': 7, '4': 1, '5': 9, '9': 2, '10': 'sha256', '17': true},
-    {'1': 'created_at', '3': 8, '4': 1, '5': 9, '10': 'createdAt'},
+    {'1': 'sha256', '3': 6, '4': 1, '5': 9, '9': 2, '10': 'sha256', '17': true},
+    {'1': 'created_at', '3': 7, '4': 1, '5': 9, '10': 'createdAt'},
   ],
   '8': [
     {'1': '_content_type'},
@@ -140,11 +139,11 @@ const ReceiptFile$json = {
 /// Descriptor for `ReceiptFile`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List receiptFileDescriptor = $convert.base64Decode(
     'CgtSZWNlaXB0RmlsZRIOCgJpZBgBIAEoA1ICaWQSHQoKcmVjZWlwdF9pZBgCIAEoA1IJcmVjZW'
-    'lwdElkEh8KC3N0b3JhZ2Vfa2V5GAMgASgJUgpzdG9yYWdlS2V5EisKEW9yaWdpbmFsX2ZpbGVu'
-    'YW1lGAQgASgJUhBvcmlnaW5hbEZpbGVuYW1lEiYKDGNvbnRlbnRfdHlwZRgFIAEoCUgAUgtjb2'
-    '50ZW50VHlwZYgBARIiCgpzaXplX2J5dGVzGAYgASgDSAFSCXNpemVCeXRlc4gBARIbCgZzaGEy'
-    'NTYYByABKAlIAlIGc2hhMjU2iAEBEh0KCmNyZWF0ZWRfYXQYCCABKAlSCWNyZWF0ZWRBdEIPCg'
-    '1fY29udGVudF90eXBlQg0KC19zaXplX2J5dGVzQgkKB19zaGEyNTY=');
+    'lwdElkEisKEW9yaWdpbmFsX2ZpbGVuYW1lGAMgASgJUhBvcmlnaW5hbEZpbGVuYW1lEiYKDGNv'
+    'bnRlbnRfdHlwZRgEIAEoCUgAUgtjb250ZW50VHlwZYgBARIiCgpzaXplX2J5dGVzGAUgASgDSA'
+    'FSCXNpemVCeXRlc4gBARIbCgZzaGEyNTYYBiABKAlIAlIGc2hhMjU2iAEBEh0KCmNyZWF0ZWRf'
+    'YXQYByABKAlSCWNyZWF0ZWRBdEIPCg1fY29udGVudF90eXBlQg0KC19zaXplX2J5dGVzQgkKB1'
+    '9zaGEyNTY=');
 
 @$core.Deprecated('Use tagIndexDescriptor instead')
 const TagIndex$json = {
@@ -824,17 +823,16 @@ const ReceiptFileRequest$json = {
   '1': 'ReceiptFileRequest',
   '2': [
     {'1': 'receipt_id', '3': 1, '4': 1, '5': 3, '10': 'receiptId'},
-    {'1': 'storage_key', '3': 2, '4': 1, '5': 9, '10': 'storageKey'},
     {
       '1': 'original_filename',
-      '3': 3,
+      '3': 2,
       '4': 1,
       '5': 9,
       '10': 'originalFilename'
     },
     {
       '1': 'content_type',
-      '3': 4,
+      '3': 3,
       '4': 1,
       '5': 9,
       '9': 0,
@@ -843,14 +841,14 @@ const ReceiptFileRequest$json = {
     },
     {
       '1': 'size_bytes',
-      '3': 5,
+      '3': 4,
       '4': 1,
       '5': 3,
       '9': 1,
       '10': 'sizeBytes',
       '17': true
     },
-    {'1': 'sha256', '3': 6, '4': 1, '5': 9, '9': 2, '10': 'sha256', '17': true},
+    {'1': 'sha256', '3': 5, '4': 1, '5': 9, '9': 2, '10': 'sha256', '17': true},
   ],
   '8': [
     {'1': '_content_type'},
@@ -861,47 +859,23 @@ const ReceiptFileRequest$json = {
 
 /// Descriptor for `ReceiptFileRequest`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List receiptFileRequestDescriptor = $convert.base64Decode(
-    'ChJSZWNlaXB0RmlsZVJlcXVlc3QSHQoKcmVjZWlwdF9pZBgBIAEoA1IJcmVjZWlwdElkEh8KC3'
-    'N0b3JhZ2Vfa2V5GAIgASgJUgpzdG9yYWdlS2V5EisKEW9yaWdpbmFsX2ZpbGVuYW1lGAMgASgJ'
-    'UhBvcmlnaW5hbEZpbGVuYW1lEiYKDGNvbnRlbnRfdHlwZRgEIAEoCUgAUgtjb250ZW50VHlwZY'
-    'gBARIiCgpzaXplX2J5dGVzGAUgASgDSAFSCXNpemVCeXRlc4gBARIbCgZzaGEyNTYYBiABKAlI'
-    'AlIGc2hhMjU2iAEBQg8KDV9jb250ZW50X3R5cGVCDQoLX3NpemVfYnl0ZXNCCQoHX3NoYTI1Ng'
-    '==');
+    'ChJSZWNlaXB0RmlsZVJlcXVlc3QSHQoKcmVjZWlwdF9pZBgBIAEoA1IJcmVjZWlwdElkEisKEW'
+    '9yaWdpbmFsX2ZpbGVuYW1lGAIgASgJUhBvcmlnaW5hbEZpbGVuYW1lEiYKDGNvbnRlbnRfdHlw'
+    'ZRgDIAEoCUgAUgtjb250ZW50VHlwZYgBARIiCgpzaXplX2J5dGVzGAQgASgDSAFSCXNpemVCeX'
+    'Rlc4gBARIbCgZzaGEyNTYYBSABKAlIAlIGc2hhMjU2iAEBQg8KDV9jb250ZW50X3R5cGVCDQoL'
+    'X3NpemVfYnl0ZXNCCQoHX3NoYTI1Ng==');
 
 @$core.Deprecated('Use fileLookupRequestDescriptor instead')
 const FileLookupRequest$json = {
   '1': 'FileLookupRequest',
   '2': [
-    {
-      '1': 'file_id',
-      '3': 1,
-      '4': 1,
-      '5': 3,
-      '9': 0,
-      '10': 'fileId',
-      '17': true
-    },
-    {
-      '1': 'storage_key',
-      '3': 2,
-      '4': 1,
-      '5': 9,
-      '9': 1,
-      '10': 'storageKey',
-      '17': true
-    },
-  ],
-  '8': [
-    {'1': '_file_id'},
-    {'1': '_storage_key'},
+    {'1': 'file_id', '3': 1, '4': 1, '5': 3, '10': 'fileId'},
   ],
 };
 
 /// Descriptor for `FileLookupRequest`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List fileLookupRequestDescriptor = $convert.base64Decode(
-    'ChFGaWxlTG9va3VwUmVxdWVzdBIcCgdmaWxlX2lkGAEgASgDSABSBmZpbGVJZIgBARIkCgtzdG'
-    '9yYWdlX2tleRgCIAEoCUgBUgpzdG9yYWdlS2V5iAEBQgoKCF9maWxlX2lkQg4KDF9zdG9yYWdl'
-    'X2tleQ==');
+    'ChFGaWxlTG9va3VwUmVxdWVzdBIXCgdmaWxlX2lkGAEgASgDUgZmaWxlSWQ=');
 
 @$core.Deprecated('Use fileListRequestDescriptor instead')
 const FileListRequest$json = {

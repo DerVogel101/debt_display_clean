@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
 from pathlib import Path
+from uuid import uuid4
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import Response
@@ -14,7 +16,6 @@ from backend.db import (
     delete_recipient,
     delete_user,
     get_file_by_id,
-    get_file_by_storage_key,
     get_or_create_tag,
     get_or_create_user,
     get_recipient_by_id,
@@ -65,6 +66,44 @@ def _dt_to_proto(value: datetime | None) -> str:
 
 def _dt_from_proto(value: str | None) -> datetime | None:
     return None if not value else datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+def _upload_root() -> Path:
+    return Path(settings.UPLOAD_DIR).resolve()
+
+
+def _sanitize_filename(filename: str) -> str:
+    candidate = Path(filename).name.strip()
+    if not candidate:
+        candidate = "file"
+    sanitized = re.sub(r"[^A-Za-z0-9._-]+", "_", candidate).strip("._")
+    return sanitized or "file"
+
+
+def _build_storage_key(owner_id: int, receipt_id: int, original_filename: str) -> str:
+    safe_name = _sanitize_filename(original_filename)
+    suffix = Path(safe_name).suffix
+    generated_name = f"{uuid4().hex}{suffix}"
+    return Path(str(owner_id), str(receipt_id), generated_name).as_posix()
+
+
+def _resolve_managed_storage_path(storage_key: str) -> Path | None:
+    root = _upload_root()
+    candidate = Path(storage_key)
+    resolved = candidate.resolve() if candidate.is_absolute() else (root / candidate).resolve()
+    try:
+        resolved.relative_to(root)
+    except ValueError:
+        return None
+    return resolved
+
+
+def _delete_managed_file(storage_key: str) -> bool:
+    resolved = _resolve_managed_storage_path(storage_key)
+    if resolved is None:
+        return False
+    resolved.unlink(missing_ok=True)
+    return True
 
 
 def _has_field(message, field: str) -> bool:
@@ -125,7 +164,6 @@ def _file_to_pb(file_record) -> debt_pb2.ReceiptFile:
     msg = debt_pb2.ReceiptFile(
         id=file_record.id,
         receipt_id=file_record.receipt_id,
-        storage_key=file_record.storage_key,
         original_filename=file_record.original_filename,
         created_at=_dt_to_proto(file_record.created_at),
     )
@@ -223,14 +261,6 @@ async def _require_file_owner(session: AsyncSession, file_id: int, user_id: int)
     return file_record
 
 
-async def _require_file_owner_by_storage_key(session: AsyncSession, storage_key: str, user_id: int):
-    file_record = await get_file_by_storage_key(session, storage_key)
-    if file_record is None:
-        raise ValueError(f"ReceiptFile {storage_key} not found")
-    await _require_receipt_owner(session, file_record.receipt_id, user_id)
-    return file_record
-
-
 @api_app.post("/auth/login")
 async def login(request: Request, session: AsyncSession = Depends(get_session)) -> ProtobufResponse:
     body = await request.body()
@@ -323,7 +353,7 @@ async def delete_me(request: Request, session: AsyncSession = Depends(get_sessio
         storage_keys = await delete_user(session, user.id)
         await session.commit()
         for storage_key in storage_keys:
-            Path(storage_key).unlink(missing_ok=True)
+            _delete_managed_file(storage_key)
         return _pb_response(debt_pb2.ActionResponse(success=True, message="User deleted"))
     except Exception as exc:
         await session.rollback()
@@ -597,7 +627,7 @@ async def delete_receipt_route(request: Request, session: AsyncSession = Depends
         storage_keys = await delete_receipt(session, proto_req.receipt_id)
         await session.commit()
         for storage_key in storage_keys:
-            Path(storage_key).unlink(missing_ok=True)
+            _delete_managed_file(storage_key)
         return _pb_response(debt_pb2.ActionResponse(success=True, message="Receipt deleted"))
     except Exception as exc:
         await session.rollback()
@@ -611,15 +641,12 @@ async def attach_file_route(request: Request, session: AsyncSession = Depends(ge
     proto_req.ParseFromString(body)
     try:
         user = await _current_user(request, session)
-        await _require_receipt_owner(session, proto_req.receipt_id, user.id)
-        existing = await get_file_by_storage_key(session, proto_req.storage_key)
-        if existing is not None:
-            await session.commit()
-            return _pb_response(debt_pb2.FileResponse(success=True, file=_file_to_pb(existing)))
+        receipt = await _require_receipt_owner(session, proto_req.receipt_id, user.id)
+        storage_key = _build_storage_key(receipt.owner_id, receipt.id, proto_req.original_filename)
         file_record = await attach_file(
             session=session,
             receipt_id=proto_req.receipt_id,
-            storage_key=proto_req.storage_key,
+            storage_key=storage_key,
             original_filename=proto_req.original_filename,
             content_type=proto_req.content_type if _has_field(proto_req, "content_type") else None,
             size_bytes=proto_req.size_bytes if _has_field(proto_req, "size_bytes") else None,
@@ -639,12 +666,9 @@ async def get_file_route(request: Request, session: AsyncSession = Depends(get_s
     proto_req.ParseFromString(body)
     try:
         user = await _current_user(request, session)
-        if _has_field(proto_req, "file_id"):
-            file_record = await _require_file_owner(session, proto_req.file_id, user.id)
-        elif _has_field(proto_req, "storage_key"):
-            file_record = await _require_file_owner_by_storage_key(session, proto_req.storage_key, user.id)
-        else:
-            raise ValueError("file_id or storage_key required")
+        if proto_req.file_id <= 0:
+            raise ValueError("file_id required")
+        file_record = await _require_file_owner(session, proto_req.file_id, user.id)
         await session.commit()
         return _pb_response(debt_pb2.FileResponse(success=True, file=_file_to_pb(file_record)))
     except Exception as exc:
@@ -678,15 +702,12 @@ async def delete_file_route(request: Request, session: AsyncSession = Depends(ge
     proto_req.ParseFromString(body)
     try:
         user = await _current_user(request, session)
-        if _has_field(proto_req, "file_id"):
-            file_record = await _require_file_owner(session, proto_req.file_id, user.id)
-        elif _has_field(proto_req, "storage_key"):
-            file_record = await _require_file_owner_by_storage_key(session, proto_req.storage_key, user.id)
-        else:
-            raise ValueError("file_id or storage_key required")
+        if proto_req.file_id <= 0:
+            raise ValueError("file_id required")
+        file_record = await _require_file_owner(session, proto_req.file_id, user.id)
         storage_key = await delete_file_record(session, file_record.id)
         await session.commit()
-        Path(storage_key).unlink(missing_ok=True)
+        _delete_managed_file(storage_key)
         return _pb_response(debt_pb2.ActionResponse(success=True, message="File deleted"))
     except Exception as exc:
         await session.rollback()

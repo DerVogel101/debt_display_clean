@@ -57,13 +57,13 @@ Examples:
 
 ```powershell
 .venv\Scripts\Activate.ps1
-python main.py
+python -m backend.main
 ```
 
 or
 
 ```powershell
-uv run python main.py
+uv run python -m backend.main
 ```
 
 Do not assume global Python packages are installed. If a Python command depends on project packages, use the venv or `uv run`.

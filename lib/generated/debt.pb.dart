@@ -274,7 +274,6 @@ class ReceiptFile extends $pb.GeneratedMessage {
   factory ReceiptFile({
     $fixnum.Int64? id,
     $fixnum.Int64? receiptId,
-    $core.String? storageKey,
     $core.String? originalFilename,
     $core.String? contentType,
     $fixnum.Int64? sizeBytes,
@@ -284,7 +283,6 @@ class ReceiptFile extends $pb.GeneratedMessage {
     final result = create();
     if (id != null) result.id = id;
     if (receiptId != null) result.receiptId = receiptId;
-    if (storageKey != null) result.storageKey = storageKey;
     if (originalFilename != null) result.originalFilename = originalFilename;
     if (contentType != null) result.contentType = contentType;
     if (sizeBytes != null) result.sizeBytes = sizeBytes;
@@ -308,12 +306,11 @@ class ReceiptFile extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aInt64(1, _omitFieldNames ? '' : 'id')
     ..aInt64(2, _omitFieldNames ? '' : 'receiptId')
-    ..aOS(3, _omitFieldNames ? '' : 'storageKey')
-    ..aOS(4, _omitFieldNames ? '' : 'originalFilename')
-    ..aOS(5, _omitFieldNames ? '' : 'contentType')
-    ..aInt64(6, _omitFieldNames ? '' : 'sizeBytes')
-    ..aOS(7, _omitFieldNames ? '' : 'sha256')
-    ..aOS(8, _omitFieldNames ? '' : 'createdAt')
+    ..aOS(3, _omitFieldNames ? '' : 'originalFilename')
+    ..aOS(4, _omitFieldNames ? '' : 'contentType')
+    ..aInt64(5, _omitFieldNames ? '' : 'sizeBytes')
+    ..aOS(6, _omitFieldNames ? '' : 'sha256')
+    ..aOS(7, _omitFieldNames ? '' : 'createdAt')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -354,58 +351,49 @@ class ReceiptFile extends $pb.GeneratedMessage {
   void clearReceiptId() => $_clearField(2);
 
   @$pb.TagNumber(3)
-  $core.String get storageKey => $_getSZ(2);
+  $core.String get originalFilename => $_getSZ(2);
   @$pb.TagNumber(3)
-  set storageKey($core.String value) => $_setString(2, value);
+  set originalFilename($core.String value) => $_setString(2, value);
   @$pb.TagNumber(3)
-  $core.bool hasStorageKey() => $_has(2);
+  $core.bool hasOriginalFilename() => $_has(2);
   @$pb.TagNumber(3)
-  void clearStorageKey() => $_clearField(3);
+  void clearOriginalFilename() => $_clearField(3);
 
   @$pb.TagNumber(4)
-  $core.String get originalFilename => $_getSZ(3);
+  $core.String get contentType => $_getSZ(3);
   @$pb.TagNumber(4)
-  set originalFilename($core.String value) => $_setString(3, value);
+  set contentType($core.String value) => $_setString(3, value);
   @$pb.TagNumber(4)
-  $core.bool hasOriginalFilename() => $_has(3);
+  $core.bool hasContentType() => $_has(3);
   @$pb.TagNumber(4)
-  void clearOriginalFilename() => $_clearField(4);
+  void clearContentType() => $_clearField(4);
 
   @$pb.TagNumber(5)
-  $core.String get contentType => $_getSZ(4);
+  $fixnum.Int64 get sizeBytes => $_getI64(4);
   @$pb.TagNumber(5)
-  set contentType($core.String value) => $_setString(4, value);
+  set sizeBytes($fixnum.Int64 value) => $_setInt64(4, value);
   @$pb.TagNumber(5)
-  $core.bool hasContentType() => $_has(4);
+  $core.bool hasSizeBytes() => $_has(4);
   @$pb.TagNumber(5)
-  void clearContentType() => $_clearField(5);
+  void clearSizeBytes() => $_clearField(5);
 
   @$pb.TagNumber(6)
-  $fixnum.Int64 get sizeBytes => $_getI64(5);
+  $core.String get sha256 => $_getSZ(5);
   @$pb.TagNumber(6)
-  set sizeBytes($fixnum.Int64 value) => $_setInt64(5, value);
+  set sha256($core.String value) => $_setString(5, value);
   @$pb.TagNumber(6)
-  $core.bool hasSizeBytes() => $_has(5);
+  $core.bool hasSha256() => $_has(5);
   @$pb.TagNumber(6)
-  void clearSizeBytes() => $_clearField(6);
+  void clearSha256() => $_clearField(6);
 
   @$pb.TagNumber(7)
-  $core.String get sha256 => $_getSZ(6);
+  $core.String get createdAt => $_getSZ(6);
   @$pb.TagNumber(7)
-  set sha256($core.String value) => $_setString(6, value);
+  set createdAt($core.String value) => $_setString(6, value);
   @$pb.TagNumber(7)
-  $core.bool hasSha256() => $_has(6);
+  $core.bool hasCreatedAt() => $_has(6);
   @$pb.TagNumber(7)
-  void clearSha256() => $_clearField(7);
-
-  @$pb.TagNumber(8)
-  $core.String get createdAt => $_getSZ(7);
-  @$pb.TagNumber(8)
-  set createdAt($core.String value) => $_setString(7, value);
-  @$pb.TagNumber(8)
-  $core.bool hasCreatedAt() => $_has(7);
-  @$pb.TagNumber(8)
-  void clearCreatedAt() => $_clearField(8);
+  void clearCreatedAt() => $_clearField(7);
 }
 
 class TagIndex extends $pb.GeneratedMessage {
@@ -2406,7 +2394,6 @@ class MarkReceiptPaidRequest extends $pb.GeneratedMessage {
 class ReceiptFileRequest extends $pb.GeneratedMessage {
   factory ReceiptFileRequest({
     $fixnum.Int64? receiptId,
-    $core.String? storageKey,
     $core.String? originalFilename,
     $core.String? contentType,
     $fixnum.Int64? sizeBytes,
@@ -2414,7 +2401,6 @@ class ReceiptFileRequest extends $pb.GeneratedMessage {
   }) {
     final result = create();
     if (receiptId != null) result.receiptId = receiptId;
-    if (storageKey != null) result.storageKey = storageKey;
     if (originalFilename != null) result.originalFilename = originalFilename;
     if (contentType != null) result.contentType = contentType;
     if (sizeBytes != null) result.sizeBytes = sizeBytes;
@@ -2436,11 +2422,10 @@ class ReceiptFileRequest extends $pb.GeneratedMessage {
       package: const $pb.PackageName(_omitMessageNames ? '' : 'debt'),
       createEmptyInstance: create)
     ..aInt64(1, _omitFieldNames ? '' : 'receiptId')
-    ..aOS(2, _omitFieldNames ? '' : 'storageKey')
-    ..aOS(3, _omitFieldNames ? '' : 'originalFilename')
-    ..aOS(4, _omitFieldNames ? '' : 'contentType')
-    ..aInt64(5, _omitFieldNames ? '' : 'sizeBytes')
-    ..aOS(6, _omitFieldNames ? '' : 'sha256')
+    ..aOS(2, _omitFieldNames ? '' : 'originalFilename')
+    ..aOS(3, _omitFieldNames ? '' : 'contentType')
+    ..aInt64(4, _omitFieldNames ? '' : 'sizeBytes')
+    ..aOS(5, _omitFieldNames ? '' : 'sha256')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2472,59 +2457,48 @@ class ReceiptFileRequest extends $pb.GeneratedMessage {
   void clearReceiptId() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  $core.String get storageKey => $_getSZ(1);
+  $core.String get originalFilename => $_getSZ(1);
   @$pb.TagNumber(2)
-  set storageKey($core.String value) => $_setString(1, value);
+  set originalFilename($core.String value) => $_setString(1, value);
   @$pb.TagNumber(2)
-  $core.bool hasStorageKey() => $_has(1);
+  $core.bool hasOriginalFilename() => $_has(1);
   @$pb.TagNumber(2)
-  void clearStorageKey() => $_clearField(2);
+  void clearOriginalFilename() => $_clearField(2);
 
   @$pb.TagNumber(3)
-  $core.String get originalFilename => $_getSZ(2);
+  $core.String get contentType => $_getSZ(2);
   @$pb.TagNumber(3)
-  set originalFilename($core.String value) => $_setString(2, value);
+  set contentType($core.String value) => $_setString(2, value);
   @$pb.TagNumber(3)
-  $core.bool hasOriginalFilename() => $_has(2);
+  $core.bool hasContentType() => $_has(2);
   @$pb.TagNumber(3)
-  void clearOriginalFilename() => $_clearField(3);
+  void clearContentType() => $_clearField(3);
 
   @$pb.TagNumber(4)
-  $core.String get contentType => $_getSZ(3);
+  $fixnum.Int64 get sizeBytes => $_getI64(3);
   @$pb.TagNumber(4)
-  set contentType($core.String value) => $_setString(3, value);
+  set sizeBytes($fixnum.Int64 value) => $_setInt64(3, value);
   @$pb.TagNumber(4)
-  $core.bool hasContentType() => $_has(3);
+  $core.bool hasSizeBytes() => $_has(3);
   @$pb.TagNumber(4)
-  void clearContentType() => $_clearField(4);
+  void clearSizeBytes() => $_clearField(4);
 
   @$pb.TagNumber(5)
-  $fixnum.Int64 get sizeBytes => $_getI64(4);
+  $core.String get sha256 => $_getSZ(4);
   @$pb.TagNumber(5)
-  set sizeBytes($fixnum.Int64 value) => $_setInt64(4, value);
+  set sha256($core.String value) => $_setString(4, value);
   @$pb.TagNumber(5)
-  $core.bool hasSizeBytes() => $_has(4);
+  $core.bool hasSha256() => $_has(4);
   @$pb.TagNumber(5)
-  void clearSizeBytes() => $_clearField(5);
-
-  @$pb.TagNumber(6)
-  $core.String get sha256 => $_getSZ(5);
-  @$pb.TagNumber(6)
-  set sha256($core.String value) => $_setString(5, value);
-  @$pb.TagNumber(6)
-  $core.bool hasSha256() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearSha256() => $_clearField(6);
+  void clearSha256() => $_clearField(5);
 }
 
 class FileLookupRequest extends $pb.GeneratedMessage {
   factory FileLookupRequest({
     $fixnum.Int64? fileId,
-    $core.String? storageKey,
   }) {
     final result = create();
     if (fileId != null) result.fileId = fileId;
-    if (storageKey != null) result.storageKey = storageKey;
     return result;
   }
 
@@ -2542,7 +2516,6 @@ class FileLookupRequest extends $pb.GeneratedMessage {
       package: const $pb.PackageName(_omitMessageNames ? '' : 'debt'),
       createEmptyInstance: create)
     ..aInt64(1, _omitFieldNames ? '' : 'fileId')
-    ..aOS(2, _omitFieldNames ? '' : 'storageKey')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2572,15 +2545,6 @@ class FileLookupRequest extends $pb.GeneratedMessage {
   $core.bool hasFileId() => $_has(0);
   @$pb.TagNumber(1)
   void clearFileId() => $_clearField(1);
-
-  @$pb.TagNumber(2)
-  $core.String get storageKey => $_getSZ(1);
-  @$pb.TagNumber(2)
-  set storageKey($core.String value) => $_setString(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasStorageKey() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearStorageKey() => $_clearField(2);
 }
 
 class FileListRequest extends $pb.GeneratedMessage {

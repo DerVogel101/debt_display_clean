@@ -43,10 +43,9 @@ class Recipient(_message.Message):
     def __init__(self, id: _Optional[int] = ..., name: _Optional[str] = ..., owner_id: _Optional[int] = ..., description: _Optional[str] = ..., created_at: _Optional[str] = ..., members: _Optional[_Iterable[_Union[User, _Mapping]]] = ..., member_ids: _Optional[_Iterable[int]] = ...) -> None: ...
 
 class ReceiptFile(_message.Message):
-    __slots__ = ("id", "receipt_id", "storage_key", "original_filename", "content_type", "size_bytes", "sha256", "created_at")
+    __slots__ = ("id", "receipt_id", "original_filename", "content_type", "size_bytes", "sha256", "created_at")
     ID_FIELD_NUMBER: _ClassVar[int]
     RECEIPT_ID_FIELD_NUMBER: _ClassVar[int]
-    STORAGE_KEY_FIELD_NUMBER: _ClassVar[int]
     ORIGINAL_FILENAME_FIELD_NUMBER: _ClassVar[int]
     CONTENT_TYPE_FIELD_NUMBER: _ClassVar[int]
     SIZE_BYTES_FIELD_NUMBER: _ClassVar[int]
@@ -54,13 +53,12 @@ class ReceiptFile(_message.Message):
     CREATED_AT_FIELD_NUMBER: _ClassVar[int]
     id: int
     receipt_id: int
-    storage_key: str
     original_filename: str
     content_type: str
     size_bytes: int
     sha256: str
     created_at: str
-    def __init__(self, id: _Optional[int] = ..., receipt_id: _Optional[int] = ..., storage_key: _Optional[str] = ..., original_filename: _Optional[str] = ..., content_type: _Optional[str] = ..., size_bytes: _Optional[int] = ..., sha256: _Optional[str] = ..., created_at: _Optional[str] = ...) -> None: ...
+    def __init__(self, id: _Optional[int] = ..., receipt_id: _Optional[int] = ..., original_filename: _Optional[str] = ..., content_type: _Optional[str] = ..., size_bytes: _Optional[int] = ..., sha256: _Optional[str] = ..., created_at: _Optional[str] = ...) -> None: ...
 
 class TagIndex(_message.Message):
     __slots__ = ("id", "icon", "text", "color")
@@ -331,28 +329,24 @@ class MarkReceiptPaidRequest(_message.Message):
     def __init__(self, receipt_id: _Optional[int] = ..., amount_paid: _Optional[float] = ...) -> None: ...
 
 class ReceiptFileRequest(_message.Message):
-    __slots__ = ("receipt_id", "storage_key", "original_filename", "content_type", "size_bytes", "sha256")
+    __slots__ = ("receipt_id", "original_filename", "content_type", "size_bytes", "sha256")
     RECEIPT_ID_FIELD_NUMBER: _ClassVar[int]
-    STORAGE_KEY_FIELD_NUMBER: _ClassVar[int]
     ORIGINAL_FILENAME_FIELD_NUMBER: _ClassVar[int]
     CONTENT_TYPE_FIELD_NUMBER: _ClassVar[int]
     SIZE_BYTES_FIELD_NUMBER: _ClassVar[int]
     SHA256_FIELD_NUMBER: _ClassVar[int]
     receipt_id: int
-    storage_key: str
     original_filename: str
     content_type: str
     size_bytes: int
     sha256: str
-    def __init__(self, receipt_id: _Optional[int] = ..., storage_key: _Optional[str] = ..., original_filename: _Optional[str] = ..., content_type: _Optional[str] = ..., size_bytes: _Optional[int] = ..., sha256: _Optional[str] = ...) -> None: ...
+    def __init__(self, receipt_id: _Optional[int] = ..., original_filename: _Optional[str] = ..., content_type: _Optional[str] = ..., size_bytes: _Optional[int] = ..., sha256: _Optional[str] = ...) -> None: ...
 
 class FileLookupRequest(_message.Message):
-    __slots__ = ("file_id", "storage_key")
+    __slots__ = ("file_id",)
     FILE_ID_FIELD_NUMBER: _ClassVar[int]
-    STORAGE_KEY_FIELD_NUMBER: _ClassVar[int]
     file_id: int
-    storage_key: str
-    def __init__(self, file_id: _Optional[int] = ..., storage_key: _Optional[str] = ...) -> None: ...
+    def __init__(self, file_id: _Optional[int] = ...) -> None: ...
 
 class FileListRequest(_message.Message):
     __slots__ = ("receipt_id",)
