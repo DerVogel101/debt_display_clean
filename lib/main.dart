@@ -1,11 +1,13 @@
 import 'package:auth0_flutter/auth0_flutter.dart';
 import 'package:flutter/material.dart';
-import 'package:auth0_flutter/auth0_flutter_web.dart';
 import 'auth0_service.dart';
 import 'config/app_config.dart';
 import 'services/auth_backend_service.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await AppConfig.load();
+  await Auth0Service.init();
   runApp(const MyApp());
 }
 
@@ -34,6 +36,7 @@ class MainView extends StatefulWidget {
 
 class _MainViewState extends State<MainView> {
   final auth0Service = Auth0Service();
+  final authBackendService = AuthBackendService();
   Credentials? _credentials;
   bool _isLoading = true;
   String? _backendError;
@@ -52,14 +55,17 @@ class _MainViewState extends State<MainView> {
             : null,
       );
       if (credentials != null) {
-        // Sync user with backend via Protobuf
-        final backendResp = await AuthBackendService().login(
+        final backendResp = await authBackendService.login(
           credentials.accessToken,
           email: credentials.user.email,
           name: credentials.user.name,
           avatarUrl: credentials.user.pictureUrl?.toString(),
         );
         if (!backendResp.success) {
+          if (authBackendService.isExpiredTokenMessage(backendResp.message)) {
+            await _handleExpiredSession();
+            return;
+          }
           setState(() {
             _backendError = backendResp.message;
             _isLoading = false;
@@ -80,14 +86,38 @@ class _MainViewState extends State<MainView> {
         setState(() => _isLoading = false);
         return;
       }
-      print('Error handling auth callback: $e');
+      if (authBackendService.isExpiredTokenMessage(msg)) {
+        await _handleExpiredSession();
+        return;
+      }
+      debugPrint('Error handling auth callback: $e');
       setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _handleExpiredSession() async {
+    try {
+      await auth0Service.auth0Web.logout(returnToUrl: AppConfig.frontendUrl);
+      return;
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _credentials = null;
+        _backendError = 'Your session expired. Please log in again.';
+        _isLoading = false;
+      });
     }
   }
 
   /// Returns true if [token] is cryptographically valid and not expired.
   Future<bool> isTokenValid(String token) async {
-    final resp = await AuthBackendService().verifyToken(token);
+    final resp = await authBackendService.verifyToken(token);
+    if (!resp.valid && authBackendService.isExpiredTokenMessage(resp.message)) {
+      await _handleExpiredSession();
+      return false;
+    }
     final notExpired =
         resp.expiresAt > DateTime.now().millisecondsSinceEpoch ~/ 1000;
     return resp.valid && notExpired;

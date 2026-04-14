@@ -3,6 +3,8 @@ backend/web/
 backend/__pycache__/
 backend/database.sqlite
 
+assets/env/app.env
+
 # Miscellaneous
 *.class
 *.log

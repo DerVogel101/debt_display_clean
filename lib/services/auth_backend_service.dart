@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:debt_display/generated/auth.pb.dart';
 import 'package:debt_display/config/app_config.dart';
+import 'dart:typed_data';
 
 class AuthBackendService {
   static final AuthBackendService _instance = AuthBackendService._internal();
@@ -13,7 +14,31 @@ class AuthBackendService {
       baseUrl: AppConfig.backendUrl,
       headers: {'Content-Type': 'application/x-protobuf'},
       responseType: ResponseType.bytes,
+      validateStatus: (_) => true,
     ));
+  }
+
+  bool isExpiredTokenMessage(String? message) {
+    final normalized = message?.trim().toLowerCase() ?? '';
+    return normalized == 'token expired' || normalized.contains('expired');
+  }
+
+  T _parseProtobufResponse<T>(
+    Response<dynamic> response,
+    T Function(List<int> bytes) fromBuffer,
+  ) {
+    final data = response.data;
+    if (data is List<int>) {
+      return fromBuffer(data);
+    }
+    if (data is Uint8List) {
+      return fromBuffer(data);
+    }
+    throw DioException(
+      requestOptions: response.requestOptions,
+      response: response,
+      message: 'Backend returned non-protobuf response',
+    );
   }
 
   Options withAuthToken(
@@ -44,7 +69,7 @@ class AuthBackendService {
       '/api/auth/login',
       data: req.writeToBuffer(),
     );
-    return LoginResponse.fromBuffer(response.data as List<int>);
+    return _parseProtobufResponse(response, LoginResponse.fromBuffer);
   }
 
   /// Check token validity before any protected API call.
@@ -54,6 +79,6 @@ class AuthBackendService {
       '/api/auth/verify',
       data: req.writeToBuffer(),
     );
-    return TokenVerifyResponse.fromBuffer(response.data as List<int>);
+    return _parseProtobufResponse(response, TokenVerifyResponse.fromBuffer);
   }
 }

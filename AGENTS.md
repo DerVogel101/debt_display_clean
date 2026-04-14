@@ -10,7 +10,8 @@ When running `dart` or `flutter` commands in this repo:
 
 1. Start from project root.
 2. Expect sandboxed execution to fail or hang.
-3. Request elevated approval for `dart ...` and `flutter ...` commands when needed.
+3. Always request elevated approval for `dart ...` and `flutter ...` commands.
+4. Do not run them in the sandbox.
 
 Examples:
 
@@ -22,6 +23,12 @@ flutter test
 
 ## Protobuf Generation
 
+When running `protoc` commands in this repo:
+
+1. Start from project root.
+2. Always request elevated approval for `protoc ...` commands.
+3. Do not run them in the sandbox.
+
 To regenerate protobuf files successfully:
 
 1. Run commands from the project root.
@@ -29,14 +36,14 @@ To regenerate protobuf files successfully:
 3. Use these commands:
 
 ```powershell
-protoc -I proto/ --dart_out=lib/generated/ proto/auth.proto
-protoc -I proto/ --python_out=backend/proto/ proto/auth.proto
+protoc -I proto/ --python_out=backend/proto/ --pyi_out=backend/proto/ --plugin=protoc-gen-dart=C:/Users/janir/AppData/Local/Pub/Cache/bin/protoc-gen-dart.bat --dart_out=lib/generated/ proto/auth.proto proto/debt.proto
 ```
 
 Notes:
 
 - `protoc` must be available on `PATH`.
 - `protoc-gen-dart` must be available on `PATH`.
+- Generate Python `.pyi` stubs with `--pyi_out=backend/proto/` to help IDE static analysis resolve protobuf message classes.
 - In this repo, elevated execution may be required even when the command itself is correct.
 
 ## Python Command Rules
