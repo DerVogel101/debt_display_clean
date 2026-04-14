@@ -7,7 +7,7 @@ proto:
 # ── Dev servers ───────────────────────────────────────────────────────────────
 # Backend on :3300 (default from config)
 dev-backend:
-	uv run python -m backend.main
+	uv run python -m backend
 
 # Flutter web dev server on :3000, pointing at backend :3300.
 # Frontend config now comes from assets/env/app.env.
