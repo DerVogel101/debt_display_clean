@@ -16,6 +16,18 @@ class AuthBackendService {
     ));
   }
 
+  Options withAuthToken(
+    String accessToken, {
+    Options? options,
+  }) {
+    final headers = <String, dynamic>{
+      ...?options?.headers,
+      'Authorization': 'Bearer $accessToken',
+    };
+
+    return (options ?? Options()).copyWith(headers: headers);
+  }
+
   /// Call after a successful Auth0 login to register/sync the user in the DB.
   Future<LoginResponse> login(
     String accessToken, {

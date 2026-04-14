@@ -4,6 +4,22 @@
 
 This project runs in a Windows environment with PowerShell.
 
+## Dart / Flutter Commands
+
+When running `dart` or `flutter` commands in this repo:
+
+1. Start from project root.
+2. Expect sandboxed execution to fail or hang.
+3. Request elevated approval for `dart ...` and `flutter ...` commands when needed.
+
+Examples:
+
+```powershell
+dart analyze
+flutter analyze
+flutter test
+```
+
 ## Protobuf Generation
 
 To regenerate protobuf files successfully:
