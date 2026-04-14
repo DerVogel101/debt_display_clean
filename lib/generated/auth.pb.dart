@@ -21,9 +21,15 @@ export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 class LoginRequest extends $pb.GeneratedMessage {
   factory LoginRequest({
     $core.String? accessToken,
+    $core.String? email,
+    $core.String? name,
+    $core.String? avatarUrl,
   }) {
     final result = create();
     if (accessToken != null) result.accessToken = accessToken;
+    if (email != null) result.email = email;
+    if (name != null) result.name = name;
+    if (avatarUrl != null) result.avatarUrl = avatarUrl;
     return result;
   }
 
@@ -41,6 +47,9 @@ class LoginRequest extends $pb.GeneratedMessage {
       package: const $pb.PackageName(_omitMessageNames ? '' : 'auth'),
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'accessToken')
+    ..aOS(2, _omitFieldNames ? '' : 'email')
+    ..aOS(3, _omitFieldNames ? '' : 'name')
+    ..aOS(4, _omitFieldNames ? '' : 'avatarUrl')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -70,6 +79,33 @@ class LoginRequest extends $pb.GeneratedMessage {
   $core.bool hasAccessToken() => $_has(0);
   @$pb.TagNumber(1)
   void clearAccessToken() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get email => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set email($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasEmail() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearEmail() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get name => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set name($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasName() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearName() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get avatarUrl => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set avatarUrl($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasAvatarUrl() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearAvatarUrl() => $_clearField(4);
 }
 
 /// Backend → Dart on login

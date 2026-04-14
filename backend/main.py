@@ -47,16 +47,17 @@ async def login(
 
     try:
         claims = await verify_token(proto_req.access_token)
-    except HTTPException:
+    except HTTPException as e:
+        print(e)
         resp = auth_pb2.LoginResponse(success=False, message="Invalid or expired token")
         return ProtobufResponse(content=resp.SerializeToString(), status_code=401)
 
     user = await get_or_create_user(
         session=session,
         sub=claims["sub"],
-        email=claims.get("email"),
-        name=claims.get("name"),
-        avatar_url=claims.get("picture"),
+        email=proto_req.email or claims.get("email"),
+        name=proto_req.name or claims.get("name"),
+        avatar_url=proto_req.avatar_url or claims.get("picture"),
     )
     await session.commit()
 

@@ -29,6 +29,7 @@ async def verify_token(token: str) -> dict[str, Any]:
             algorithms=["RS256"],
             audience=settings.AUTH0_AUDIENCE,
             issuer=f"https://{settings.AUTH0_DOMAIN}/",
+            leeway=settings.AUTH0_JWT_LEEWAY_SECONDS,
         )
         return claims
     except ExpiredSignatureError:

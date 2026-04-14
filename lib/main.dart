@@ -44,9 +44,6 @@ class _MainViewState extends State<MainView> {
     _handleAuthCallback();
   }
 
-  /// Returns true if [token] looks like a JWT (three base64 segments).
-  bool _isJwt(String token) => token.split('.').length == 3;
-
   Future<void> _handleAuthCallback() async {
     try {
       final credentials = await auth0Service.auth0Web.onLoad(
@@ -54,20 +51,13 @@ class _MainViewState extends State<MainView> {
             ? AppConfig.auth0Audience
             : null,
       );
-
-      // If onLoad() returned the stale default opaque token (no audience),
-      // force a logout so the next login issues a proper audience-scoped JWT.
-      if (credentials != null && !_isJwt(credentials.accessToken)) {
-        await auth0Service.auth0Web.logout(
-          returnToUrl: AppConfig.frontendUrl,
-        );
-        return;
-      }
-
       if (credentials != null) {
         // Sync user with backend via Protobuf
         final backendResp = await AuthBackendService().login(
           credentials.accessToken,
+          email: credentials.user.email,
+          name: credentials.user.name,
+          avatarUrl: credentials.user.pictureUrl?.toString(),
         );
         if (!backendResp.success) {
           setState(() {

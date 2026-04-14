@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     # AUTH0_AUDIENCE → the identifier you set for your API in Auth0
     AUTH0_DOMAIN: str = ""
     AUTH0_AUDIENCE: str = ""
+    AUTH0_JWT_LEEWAY_SECONDS: int = 60
 
     # SQLite file path
     DATABASE_URL: str = "sqlite+aiosqlite:///./database.sqlite"

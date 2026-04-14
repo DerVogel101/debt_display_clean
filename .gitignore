@@ -1,5 +1,6 @@
 .env
 backend/web/
+backend/__pycache__/
 backend/database.sqlite
 
 # Miscellaneous
