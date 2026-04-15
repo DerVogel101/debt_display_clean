@@ -74,7 +74,7 @@ class LoginHardeningTests(AsyncDatabaseTestCase):
             avatar_url="https://evil.example/avatar.png",
         )
 
-        with patch("backend.main.verify_token", new=AsyncMock(return_value=claims)):
+        with patch("backend.api.verify_token", new=AsyncMock(return_value=claims)):
             transport = ASGITransport(app=main.app)
             async with AsyncClient(
                 transport=transport,
@@ -107,7 +107,7 @@ class LoginHardeningTests(AsyncDatabaseTestCase):
             avatar_url="https://example.com/body.png",
         )
 
-        with patch("backend.main.verify_token", new=AsyncMock(return_value=claims_without_profile)):
+        with patch("backend.api.verify_token", new=AsyncMock(return_value=claims_without_profile)):
             transport = ASGITransport(app=main.app)
             async with AsyncClient(
                 transport=transport,
@@ -149,7 +149,7 @@ class LoginHardeningTests(AsyncDatabaseTestCase):
         second_request = auth_pb2.LoginRequest(access_token="second-token")
 
         with patch(
-            "backend.main.verify_token",
+            "backend.api.verify_token",
             new=AsyncMock(side_effect=[claims_with_profile, claims_without_profile]),
         ):
             transport = ASGITransport(app=main.app)

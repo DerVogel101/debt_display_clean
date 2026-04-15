@@ -20,7 +20,7 @@ async def verify_token(token: str) -> dict[str, Any]:
     Raises HTTPException(401) on any failure.
     """
     import jwt  # PyJWT with cryptography extra
-    from jwt import PyJWKClient, ExpiredSignatureError, InvalidTokenError
+    from jwt import PyJWKClient, PyJWKClientError, ExpiredSignatureError, InvalidTokenError, PyJWTError
 
     try:
         jwks_client = PyJWKClient(
@@ -42,10 +42,11 @@ async def verify_token(token: str) -> dict[str, Any]:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token expired",
         )
-    except InvalidTokenError as exc:
+    except (InvalidTokenError, PyJWTError, PyJWKClientError, ValueError) as exc:
+        detail = "Token expired" if "expired" in str(exc).lower() else str(exc)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=str(exc),
+            detail=detail,
         )
 
 

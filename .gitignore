@@ -1,7 +1,11 @@
 .env
 backend/web/
 backend/__pycache__/
+backend/proto/__pycache__/
+__pycache__/
 backend/database.sqlite
+
+assets/env/app.env
 
 # Miscellaneous
 *.class

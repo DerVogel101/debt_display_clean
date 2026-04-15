@@ -1,0 +1,233 @@
+syntax = "proto3";
+
+package debt;
+
+message EmptyRequest {}
+
+message User {
+  int64 id = 1;
+  string sub = 2;
+  optional string email = 3;
+  optional string name = 4;
+  optional string avatar_url = 5;
+}
+
+message Recipient {
+  int64 id = 1;
+  string name = 2;
+  int64 owner_id = 3;
+  optional string description = 4;
+  string created_at = 5;
+  repeated User members = 6;
+  repeated int64 member_ids = 7;
+}
+
+message ReceiptFile {
+  int64 id = 1;
+  int64 receipt_id = 2;
+  string original_filename = 3;
+  optional string content_type = 4;
+  optional int64 size_bytes = 5;
+  optional string sha256 = 6;
+  string created_at = 7;
+}
+
+message TagIndex {
+  int64 id = 1;
+  string icon = 2;
+  string text = 3;
+  string color = 4;
+}
+
+message Receipt {
+  int64 id = 1;
+  string title = 2;
+  optional string description = 3;
+  double amount_owed = 4;
+  optional double amount_paid = 5;
+  optional string due_date = 6;
+  bool is_paid = 7;
+  string currency = 8;
+  optional string paid_at = 9;
+  optional string notes = 10;
+  string created_at = 11;
+  optional string updated_at = 12;
+  int64 owner_id = 13;
+  optional int64 recipient_id = 14;
+  optional string recipient_name = 15;
+  optional Recipient recipient = 16;
+  repeated ReceiptFile files = 17;
+  repeated TagIndex tags = 18;
+}
+
+message ActionResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message UserResponse {
+  bool success = 1;
+  string message = 2;
+  User user = 3;
+}
+
+message UsersResponse {
+  bool success = 1;
+  string message = 2;
+  repeated User users = 3;
+}
+
+message RecipientResponse {
+  bool success = 1;
+  string message = 2;
+  Recipient recipient = 3;
+}
+
+message RecipientsResponse {
+  bool success = 1;
+  string message = 2;
+  repeated Recipient recipients = 3;
+}
+
+message ReceiptResponse {
+  bool success = 1;
+  string message = 2;
+  Receipt receipt = 3;
+}
+
+message ReceiptsResponse {
+  bool success = 1;
+  string message = 2;
+  repeated Receipt receipts = 3;
+}
+
+message FileResponse {
+  bool success = 1;
+  string message = 2;
+  ReceiptFile file = 3;
+}
+
+message FilesResponse {
+  bool success = 1;
+  string message = 2;
+  repeated ReceiptFile files = 3;
+}
+
+message TagResponse {
+  bool success = 1;
+  string message = 2;
+  TagIndex tag = 3;
+}
+
+message TagsResponse {
+  bool success = 1;
+  string message = 2;
+  repeated TagIndex tags = 3;
+}
+
+message UpdateUserRequest {
+  optional string email = 1;
+  optional string name = 2;
+  optional string avatar_url = 3;
+}
+
+message CreateRecipientRequest {
+  string name = 1;
+  optional string description = 2;
+  repeated int64 member_ids = 3;
+}
+
+message RecipientLookupRequest {
+  int64 recipient_id = 1;
+}
+
+message UpdateRecipientRequest {
+  int64 recipient_id = 1;
+  optional string name = 2;
+  optional string description = 3;
+}
+
+message RecipientMemberRequest {
+  int64 recipient_id = 1;
+  int64 user_id = 2;
+}
+
+message CreateReceiptRequest {
+  string title = 1;
+  double amount_owed = 2;
+  optional string currency = 3;
+  optional int64 recipient_id = 4;
+  optional string description = 5;
+  optional string due_date = 6;
+  optional string notes = 7;
+}
+
+message ReceiptLookupRequest {
+  int64 receipt_id = 1;
+}
+
+message ReceiptListRequest {
+  optional bool is_paid = 1;
+  repeated int64 tag_ids = 2;
+  optional int64 cursor = 3;
+  optional int32 limit = 4;
+}
+
+message UpdateReceiptRequest {
+  int64 receipt_id = 1;
+  optional string title = 2;
+  optional string description = 3;
+  optional double amount_owed = 4;
+  optional double amount_paid = 5;
+  optional string due_date = 6;
+  optional string notes = 7;
+  optional string currency = 8;
+}
+
+message MarkReceiptPaidRequest {
+  int64 receipt_id = 1;
+  optional double amount_paid = 2;
+}
+
+message ReceiptFileRequest {
+  int64 receipt_id = 1;
+  string original_filename = 2;
+  optional string content_type = 3;
+  optional int64 size_bytes = 4;
+  optional string sha256 = 5;
+}
+
+message FileLookupRequest {
+  int64 file_id = 1;
+}
+
+message FileListRequest {
+  int64 receipt_id = 1;
+}
+
+message TagUpsertRequest {
+  string text = 1;
+  string icon = 2;
+  string color = 3;
+}
+
+message TagLookupRequest {
+  optional int64 tag_id = 1;
+  optional string text = 2;
+}
+
+message UpdateTagRequest {
+  int64 tag_id = 1;
+  optional string icon = 2;
+  optional string color = 3;
+}
+
+message TagReceiptRequest {
+  int64 receipt_id = 1;
+  int64 tag_id = 2;
+}
+
+message SetReceiptTagsRequest {
+  int64 receipt_id = 1;
+  repeated int64 tag_ids = 2;
+}
