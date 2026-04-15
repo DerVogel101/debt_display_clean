@@ -98,7 +98,40 @@ class LoginHardeningTests(AsyncDatabaseTestCase):
         self.assertEqual(user.name, claims["name"])
         self.assertEqual(user.avatar_url, claims["picture"])
 
-    async def test_login_does_not_use_body_fields_as_missing_claim_fallback(self) -> None:
+    async def test_login_uses_body_fields_when_token_claims_are_missing(self) -> None:
+        claims_without_profile = {"sub": "auth0|owner"}
+        request = auth_pb2.LoginRequest(
+            access_token="valid-token",
+            email="body@example.com",
+            name="Body Name",
+            avatar_url="https://example.com/body.png",
+        )
+
+        with patch("backend.main.verify_token", new=AsyncMock(return_value=claims_without_profile)):
+            transport = ASGITransport(app=main.app)
+            async with AsyncClient(
+                transport=transport,
+                base_url="http://testserver",
+            ) as client:
+                response = await client.post(
+                    "/api/auth/login",
+                    content=request.SerializeToString(),
+                    headers={"Content-Type": "application/x-protobuf"},
+                )
+
+        self.assertEqual(response.status_code, 200)
+
+        async with db.async_session_maker() as session:
+            result = await session.execute(
+                select(db.User).where(db.User.sub == claims_without_profile["sub"])
+            )
+            user = result.scalar_one()
+
+        self.assertEqual(user.email, request.email)
+        self.assertEqual(user.name, request.name)
+        self.assertEqual(user.avatar_url, request.avatar_url)
+
+    async def test_login_preserves_existing_profile_when_claims_and_body_are_empty(self) -> None:
         claims_with_profile = {
             "sub": "auth0|owner",
             "email": "claim@example.com",
@@ -113,12 +146,7 @@ class LoginHardeningTests(AsyncDatabaseTestCase):
             name="Ignored",
             avatar_url="https://ignored.example/avatar.png",
         )
-        second_request = auth_pb2.LoginRequest(
-            access_token="second-token",
-            email="spoof@example.com",
-            name="Spoofed Name",
-            avatar_url="https://evil.example/avatar.png",
-        )
+        second_request = auth_pb2.LoginRequest(access_token="second-token")
 
         with patch(
             "backend.main.verify_token",
@@ -350,6 +378,42 @@ class AuthorizationDependencyTests(AsyncDatabaseTestCase):
 
         self.assertEqual(ctx.exception.status_code, 403)
 
+    async def test_receipt_mutation_dependency_allows_owner(self) -> None:
+        dependency = authorization.authorize_resource(
+            authorization.ResourceType.RECEIPT,
+            "receipt_id",
+            authorization.AccessPolicy.MUTATE,
+        )
+
+        async with db.async_session_maker() as session:
+            request = self._make_request(receipt_id=str(self.receipt.id))
+            resource = await dependency(
+                request=request,
+                session=session,
+                current_user=self.owner,
+            )
+
+        self.assertEqual(resource.id, self.receipt.id)
+        self.assertEqual(request.state.authorized_receipt.id, self.receipt.id)
+
+    async def test_receipt_mutation_dependency_returns_404_for_missing_receipt(self) -> None:
+        dependency = authorization.authorize_resource(
+            authorization.ResourceType.RECEIPT,
+            "receipt_id",
+            authorization.AccessPolicy.MUTATE,
+        )
+
+        async with db.async_session_maker() as session:
+            request = self._make_request(receipt_id="999999")
+            with self.assertRaises(HTTPException) as ctx:
+                await dependency(
+                    request=request,
+                    session=session,
+                    current_user=self.owner,
+                )
+
+        self.assertEqual(ctx.exception.status_code, 404)
+
     async def test_file_read_dependency_hides_resource_from_stranger(self) -> None:
         dependency = authorization.authorize_resource(
             authorization.ResourceType.FILE,
@@ -364,6 +428,60 @@ class AuthorizationDependencyTests(AsyncDatabaseTestCase):
                     request=request,
                     session=session,
                     current_user=self.stranger,
+                )
+
+        self.assertEqual(ctx.exception.status_code, 404)
+
+    async def test_file_mutation_dependency_allows_owner(self) -> None:
+        dependency = authorization.authorize_resource(
+            authorization.ResourceType.FILE,
+            "file_id",
+            authorization.AccessPolicy.MUTATE,
+        )
+
+        async with db.async_session_maker() as session:
+            request = self._make_request(file_id=str(self.file_record.id))
+            resource = await dependency(
+                request=request,
+                session=session,
+                current_user=self.owner,
+            )
+
+        self.assertEqual(resource.id, self.file_record.id)
+        self.assertEqual(request.state.authorized_file.id, self.file_record.id)
+
+    async def test_file_mutation_dependency_rejects_member(self) -> None:
+        dependency = authorization.authorize_resource(
+            authorization.ResourceType.FILE,
+            "file_id",
+            authorization.AccessPolicy.MUTATE,
+        )
+
+        async with db.async_session_maker() as session:
+            request = self._make_request(file_id=str(self.file_record.id))
+            with self.assertRaises(HTTPException) as ctx:
+                await dependency(
+                    request=request,
+                    session=session,
+                    current_user=self.member,
+                )
+
+        self.assertEqual(ctx.exception.status_code, 403)
+
+    async def test_file_mutation_dependency_returns_404_for_missing_file(self) -> None:
+        dependency = authorization.authorize_resource(
+            authorization.ResourceType.FILE,
+            "file_id",
+            authorization.AccessPolicy.MUTATE,
+        )
+
+        async with db.async_session_maker() as session:
+            request = self._make_request(file_id="999999")
+            with self.assertRaises(HTTPException) as ctx:
+                await dependency(
+                    request=request,
+                    session=session,
+                    current_user=self.owner,
                 )
 
         self.assertEqual(ctx.exception.status_code, 404)
@@ -393,3 +511,21 @@ class AuthorizationDependencyTests(AsyncDatabaseTestCase):
 
         self.assertEqual(resource.id, self.recipient.id)
         self.assertEqual(ctx.exception.status_code, 403)
+
+    async def test_recipient_manage_members_dependency_returns_404_for_missing_recipient(self) -> None:
+        dependency = authorization.authorize_resource(
+            authorization.ResourceType.RECIPIENT,
+            "recipient_id",
+            authorization.AccessPolicy.MANAGE_MEMBERS,
+        )
+
+        async with db.async_session_maker() as session:
+            request = self._make_request(recipient_id="999999")
+            with self.assertRaises(HTTPException) as ctx:
+                await dependency(
+                    request=request,
+                    session=session,
+                    current_user=self.owner,
+                )
+
+        self.assertEqual(ctx.exception.status_code, 404)

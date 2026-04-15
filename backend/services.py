@@ -17,6 +17,22 @@ class AuthorizationError(PermissionError):
     pass
 
 
+def _require_owned_resource(
+    resource: Receipt | Recipient | ReceiptFile | None,
+    resource_name: str,
+    resource_id: int,
+    owner_id: int | None,
+    actor_user_id: int,
+) -> Receipt | Recipient | ReceiptFile:
+    if resource is None:
+        raise ResourceNotFoundError(f"{resource_name} {resource_id} not found")
+    if owner_id != actor_user_id:
+        raise AuthorizationError(
+            f"User {actor_user_id} cannot mutate {resource_name.lower()} {resource_id}"
+        )
+    return resource
+
+
 def _member_recipient_ids(actor_user_id: int):
     return select(recipient_members.c.recipient_id).where(
         recipient_members.c.user_id == actor_user_id
@@ -80,15 +96,17 @@ async def get_owned_recipient(
 ) -> Recipient:
     result = await session.execute(
         select(Recipient)
-        .where(Recipient.id == recipient_id, Recipient.owner_id == actor_user_id)
+        .where(Recipient.id == recipient_id)
         .options(selectinload(Recipient.members))
     )
     recipient = result.scalar_one_or_none()
-    if recipient is None:
-        raise AuthorizationError(
-            f"User {actor_user_id} cannot mutate recipient {recipient_id}"
-        )
-    return recipient
+    return _require_owned_resource(
+        recipient,
+        "Recipient",
+        recipient_id,
+        recipient.owner_id if recipient is not None else None,
+        actor_user_id,
+    )
 
 
 async def get_owned_receipt(
@@ -98,7 +116,7 @@ async def get_owned_receipt(
 ) -> Receipt:
     result = await session.execute(
         select(Receipt)
-        .where(Receipt.id == receipt_id, Receipt.owner_id == actor_user_id)
+        .where(Receipt.id == receipt_id)
         .options(
             selectinload(Receipt.recipient),
             selectinload(Receipt.files),
@@ -106,11 +124,13 @@ async def get_owned_receipt(
         )
     )
     receipt = result.scalar_one_or_none()
-    if receipt is None:
-        raise AuthorizationError(
-            f"User {actor_user_id} cannot mutate receipt {receipt_id}"
-        )
-    return receipt
+    return _require_owned_resource(
+        receipt,
+        "Receipt",
+        receipt_id,
+        receipt.owner_id if receipt is not None else None,
+        actor_user_id,
+    )
 
 
 async def list_visible_receipts(
@@ -269,13 +289,17 @@ async def get_file_for_owner(
     file_id: int,
 ) -> ReceiptFile:
     result = await session.execute(
-        select(ReceiptFile)
+        select(ReceiptFile, Receipt.owner_id)
         .join(Receipt, Receipt.id == ReceiptFile.receipt_id)
-        .where(ReceiptFile.id == file_id, Receipt.owner_id == actor_user_id)
+        .where(ReceiptFile.id == file_id)
     )
-    file_record = result.scalar_one_or_none()
-    if file_record is None:
-        raise AuthorizationError(
-            f"User {actor_user_id} cannot mutate file {file_id}"
-        )
-    return file_record
+    row = result.one_or_none()
+    file_record = row[0] if row is not None else None
+    owner_id = row[1] if row is not None else None
+    return _require_owned_resource(
+        file_record,
+        "File",
+        file_id,
+        owner_id,
+        actor_user_id,
+    )

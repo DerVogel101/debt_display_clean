@@ -27,6 +27,13 @@ class ProtobufResponse(Response):
     media_type = "application/x-protobuf"
 
 
+def _first_non_empty(*values: str | None) -> str | None:
+    for value in values:
+        if value:
+            return value
+    return None
+
+
 @api_app.get("/test")
 async def test():
     raise HTTPException(
@@ -54,9 +61,9 @@ async def login(
     user = await get_or_create_user(
         session=session,
         sub=claims["sub"],
-        email=claims.get("email"),
-        name=claims.get("name"),
-        avatar_url=claims.get("picture"),
+        email=_first_non_empty(claims.get("email"), proto_req.email or None),
+        name=_first_non_empty(claims.get("name"), proto_req.name or None),
+        avatar_url=_first_non_empty(claims.get("picture"), proto_req.avatar_url or None),
     )
     await session.commit()
 
