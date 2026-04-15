@@ -6,9 +6,11 @@ from functools import wraps
 from inspect import Parameter, Signature, signature
 from typing import Any
 
-from fastapi import HTTPException, Request, status
+from fastapi import Depends, HTTPException, Request, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.config import settings
+from backend.db import User, get_session, get_user_by_sub
 
 
 async def verify_token(token: str) -> dict[str, Any]:
@@ -67,6 +69,32 @@ async def require_auth(request: Request) -> dict[str, Any]:
     claims = await verify_token(_extract_bearer_token(request))
     request.state.auth_claims = claims
     return claims
+
+
+async def get_current_user(
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> User:
+    """
+    Resolve the authenticated token to a local user row.
+    """
+    claims = await require_auth(request)
+    sub = claims.get("sub")
+    if not sub:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token missing subject claim",
+        )
+
+    user = await get_user_by_sub(session, sub)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authenticated user is not registered locally",
+        )
+
+    request.state.current_user = user
+    return user
 
 
 def get_auth_claims(request: Request) -> dict[str, Any]:

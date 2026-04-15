@@ -1,15 +1,14 @@
-from fastapi import FastAPI, Request, Depends
+import uvicorn
+from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-import uvicorn
 
-from auth import verify_token
-from config import settings
-from db import get_session, get_or_create_user
-from proto import auth_pb2
+from backend.auth import verify_token
+from backend.config import settings
+from backend.db import get_or_create_user, get_session
+from backend.proto import auth_pb2
 
 app = FastAPI(title="root")
 
@@ -55,9 +54,9 @@ async def login(
     user = await get_or_create_user(
         session=session,
         sub=claims["sub"],
-        email=proto_req.email or claims.get("email"),
-        name=proto_req.name or claims.get("name"),
-        avatar_url=proto_req.avatar_url or claims.get("picture"),
+        email=claims.get("email"),
+        name=claims.get("name"),
+        avatar_url=claims.get("picture"),
     )
     await session.commit()
 
