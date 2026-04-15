@@ -13,6 +13,28 @@ from backend.config import settings
 from backend.db import User, get_session, get_user_by_sub
 
 
+async def fetch_userinfo(access_token: str) -> dict[str, Any]:
+    """
+    Best-effort profile fetch from Auth0's /userinfo endpoint.
+    Returns an empty dict when enrichment is unavailable so login can still
+    succeed with the verified subject claim alone.
+    """
+    import httpx
+
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(
+                f"https://{settings.AUTH0_DOMAIN}/userinfo",
+                headers={"Authorization": f"Bearer {access_token}"},
+            )
+            response.raise_for_status()
+            payload = response.json()
+    except (httpx.HTTPError, ValueError):
+        return {}
+
+    return payload if isinstance(payload, dict) else {}
+
+
 async def verify_token(token: str) -> dict[str, Any]:
     """
     Verify an Auth0 access token (RS256).

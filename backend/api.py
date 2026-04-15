@@ -1,21 +1,19 @@
 from __future__ import annotations
 
-import re
 from datetime import datetime, timezone
 from pathlib import Path
-from uuid import uuid4
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.auth import require_auth, verify_token
+from backend import authorization, services
+from backend.auth import fetch_userinfo, get_current_user, verify_token
 from backend.db import (
     add_member_to_recipient,
     create_recipient,
     delete_recipient,
     delete_user,
-    get_file_by_id,
     get_or_create_tag,
     get_or_create_user,
     get_recipient_by_id,
@@ -25,25 +23,19 @@ from backend.db import (
     list_all_tags,
     list_files_for_receipt,
     list_recipients_for_user,
-    list_receipts_for_owner,
-    mark_receipt_paid,
-    mark_receipt_unpaid,
     remove_member_from_recipient,
-    set_receipt_tags,
     tag_receipt,
     untag_receipt,
     update_recipient,
-    update_receipt,
     update_tag,
     update_user_profile,
-    attach_file,
     create_receipt,
-    delete_file_record,
-    delete_receipt, delete_tag,
+    delete_tag,
 )
 from backend.db import get_session
 from backend.config import settings
 from backend.proto import auth_pb2, debt_pb2
+from backend.storage import resolve_storage_path
 
 api_app = FastAPI(title="api")
 
@@ -78,36 +70,10 @@ def _dt_from_proto(value: str | None) -> datetime | None:
 def _upload_root() -> Path:
     return Path(settings.UPLOAD_DIR).resolve()
 
-
-def _sanitize_filename(filename: str) -> str:
-    candidate = Path(filename).name.strip()
-    if not candidate:
-        candidate = "file"
-    sanitized = re.sub(r"[^A-Za-z0-9._-]+", "_", candidate).strip("._")
-    return sanitized or "file"
-
-
-def _build_storage_key(owner_id: int, receipt_id: int, original_filename: str) -> str:
-    safe_name = _sanitize_filename(original_filename)
-    suffix = Path(safe_name).suffix
-    generated_name = f"{uuid4().hex}{suffix}"
-    return Path(str(owner_id), str(receipt_id), generated_name).as_posix()
-
-
-def _resolve_managed_storage_path(storage_key: str) -> Path | None:
-    root = _upload_root()
-    candidate = Path(storage_key)
-    resolved = candidate.resolve() if candidate.is_absolute() else (root / candidate).resolve()
-    try:
-        resolved.relative_to(root)
-    except ValueError:
-        return None
-    return resolved
-
-
 def _delete_managed_file(storage_key: str) -> bool:
-    resolved = _resolve_managed_storage_path(storage_key)
-    if resolved is None:
+    try:
+        resolved = resolve_storage_path(storage_key, _upload_root())
+    except ValueError:
         return False
     resolved.unlink(missing_ok=True)
     return True
@@ -223,49 +189,27 @@ def _receipt_to_pb(receipt) -> debt_pb2.Receipt:
 
 
 async def _current_user(request: Request, session: AsyncSession):
-    claims = await require_auth(request)
-    return await get_or_create_user(
+    return await get_current_user(request=request, session=session)
+
+
+async def _authorize_message_resource(
+    request: Request,
+    session: AsyncSession,
+    user,
+    resource_type: authorization.ResourceType,
+    field_name: str,
+    message,
+    policy: authorization.AccessPolicy,
+):
+    return await authorization.authorize_resource_from_message(
+        request=request,
         session=session,
-        sub=claims["sub"],
-        email=claims.get("email"),
-        name=claims.get("name"),
-        avatar_url=claims.get("picture"),
+        current_user=user,
+        resource_type=resource_type,
+        field_name=field_name,
+        message=message,
+        policy=policy,
     )
-
-
-async def _require_recipient_access(session: AsyncSession, recipient_id: int, user_id: int):
-    recipient = await get_recipient_by_id(session, recipient_id)
-    if recipient is None:
-        raise ValueError(f"Recipient {recipient_id} not found")
-    if recipient.owner_id != user_id and all(member.id != user_id for member in recipient.members):
-        raise HTTPException(status_code=403, detail="Forbidden")
-    return recipient
-
-
-async def _require_recipient_owner(session: AsyncSession, recipient_id: int, user_id: int):
-    recipient = await get_recipient_by_id(session, recipient_id)
-    if recipient is None:
-        raise ValueError(f"Recipient {recipient_id} not found")
-    if recipient.owner_id != user_id:
-        raise HTTPException(status_code=403, detail="Forbidden")
-    return recipient
-
-
-async def _require_receipt_owner(session: AsyncSession, receipt_id: int, user_id: int):
-    receipt = await get_receipt_by_id(session, receipt_id)
-    if receipt is None:
-        raise ValueError(f"Receipt {receipt_id} not found")
-    if receipt.owner_id != user_id:
-        raise HTTPException(status_code=403, detail="Forbidden")
-    return receipt
-
-
-async def _require_file_owner(session: AsyncSession, file_id: int, user_id: int):
-    file_record = await get_file_by_id(session, file_id)
-    if file_record is None:
-        raise ValueError(f"ReceiptFile {file_id} not found")
-    await _require_receipt_owner(session, file_record.receipt_id, user_id)
-    return file_record
 
 
 @api_app.post("/auth/login")
@@ -275,12 +219,28 @@ async def login(request: Request, session: AsyncSession = Depends(get_session)) 
     proto_req.ParseFromString(body)
     try:
         claims = await verify_token(proto_req.access_token)
+        userinfo = {}
+        if any(claims.get(field) is None for field in ("email", "name", "picture")):
+            userinfo = await fetch_userinfo(proto_req.access_token)
+
         user = await get_or_create_user(
             session=session,
             sub=claims["sub"],
-            email=_first_non_empty(claims.get("email"), proto_req.email or None),
-            name=_first_non_empty(claims.get("name"), proto_req.name or None),
-            avatar_url=_first_non_empty(claims.get("picture"), proto_req.avatar_url or None),
+            email=_first_non_empty(
+                claims.get("email"),
+                userinfo.get("email"),
+                proto_req.email,
+            ),
+            name=_first_non_empty(
+                claims.get("name"),
+                userinfo.get("name"),
+                proto_req.name,
+            ),
+            avatar_url=_first_non_empty(
+                claims.get("picture"),
+                userinfo.get("picture"),
+                proto_req.avatar_url,
+            ),
         )
         await session.commit()
         return _pb_response(
@@ -396,7 +356,15 @@ async def get_recipient_route(request: Request, session: AsyncSession = Depends(
     proto_req.ParseFromString(body)
     try:
         user = await _current_user(request, session)
-        recipient = await _require_recipient_access(session, proto_req.recipient_id, user.id)
+        recipient = await _authorize_message_resource(
+            request,
+            session,
+            user,
+            authorization.ResourceType.RECIPIENT,
+            "recipient_id",
+            proto_req,
+            authorization.AccessPolicy.READ,
+        )
         await session.commit()
         return _pb_response(debt_pb2.RecipientResponse(success=True, recipient=_recipient_to_pb(recipient)))
     except Exception as exc:
@@ -426,7 +394,15 @@ async def update_recipient_route(request: Request, session: AsyncSession = Depen
     proto_req.ParseFromString(body)
     try:
         user = await _current_user(request, session)
-        await _require_recipient_owner(session, proto_req.recipient_id, user.id)
+        await _authorize_message_resource(
+            request,
+            session,
+            user,
+            authorization.ResourceType.RECIPIENT,
+            "recipient_id",
+            proto_req,
+            authorization.AccessPolicy.MUTATE,
+        )
         recipient = await update_recipient(
             session=session,
             recipient_id=proto_req.recipient_id,
@@ -448,7 +424,15 @@ async def add_member_route(request: Request, session: AsyncSession = Depends(get
     proto_req.ParseFromString(body)
     try:
         user = await _current_user(request, session)
-        await _require_recipient_owner(session, proto_req.recipient_id, user.id)
+        await _authorize_message_resource(
+            request,
+            session,
+            user,
+            authorization.ResourceType.RECIPIENT,
+            "recipient_id",
+            proto_req,
+            authorization.AccessPolicy.MANAGE_MEMBERS,
+        )
         await add_member_to_recipient(session, proto_req.recipient_id, proto_req.user_id)
         await session.commit()
         return _pb_response(debt_pb2.ActionResponse(success=True, message="Member added"))
@@ -464,7 +448,15 @@ async def remove_member_route(request: Request, session: AsyncSession = Depends(
     proto_req.ParseFromString(body)
     try:
         user = await _current_user(request, session)
-        await _require_recipient_owner(session, proto_req.recipient_id, user.id)
+        await _authorize_message_resource(
+            request,
+            session,
+            user,
+            authorization.ResourceType.RECIPIENT,
+            "recipient_id",
+            proto_req,
+            authorization.AccessPolicy.MANAGE_MEMBERS,
+        )
         await remove_member_from_recipient(session, proto_req.recipient_id, proto_req.user_id)
         await session.commit()
         return _pb_response(debt_pb2.ActionResponse(success=True, message="Member removed"))
@@ -480,7 +472,15 @@ async def delete_recipient_route(request: Request, session: AsyncSession = Depen
     proto_req.ParseFromString(body)
     try:
         user = await _current_user(request, session)
-        await _require_recipient_owner(session, proto_req.recipient_id, user.id)
+        await _authorize_message_resource(
+            request,
+            session,
+            user,
+            authorization.ResourceType.RECIPIENT,
+            "recipient_id",
+            proto_req,
+            authorization.AccessPolicy.DELETE,
+        )
         await delete_recipient(session, proto_req.recipient_id)
         await session.commit()
         return _pb_response(debt_pb2.ActionResponse(success=True, message="Recipient deleted"))
@@ -498,7 +498,15 @@ async def create_receipt_route(request: Request, session: AsyncSession = Depends
         user = await _current_user(request, session)
         recipient_id = proto_req.recipient_id if _has_field(proto_req, "recipient_id") else None
         if recipient_id is not None:
-            await _require_recipient_access(session, recipient_id, user.id)
+            await _authorize_message_resource(
+                request,
+                session,
+                user,
+                authorization.ResourceType.RECIPIENT,
+                "recipient_id",
+                proto_req,
+                authorization.AccessPolicy.READ,
+            )
         receipt = await create_receipt(
             session=session,
             owner_id=user.id,
@@ -525,7 +533,15 @@ async def get_receipt_route(request: Request, session: AsyncSession = Depends(ge
     proto_req.ParseFromString(body)
     try:
         user = await _current_user(request, session)
-        receipt = await _require_receipt_owner(session, proto_req.receipt_id, user.id)
+        receipt = await _authorize_message_resource(
+            request,
+            session,
+            user,
+            authorization.ResourceType.RECEIPT,
+            "receipt_id",
+            proto_req,
+            authorization.AccessPolicy.READ,
+        )
         await session.commit()
         return _pb_response(debt_pb2.ReceiptResponse(success=True, receipt=_receipt_to_pb(receipt)))
     except Exception as exc:
@@ -540,9 +556,9 @@ async def list_receipts_route(request: Request, session: AsyncSession = Depends(
     proto_req.ParseFromString(body)
     try:
         user = await _current_user(request, session)
-        receipts = await list_receipts_for_owner(
+        receipts = await services.list_visible_receipts(
             session,
-            owner_id=user.id,
+            actor_user_id=user.id,
             is_paid=proto_req.is_paid if _has_field(proto_req, "is_paid") else None,
             tag_ids=list(proto_req.tag_ids) or None,
             cursor=proto_req.cursor if _has_field(proto_req, "cursor") else None,
@@ -565,9 +581,9 @@ async def update_receipt_route(request: Request, session: AsyncSession = Depends
     proto_req.ParseFromString(body)
     try:
         user = await _current_user(request, session)
-        await _require_receipt_owner(session, proto_req.receipt_id, user.id)
-        receipt = await update_receipt(
+        receipt = await services.update_receipt_for_owner(
             session=session,
+            actor_user_id=user.id,
             receipt_id=proto_req.receipt_id,
             title=proto_req.title if _has_field(proto_req, "title") else None,
             description=proto_req.description if _has_field(proto_req, "description") else None,
@@ -592,9 +608,9 @@ async def mark_receipt_paid_route(request: Request, session: AsyncSession = Depe
     proto_req.ParseFromString(body)
     try:
         user = await _current_user(request, session)
-        await _require_receipt_owner(session, proto_req.receipt_id, user.id)
-        receipt = await mark_receipt_paid(
+        receipt = await services.mark_receipt_paid_for_owner(
             session=session,
+            actor_user_id=user.id,
             receipt_id=proto_req.receipt_id,
             amount_paid=proto_req.amount_paid if _has_field(proto_req, "amount_paid") else None,
         )
@@ -613,8 +629,11 @@ async def mark_receipt_unpaid_route(request: Request, session: AsyncSession = De
     proto_req.ParseFromString(body)
     try:
         user = await _current_user(request, session)
-        await _require_receipt_owner(session, proto_req.receipt_id, user.id)
-        receipt = await mark_receipt_unpaid(session=session, receipt_id=proto_req.receipt_id)
+        receipt = await services.mark_receipt_unpaid_for_owner(
+            session=session,
+            actor_user_id=user.id,
+            receipt_id=proto_req.receipt_id,
+        )
         await session.commit()
         receipt = await get_receipt_by_id(session, receipt.id)
         return _pb_response(debt_pb2.ReceiptResponse(success=True, receipt=_receipt_to_pb(receipt)))
@@ -630,8 +649,11 @@ async def delete_receipt_route(request: Request, session: AsyncSession = Depends
     proto_req.ParseFromString(body)
     try:
         user = await _current_user(request, session)
-        await _require_receipt_owner(session, proto_req.receipt_id, user.id)
-        storage_keys = await delete_receipt(session, proto_req.receipt_id)
+        storage_keys = await services.delete_receipt_for_owner(
+            session=session,
+            actor_user_id=user.id,
+            receipt_id=proto_req.receipt_id,
+        )
         await session.commit()
         for storage_key in storage_keys:
             _delete_managed_file(storage_key)
@@ -648,13 +670,11 @@ async def attach_file_route(request: Request, session: AsyncSession = Depends(ge
     proto_req.ParseFromString(body)
     try:
         user = await _current_user(request, session)
-        receipt = await _require_receipt_owner(session, proto_req.receipt_id, user.id)
-        storage_key = _build_storage_key(receipt.owner_id, receipt.id, proto_req.original_filename)
-        file_record = await attach_file(
+        file_record = await services.create_receipt_file_for_owner(
             session=session,
+            actor_user_id=user.id,
             receipt_id=proto_req.receipt_id,
-            storage_key=storage_key,
-            original_filename=proto_req.original_filename,
+            client_filename=proto_req.original_filename,
             content_type=proto_req.content_type if _has_field(proto_req, "content_type") else None,
             size_bytes=proto_req.size_bytes if _has_field(proto_req, "size_bytes") else None,
             sha256=proto_req.sha256 if _has_field(proto_req, "sha256") else None,
@@ -673,9 +693,15 @@ async def get_file_route(request: Request, session: AsyncSession = Depends(get_s
     proto_req.ParseFromString(body)
     try:
         user = await _current_user(request, session)
-        if proto_req.file_id <= 0:
-            raise ValueError("file_id required")
-        file_record = await _require_file_owner(session, proto_req.file_id, user.id)
+        file_record = await _authorize_message_resource(
+            request,
+            session,
+            user,
+            authorization.ResourceType.FILE,
+            "file_id",
+            proto_req,
+            authorization.AccessPolicy.READ,
+        )
         await session.commit()
         return _pb_response(debt_pb2.FileResponse(success=True, file=_file_to_pb(file_record)))
     except Exception as exc:
@@ -690,7 +716,15 @@ async def list_files_route(request: Request, session: AsyncSession = Depends(get
     proto_req.ParseFromString(body)
     try:
         user = await _current_user(request, session)
-        await _require_receipt_owner(session, proto_req.receipt_id, user.id)
+        await _authorize_message_resource(
+            request,
+            session,
+            user,
+            authorization.ResourceType.RECEIPT,
+            "receipt_id",
+            proto_req,
+            authorization.AccessPolicy.READ,
+        )
         files = await list_files_for_receipt(session, proto_req.receipt_id)
         await session.commit()
         resp = debt_pb2.FilesResponse(success=True)
@@ -709,10 +743,16 @@ async def delete_file_route(request: Request, session: AsyncSession = Depends(ge
     proto_req.ParseFromString(body)
     try:
         user = await _current_user(request, session)
-        if proto_req.file_id <= 0:
-            raise ValueError("file_id required")
-        file_record = await _require_file_owner(session, proto_req.file_id, user.id)
-        storage_key = await delete_file_record(session, file_record.id)
+        file_record = await _authorize_message_resource(
+            request,
+            session,
+            user,
+            authorization.ResourceType.FILE,
+            "file_id",
+            proto_req,
+            authorization.AccessPolicy.DELETE,
+        )
+        storage_key = await services.delete_file_for_owner(session, user.id, file_record.id)
         await session.commit()
         _delete_managed_file(storage_key)
         return _pb_response(debt_pb2.ActionResponse(success=True, message="File deleted"))
@@ -817,7 +857,15 @@ async def tag_receipt_route(request: Request, session: AsyncSession = Depends(ge
     proto_req.ParseFromString(body)
     try:
         user = await _current_user(request, session)
-        await _require_receipt_owner(session, proto_req.receipt_id, user.id)
+        await _authorize_message_resource(
+            request,
+            session,
+            user,
+            authorization.ResourceType.RECEIPT,
+            "receipt_id",
+            proto_req,
+            authorization.AccessPolicy.MUTATE,
+        )
         if await get_tag_by_id(session, proto_req.tag_id) is None:
             raise ValueError("Tag not found")
         await tag_receipt(session, proto_req.receipt_id, proto_req.tag_id)
@@ -835,7 +883,15 @@ async def untag_receipt_route(request: Request, session: AsyncSession = Depends(
     proto_req.ParseFromString(body)
     try:
         user = await _current_user(request, session)
-        await _require_receipt_owner(session, proto_req.receipt_id, user.id)
+        await _authorize_message_resource(
+            request,
+            session,
+            user,
+            authorization.ResourceType.RECEIPT,
+            "receipt_id",
+            proto_req,
+            authorization.AccessPolicy.MUTATE,
+        )
         await untag_receipt(session, proto_req.receipt_id, proto_req.tag_id)
         await session.commit()
         return _pb_response(debt_pb2.ActionResponse(success=True, message="Tag removed"))
@@ -851,11 +907,24 @@ async def set_receipt_tags_route(request: Request, session: AsyncSession = Depen
     proto_req.ParseFromString(body)
     try:
         user = await _current_user(request, session)
-        await _require_receipt_owner(session, proto_req.receipt_id, user.id)
+        await _authorize_message_resource(
+            request,
+            session,
+            user,
+            authorization.ResourceType.RECEIPT,
+            "receipt_id",
+            proto_req,
+            authorization.AccessPolicy.MUTATE,
+        )
         for tag_id in proto_req.tag_ids:
             if await get_tag_by_id(session, tag_id) is None:
                 raise ValueError(f"Tag {tag_id} not found")
-        await set_receipt_tags(session, proto_req.receipt_id, list(proto_req.tag_ids))
+        await services.set_receipt_tags_for_owner(
+            session=session,
+            actor_user_id=user.id,
+            receipt_id=proto_req.receipt_id,
+            tag_ids=list(proto_req.tag_ids),
+        )
         await session.commit()
         return _pb_response(debt_pb2.ActionResponse(success=True, message="Receipt tags updated"))
     except Exception as exc:

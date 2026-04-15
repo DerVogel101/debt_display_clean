@@ -4,6 +4,7 @@ backend/__pycache__/
 backend/proto/__pycache__/
 __pycache__/
 backend/database.sqlite
+database.sqlite
 
 assets/env/app.env
 
