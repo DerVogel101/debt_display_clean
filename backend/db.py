@@ -312,14 +312,14 @@ async def create_recipient(
 ) -> "Recipient":
     """Creates a recipient and adds all listed users as members."""
     recipient = Recipient(owner_id=owner_id, name=name, description=description)
-    session.add(recipient)
-    await session.flush()  # get recipient.id
 
     if member_ids:
         result = await session.execute(select(User).where(User.id.in_(member_ids)))
         members = list(result.scalars().all())
         recipient.members = members
-        await session.flush()
+
+    session.add(recipient)
+    await session.flush()  # get recipient.id
     return recipient
 
 
@@ -421,6 +421,9 @@ async def delete_recipient(session: AsyncSession, recipient_id: int) -> None:
 
 
 # ── Receipt Methods ───────────────────────────────────────────────────────────
+#
+# These helpers are low-level and ownership-neutral by design. Route code should
+# prefer the actor-scoped service layer in backend.services to avoid IDOR bugs.
 
 async def create_receipt(
     session: AsyncSession,
@@ -603,7 +606,8 @@ async def attach_file(
 ) -> "ReceiptFile":
     """
     Inserts a ReceiptFile metadata row after the file has been written to disk.
-    storage_key must be globally unique (UNIQUE constraint in DB).
+    storage_key must be a server-generated relative key and globally unique.
+    original_filename is the sanitized download/display name, not a path.
     """
     file_record = ReceiptFile(
         receipt_id=receipt_id,
@@ -656,7 +660,7 @@ async def get_file_by_storage_key(
     session: AsyncSession,
     storage_key: str,
 ) -> "ReceiptFile | None":
-    """Deduplication check before writing a file to disk."""
+    """Lookup by server-generated storage key."""
     result = await session.execute(
         select(ReceiptFile).where(ReceiptFile.storage_key == storage_key)
     )

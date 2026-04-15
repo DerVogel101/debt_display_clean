@@ -19,3 +19,6 @@ app.add_middleware(
 # API must be mounted before the catch-all static mount.
 app.mount("/api", api_app)
 app.mount("/", StaticFiles(directory="web/", html=True), name="frontend")
+
+if __name__ == "__main__":
+    uvicorn.run(app, host=settings.BACKEND_HOST, port=settings.BACKEND_PORT)
