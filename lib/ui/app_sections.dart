@@ -26,7 +26,7 @@ class AppSections extends StatelessWidget {
             isDesktop ? 32 : 16,
             isDesktop ? 28 : 16,
             isDesktop ? 32 : 16,
-            isDesktop ? 32 : 20,
+            isDesktop ? 32 : 118,
           ),
           child: AnimatedSwitcher(
             duration: const Duration(milliseconds: 220),

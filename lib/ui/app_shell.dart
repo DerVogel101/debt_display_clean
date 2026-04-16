@@ -31,17 +31,25 @@ class ResponsiveShell extends StatelessWidget {
             child: SafeArea(
               top: false,
               bottom: !isDesktop,
-              child: Column(
+              child: Stack(
                 children: [
-                  if (!isDesktop) const _MobileTopBar(),
-                  Expanded(child: AppSections(isDesktop: isDesktop)),
+                  Column(
+                    children: [
+                      if (!isDesktop) const _MobileTopBar(),
+                      Expanded(child: AppSections(isDesktop: isDesktop)),
+                    ],
+                  ),
+                  if (!isDesktop)
+                    const Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      child: _MobileBottomNavigation(),
+                    ),
                 ],
               ),
             ),
           ),
-          bottomNavigationBar: isDesktop
-              ? null
-              : const _MobileBottomNavigation(),
         );
       },
     );
@@ -346,7 +354,11 @@ class _MobileBottomNavigation extends StatelessWidget {
     final currentDestination = context.select<NavigationState, AppDestination>(
       (state) => state.selectedDestination,
     );
-    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final backgroundColor = theme.brightness == Brightness.dark
+        ? scheme.surfaceContainerHigh.withValues(alpha: 0.96)
+        : scheme.surface.withValues(alpha: 0.95);
 
     return SafeArea(
       top: false,
@@ -354,7 +366,7 @@ class _MobileBottomNavigation extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(14, 4, 14, 14),
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: scheme.surface.withValues(alpha: 0.95),
+            color: backgroundColor,
             borderRadius: BorderRadius.circular(30),
             border: Border.all(
               color: scheme.outlineVariant.withValues(alpha: 0.55),
@@ -367,25 +379,28 @@ class _MobileBottomNavigation extends StatelessWidget {
               ),
             ],
           ),
-          child: NavigationBar(
-            backgroundColor: Colors.transparent,
-            selectedIndex: AppDestination.values.indexOf(currentDestination),
-            height: 72,
-            elevation: 0,
-            labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-            destinations: AppDestination.values
-                .map(
-                  (destination) => NavigationDestination(
-                    icon: Icon(destination.icon),
-                    label: destination.label,
-                  ),
-                )
-                .toList(),
-            onDestinationSelected: (index) {
-              context.read<NavigationState>().selectDestination(
-                AppDestination.values[index],
-              );
-            },
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(30),
+            child: NavigationBar(
+              backgroundColor: backgroundColor,
+              selectedIndex: AppDestination.values.indexOf(currentDestination),
+              height: 72,
+              elevation: 0,
+              labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+              destinations: AppDestination.values
+                  .map(
+                    (destination) => NavigationDestination(
+                      icon: Icon(destination.icon),
+                      label: destination.label,
+                    ),
+                  )
+                  .toList(),
+              onDestinationSelected: (index) {
+                context.read<NavigationState>().selectDestination(
+                  AppDestination.values[index],
+                );
+              },
+            ),
           ),
         ),
       ),
