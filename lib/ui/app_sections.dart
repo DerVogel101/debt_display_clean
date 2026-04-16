@@ -8,33 +8,95 @@ import '../state/theme_state.dart';
 import '../theme/app_themes.dart';
 import 'app_shared.dart';
 
-class AppSections extends StatelessWidget {
+class AppSections extends StatefulWidget {
   const AppSections({super.key, required this.isDesktop});
 
   final bool isDesktop;
 
   @override
+  State<AppSections> createState() => _AppSectionsState();
+}
+
+class _AppSectionsState extends State<AppSections> {
+  static const _topFadeHeight = 28.0;
+
+  late final ScrollController _scrollController;
+  bool _showTopFade = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController()..addListener(_handleScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController
+      ..removeListener(_handleScroll)
+      ..dispose();
+    super.dispose();
+  }
+
+  void _handleScroll() {
+    if (widget.isDesktop) {
+      if (_showTopFade) {
+        setState(() => _showTopFade = false);
+      }
+      return;
+    }
+
+    final nextValue =
+        _scrollController.hasClients && _scrollController.offset > 2;
+    if (nextValue != _showTopFade) {
+      setState(() => _showTopFade = nextValue);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final maxWidth = isDesktop ? 1180.0 : 640.0;
+    final maxWidth = widget.isDesktop ? 1180.0 : 640.0;
+    final scrollView = SingleChildScrollView(
+      controller: _scrollController,
+      padding: EdgeInsets.fromLTRB(
+        widget.isDesktop ? 32 : 16,
+        widget.isDesktop ? 28 : 16,
+        widget.isDesktop ? 32 : 16,
+        widget.isDesktop ? 32 : 118,
+      ),
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 220),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        child: _buildContent(context),
+      ),
+    );
 
     return Align(
       alignment: Alignment.topCenter,
       child: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: maxWidth),
-        child: SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(
-            isDesktop ? 32 : 16,
-            isDesktop ? 28 : 16,
-            isDesktop ? 32 : 16,
-            isDesktop ? 32 : 118,
-          ),
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 220),
-            switchInCurve: Curves.easeOutCubic,
-            switchOutCurve: Curves.easeInCubic,
-            child: _buildContent(context),
-          ),
-        ),
+        child: widget.isDesktop || !_showTopFade
+            ? scrollView
+            : ShaderMask(
+                blendMode: BlendMode.dstIn,
+                shaderCallback: (bounds) {
+                  final fadeStop = (_topFadeHeight / bounds.height).clamp(
+                    0.0,
+                    1.0,
+                  );
+                  return LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: const [
+                      Colors.transparent,
+                      Colors.black,
+                      Colors.black,
+                    ],
+                    stops: [0, fadeStop, 1],
+                  ).createShader(bounds);
+                },
+                child: scrollView,
+              ),
       ),
     );
   }
@@ -50,13 +112,16 @@ class AppSections extends StatelessWidget {
     if (isLoading) {
       return LoadingSection(
         key: const ValueKey('loading'),
-        isDesktop: isDesktop,
+        isDesktop: widget.isDesktop,
       );
     }
 
     switch (selectedDestination) {
       case AppDestination.home:
-        return HomeSection(key: const ValueKey('home'), isDesktop: isDesktop);
+        return HomeSection(
+          key: const ValueKey('home'),
+          isDesktop: widget.isDesktop,
+        );
       case AppDestination.profile:
         return const ProfileSection(key: ValueKey('profile'));
       case AppDestination.menu:

@@ -140,25 +140,23 @@ class _MobileTopBar extends StatelessWidget {
     final greeting = context.select<AuthSessionState, String>(
       (state) => state.greeting,
     );
-    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final backgroundColor = theme.brightness == Brightness.dark
+        ? scheme.surfaceContainerHigh
+        : scheme.surface;
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: scheme.surface.withValues(alpha: 0.90),
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+      child: Material(
+        color: backgroundColor,
+        elevation: 0,
+        shadowColor: scheme.shadow.withValues(alpha: 0.12),
+        shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(28),
-          border: Border.all(
-            color: scheme.outlineVariant.withValues(alpha: 0.5),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: scheme.shadow.withValues(alpha: 0.12),
-              blurRadius: 20,
-              offset: const Offset(0, 10),
-            ),
-          ],
+          side: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.5)),
         ),
+        clipBehavior: Clip.antiAlias,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
           child: Row(
