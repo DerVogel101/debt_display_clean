@@ -22,16 +22,27 @@ class PageSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
     return Container(
       width: double.infinity,
       padding: padding,
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.86),
+        color: scheme.surface.withValues(
+          alpha: theme.brightness == Brightness.dark ? 0.92 : 0.88,
+        ),
         borderRadius: BorderRadius.circular(32),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.7)),
+        border: Border.all(
+          color: scheme.outlineVariant.withValues(
+            alpha: theme.brightness == Brightness.dark ? 0.65 : 0.35,
+          ),
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: scheme.shadow.withValues(
+              alpha: theme.brightness == Brightness.dark ? 0.22 : 0.07,
+            ),
             blurRadius: 30,
             offset: const Offset(0, 18),
           ),
@@ -49,18 +60,20 @@ class ErrorSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
     return PageSection(
       padding: const EdgeInsets.all(22),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.error_outline_rounded, color: Colors.red.shade700),
+          Icon(Icons.error_outline_rounded, color: scheme.error),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               'Backend authentication failed: $message',
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: Colors.red.shade900,
+                color: scheme.error,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -140,4 +153,16 @@ class UserAvatar extends StatelessWidget {
       ),
     );
   }
+}
+
+Color mutedForegroundColor(BuildContext context, {double alpha = 0.72}) {
+  return Theme.of(context).colorScheme.onSurface.withValues(alpha: alpha);
+}
+
+Color tileSurfaceColor(BuildContext context) {
+  final theme = Theme.of(context);
+  final scheme = theme.colorScheme;
+  return theme.brightness == Brightness.dark
+      ? scheme.surfaceContainerHigh.withValues(alpha: 0.92)
+      : scheme.surfaceContainerHigh.withValues(alpha: 0.66);
 }

@@ -67,3 +67,13 @@ uv run python -m backend.main
 ```
 
 Do not assume global Python packages are installed. If a Python command depends on project packages, use the venv or `uv run`.
+
+## Flutter State Management Rules
+
+For Flutter UI state in this repo:
+
+1. Use `provider` with `MultiProvider` at the app root for app-wide state.
+2. Split unrelated concerns into distinct `ChangeNotifier` app states instead of growing one global state object.
+3. Prefer `context.select`, `Selector`, and `Consumer.child` to listen to specific attributes and minimize unnecessary rebuilds.
+4. Do not watch entire notifiers from broad layout widgets unless a full subtree rebuild is intentional.
+5. Reserve widget-local `setState` for ephemeral local UI concerns only.

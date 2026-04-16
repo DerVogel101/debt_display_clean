@@ -1,28 +1,16 @@
 import 'package:auth0_flutter/auth0_flutter.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../state/auth_session_state.dart';
+import '../state/navigation_state.dart';
+import '../state/theme_state.dart';
+import '../theme/app_themes.dart';
 import 'app_shared.dart';
 
 class AppSections extends StatelessWidget {
-  const AppSections({
-    super.key,
-    required this.credentials,
-    required this.isLoading,
-    required this.backendError,
-    required this.selectedDestination,
-    required this.onDestinationSelected,
-    required this.onLogin,
-    required this.onLogout,
-    required this.isDesktop,
-  });
+  const AppSections({super.key, required this.isDesktop});
 
-  final Credentials? credentials;
-  final bool isLoading;
-  final String? backendError;
-  final AppDestination selectedDestination;
-  final ValueChanged<AppDestination> onDestinationSelected;
-  final Future<void> Function() onLogin;
-  final Future<void> Function() onLogout;
   final bool isDesktop;
 
   @override
@@ -52,6 +40,13 @@ class AppSections extends StatelessWidget {
   }
 
   Widget _buildContent(BuildContext context) {
+    final isLoading = context.select<AuthSessionState, bool>(
+      (state) => state.isLoading,
+    );
+    final selectedDestination = context.select<NavigationState, AppDestination>(
+      (state) => state.selectedDestination,
+    );
+
     if (isLoading) {
       return LoadingSection(
         key: const ValueKey('loading'),
@@ -61,51 +56,33 @@ class AppSections extends StatelessWidget {
 
     switch (selectedDestination) {
       case AppDestination.home:
-        return HomeSection(
-          key: const ValueKey('home'),
-          credentials: credentials,
-          backendError: backendError,
-          onLogin: onLogin,
-          onOpenProfile: () => onDestinationSelected(AppDestination.profile),
-          isDesktop: isDesktop,
-        );
+        return HomeSection(key: const ValueKey('home'), isDesktop: isDesktop);
       case AppDestination.profile:
-        return ProfileSection(
-          key: const ValueKey('profile'),
-          credentials: credentials,
-          backendError: backendError,
-          onLogin: onLogin,
-          onLogout: onLogout,
-        );
+        return const ProfileSection(key: ValueKey('profile'));
       case AppDestination.menu:
-        return MenuSection(
-          key: const ValueKey('menu'),
-          credentials: credentials,
-          backendError: backendError,
-          onDestinationSelected: onDestinationSelected,
-        );
+        return const MenuSection(key: ValueKey('menu'));
     }
   }
 }
 
 class HomeSection extends StatelessWidget {
-  const HomeSection({
-    super.key,
-    required this.credentials,
-    required this.backendError,
-    required this.onLogin,
-    required this.onOpenProfile,
-    required this.isDesktop,
-  });
+  const HomeSection({super.key, required this.isDesktop});
 
-  final Credentials? credentials;
-  final String? backendError;
-  final Future<void> Function() onLogin;
-  final VoidCallback onOpenProfile;
   final bool isDesktop;
 
   @override
   Widget build(BuildContext context) {
+    final authView = context
+        .select<
+          AuthSessionState,
+          ({Credentials? credentials, String? backendError})
+        >(
+          (state) => (
+            credentials: state.credentials,
+            backendError: state.backendError,
+          ),
+        );
+
     return Column(
       children: [
         PageSection(
@@ -114,26 +91,28 @@ class HomeSection extends StatelessWidget {
               ? Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(child: _HeroCopy(credentials: credentials)),
+                    Expanded(
+                      child: _HeroCopy(credentials: authView.credentials),
+                    ),
                     const SizedBox(width: 24),
                     SizedBox(
                       width: 360,
-                      child: _StatusCard(credentials: credentials),
+                      child: _StatusCard(credentials: authView.credentials),
                     ),
                   ],
                 )
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _HeroCopy(credentials: credentials),
+                    _HeroCopy(credentials: authView.credentials),
                     const SizedBox(height: 20),
-                    _StatusCard(credentials: credentials),
+                    _StatusCard(credentials: authView.credentials),
                   ],
                 ),
         ),
         const SizedBox(height: 18),
-        if (backendError != null) ...[
-          ErrorSection(message: backendError!),
+        if (authView.backendError != null) ...[
+          ErrorSection(message: authView.backendError!),
           const SizedBox(height: 18),
         ],
         PageSection(
@@ -149,11 +128,11 @@ class HomeSection extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               Text(
-                credentials == null
+                authView.credentials == null
                     ? 'Authenticate to sync your account with the backend and unlock the profile workspace.'
                     : 'Open your profile to review synced account data and session details.',
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: Colors.black87,
+                  color: mutedForegroundColor(context, alpha: 0.88),
                   height: 1.45,
                 ),
               ),
@@ -162,20 +141,30 @@ class HomeSection extends StatelessWidget {
                 spacing: 12,
                 runSpacing: 12,
                 children: [
-                  if (credentials == null)
+                  if (authView.credentials == null)
                     FilledButton.icon(
-                      onPressed: onLogin,
+                      onPressed: () {
+                        context.read<AuthSessionState>().login();
+                      },
                       icon: const Icon(Icons.login_rounded),
                       label: const Text('Log in'),
                     )
                   else
                     FilledButton.icon(
-                      onPressed: onOpenProfile,
+                      onPressed: () {
+                        context.read<NavigationState>().selectDestination(
+                          AppDestination.profile,
+                        );
+                      },
                       icon: const Icon(Icons.person_rounded),
                       label: const Text('Open profile'),
                     ),
                   OutlinedButton.icon(
-                    onPressed: onOpenProfile,
+                    onPressed: () {
+                      context.read<NavigationState>().selectDestination(
+                        AppDestination.profile,
+                      );
+                    },
                     icon: const Icon(Icons.arrow_forward_rounded),
                     label: const Text('Go to profile'),
                   ),
@@ -190,35 +179,32 @@ class HomeSection extends StatelessWidget {
 }
 
 class ProfileSection extends StatelessWidget {
-  const ProfileSection({
-    super.key,
-    required this.credentials,
-    required this.backendError,
-    required this.onLogin,
-    required this.onLogout,
-  });
-
-  final Credentials? credentials;
-  final String? backendError;
-  final Future<void> Function() onLogin;
-  final Future<void> Function() onLogout;
+  const ProfileSection({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final authView = context
+        .select<
+          AuthSessionState,
+          ({Credentials? credentials, String? backendError})
+        >(
+          (state) => (
+            credentials: state.credentials,
+            backendError: state.backendError,
+          ),
+        );
+
     return Column(
       children: [
         PageSection(
           padding: const EdgeInsets.all(24),
-          child: credentials == null
-              ? _LoggedOutProfileCard(onLogin: onLogin)
-              : _LoggedInProfileCard(
-                  credentials: credentials!,
-                  onLogout: onLogout,
-                ),
+          child: authView.credentials == null
+              ? const _LoggedOutProfileCard()
+              : _LoggedInProfileCard(credentials: authView.credentials!),
         ),
-        if (backendError != null) ...[
+        if (authView.backendError != null) ...[
           const SizedBox(height: 18),
-          ErrorSection(message: backendError!),
+          ErrorSection(message: authView.backendError!),
         ],
       ],
     );
@@ -226,19 +212,20 @@ class ProfileSection extends StatelessWidget {
 }
 
 class MenuSection extends StatelessWidget {
-  const MenuSection({
-    super.key,
-    required this.credentials,
-    required this.backendError,
-    required this.onDestinationSelected,
-  });
-
-  final Credentials? credentials;
-  final String? backendError;
-  final ValueChanged<AppDestination> onDestinationSelected;
+  const MenuSection({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final authView = context
+        .select<
+          AuthSessionState,
+          ({Credentials? credentials, String? backendError})
+        >(
+          (state) => (
+            credentials: state.credentials,
+            backendError: state.backendError,
+          ),
+        );
     final items = [
       (
         title: 'Home',
@@ -248,7 +235,7 @@ class MenuSection extends StatelessWidget {
       ),
       (
         title: 'Profile',
-        body: credentials == null
+        body: authView.credentials == null
             ? 'Open the account tab to sign in and inspect your user data.'
             : 'Review the synced account profile and active session details.',
         icon: Icons.person_rounded,
@@ -273,7 +260,7 @@ class MenuSection extends StatelessWidget {
               Text(
                 'This destination works as the current overflow area and keeps future sections visible in the navigation model.',
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: Colors.black87,
+                  color: mutedForegroundColor(context, alpha: 0.88),
                   height: 1.45,
                 ),
               ),
@@ -285,16 +272,22 @@ class MenuSection extends StatelessWidget {
                     title: item.title,
                     body: item.body,
                     icon: item.icon,
-                    onTap: () => onDestinationSelected(item.destination),
+                    onTap: () {
+                      context.read<NavigationState>().selectDestination(
+                        item.destination,
+                      );
+                    },
                   ),
                 ),
               ),
+              const SizedBox(height: 12),
+              const _ThemeSettingsCard(),
             ],
           ),
         ),
-        if (backendError != null) ...[
+        if (authView.backendError != null) ...[
           const SizedBox(height: 18),
-          ErrorSection(message: backendError!),
+          ErrorSection(message: authView.backendError!),
         ],
       ],
     );
@@ -339,9 +332,10 @@ class _HeroCopy extends StatelessWidget {
           credentials == null
               ? 'Desktop gets a persistent top bar and menu-driven navigation. On smartphones, the interface collapses into touch-first sheets with bottom navigation.'
               : 'Your session is active. Desktop keeps account controls in the top bar, while smartphone actions live under the profile tab.',
-          style: Theme.of(
-            context,
-          ).textTheme.bodyLarge?.copyWith(color: Colors.black87, height: 1.5),
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+            color: mutedForegroundColor(context, alpha: 0.88),
+            height: 1.5,
+          ),
         ),
       ],
     );
@@ -356,8 +350,17 @@ class _StatusCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isLoggedIn = credentials != null;
-    final tone = isLoggedIn ? Colors.green : Colors.red;
-    final bg = isLoggedIn ? Colors.green.shade50 : Colors.red.shade50;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final tone = isLoggedIn ? Colors.green : scheme.error;
+    final iconTone = isLoggedIn ? Colors.green.shade700 : scheme.error;
+    final bg = isLoggedIn
+        ? Colors.green.withValues(
+            alpha: theme.brightness == Brightness.dark ? 0.12 : 0.08,
+          )
+        : scheme.error.withValues(
+            alpha: theme.brightness == Brightness.dark ? 0.14 : 0.08,
+          );
 
     return Container(
       padding: const EdgeInsets.all(22),
@@ -380,7 +383,7 @@ class _StatusCard extends StatelessWidget {
               isLoggedIn
                   ? Icons.verified_user_rounded
                   : Icons.lock_outline_rounded,
-              color: tone.shade700,
+              color: iconTone,
               size: 28,
             ),
           ),
@@ -397,7 +400,7 @@ class _StatusCard extends StatelessWidget {
                 ? credentials?.user.email ?? 'Authenticated session'
                 : 'Start an Auth0 login to create or restore a browser session.',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Colors.black87,
+              color: mutedForegroundColor(context, alpha: 0.88),
               height: 1.45,
             ),
           ),
@@ -408,9 +411,7 @@ class _StatusCard extends StatelessWidget {
 }
 
 class _LoggedOutProfileCard extends StatelessWidget {
-  const _LoggedOutProfileCard({required this.onLogin});
-
-  final Future<void> Function() onLogin;
+  const _LoggedOutProfileCard();
 
   @override
   Widget build(BuildContext context) {
@@ -426,13 +427,16 @@ class _LoggedOutProfileCard extends StatelessWidget {
         const SizedBox(height: 12),
         Text(
           'Sign in to load your Auth0 identity, sync it with the backend, and expose the account controls in this section.',
-          style: Theme.of(
-            context,
-          ).textTheme.bodyLarge?.copyWith(color: Colors.black87, height: 1.5),
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+            color: mutedForegroundColor(context, alpha: 0.88),
+            height: 1.5,
+          ),
         ),
         const SizedBox(height: 24),
         FilledButton.icon(
-          onPressed: onLogin,
+          onPressed: () {
+            context.read<AuthSessionState>().login();
+          },
           icon: const Icon(Icons.login_rounded),
           label: const Text('Log in to continue'),
         ),
@@ -442,13 +446,9 @@ class _LoggedOutProfileCard extends StatelessWidget {
 }
 
 class _LoggedInProfileCard extends StatelessWidget {
-  const _LoggedInProfileCard({
-    required this.credentials,
-    required this.onLogout,
-  });
+  const _LoggedInProfileCard({required this.credentials});
 
   final Credentials credentials;
-  final Future<void> Function() onLogout;
 
   @override
   Widget build(BuildContext context) {
@@ -470,7 +470,7 @@ class _LoggedInProfileCard extends StatelessWidget {
           credentials.user.email ?? '',
           style: Theme.of(
             context,
-          ).textTheme.bodyLarge?.copyWith(color: Colors.black54),
+          ).textTheme.bodyLarge?.copyWith(color: mutedForegroundColor(context)),
         ),
         const SizedBox(height: 24),
         _ProfileInfoTable(credentials: credentials),
@@ -486,7 +486,7 @@ class _LoggedInProfileCard extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: const Color(0xFFF5F7FF),
+            color: tileSurfaceColor(context),
             borderRadius: BorderRadius.circular(20),
           ),
           child: SingleChildScrollView(
@@ -499,7 +499,9 @@ class _LoggedInProfileCard extends StatelessWidget {
         ),
         const SizedBox(height: 24),
         FilledButton.tonalIcon(
-          onPressed: onLogout,
+          onPressed: () {
+            context.read<AuthSessionState>().logout();
+          },
           icon: const Icon(Icons.logout_rounded),
           label: const Text('Log out'),
         ),
@@ -530,9 +532,13 @@ class _ProfileInfoTable extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: tileSurfaceColor(context),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
+                border: Border.all(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.outlineVariant.withValues(alpha: 0.35),
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -540,7 +546,7 @@ class _ProfileInfoTable extends StatelessWidget {
                   Text(
                     row.$1,
                     style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: Colors.black54,
+                      color: mutedForegroundColor(context),
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -581,7 +587,7 @@ class _MenuActionTile extends StatelessWidget {
       child: Ink(
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: tileSurfaceColor(context),
           borderRadius: BorderRadius.circular(24),
         ),
         child: Row(
@@ -609,9 +615,9 @@ class _MenuActionTile extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     body,
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodyMedium?.copyWith(color: Colors.black87),
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: mutedForegroundColor(context, alpha: 0.88),
+                    ),
                   ),
                 ],
               ),
@@ -620,6 +626,97 @@ class _MenuActionTile extends StatelessWidget {
             const Icon(Icons.arrow_forward_rounded),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ThemeSettingsCard extends StatelessWidget {
+  const _ThemeSettingsCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final themeView = context
+        .select<
+          ThemeState,
+          ({
+            AppThemeMode mode,
+            DarkThemePalette palette,
+            bool showDarkPalettePicker,
+          })
+        >(
+          (state) => (
+            mode: state.themeMode,
+            palette: state.darkPalette,
+            showDarkPalettePicker: state.showDarkPalettePicker,
+          ),
+        );
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: tileSurfaceColor(context),
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Appearance',
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Choose a light, auto, or dark theme mode. Dark mode uses your saved palette, with Dracula as the default fallback.',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: mutedForegroundColor(context, alpha: 0.88),
+            ),
+          ),
+          const SizedBox(height: 18),
+          SegmentedButton<AppThemeMode>(
+            showSelectedIcon: false,
+            segments: AppThemeMode.values
+                .map(
+                  (mode) => ButtonSegment<AppThemeMode>(
+                    value: mode,
+                    label: Text(mode.label),
+                  ),
+                )
+                .toList(),
+            selected: {themeView.mode},
+            onSelectionChanged: (selection) {
+              context.read<ThemeState>().setThemeMode(selection.first);
+            },
+          ),
+          if (themeView.showDarkPalettePicker) ...[
+            const SizedBox(height: 18),
+            Text(
+              'Dark palette',
+              style: Theme.of(
+                context,
+              ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: DarkThemePalette.values
+                  .map(
+                    (palette) => ChoiceChip(
+                      label: Text(palette.label),
+                      selected: themeView.palette == palette,
+                      onSelected: (_) {
+                        context.read<ThemeState>().setDarkPalette(palette);
+                      },
+                    ),
+                  )
+                  .toList(),
+            ),
+          ],
+        ],
       ),
     );
   }

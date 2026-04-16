@@ -1,6 +1,10 @@
 import 'package:auth0_flutter/auth0_flutter.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../state/auth_session_state.dart';
+import '../state/navigation_state.dart';
+import '../theme/app_themes.dart';
 import 'app_shared.dart';
 import 'app_sections.dart';
 
@@ -9,189 +13,139 @@ export 'app_shared.dart';
 const desktopBreakpoint = 768.0;
 
 class ResponsiveShell extends StatelessWidget {
-  const ResponsiveShell({
-    super.key,
-    required this.credentials,
-    required this.isLoading,
-    required this.backendError,
-    required this.selectedDestination,
-    required this.onDestinationSelected,
-    required this.onLogin,
-    required this.onLogout,
-  });
-
-  final Credentials? credentials;
-  final bool isLoading;
-  final String? backendError;
-  final AppDestination selectedDestination;
-  final ValueChanged<AppDestination> onDestinationSelected;
-  final Future<void> Function() onLogin;
-  final Future<void> Function() onLogout;
+  const ResponsiveShell({super.key});
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final isDesktop = constraints.maxWidth >= desktopBreakpoint;
+        final theme = Theme.of(context);
 
         return Scaffold(
+          appBar: isDesktop ? const _DesktopAppBar() : null,
           body: Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color(0xFFE8EDFF),
-                  Color(0xFFF8F4FF),
-                  Color(0xFFFFFCF6),
-                ],
-                stops: [0, 0.55, 1],
-              ),
+            decoration: BoxDecoration(
+              gradient: buildAppBackgroundGradient(theme),
             ),
             child: SafeArea(
+              top: false,
               bottom: !isDesktop,
               child: Column(
                 children: [
-                  if (isDesktop)
-                    _DesktopTopBar(
-                      credentials: credentials,
-                      isLoading: isLoading,
-                      selectedDestination: selectedDestination,
-                      onDestinationSelected: onDestinationSelected,
-                      onLogin: onLogin,
-                      onLogout: onLogout,
-                    )
-                  else
-                    _MobileTopBar(selectedDestination: selectedDestination),
-                  Expanded(
-                    child: AppSections(
-                      credentials: credentials,
-                      isLoading: isLoading,
-                      backendError: backendError,
-                      selectedDestination: selectedDestination,
-                      onDestinationSelected: onDestinationSelected,
-                      onLogin: onLogin,
-                      onLogout: onLogout,
-                      isDesktop: isDesktop,
-                    ),
-                  ),
+                  if (!isDesktop) const _MobileTopBar(),
+                  Expanded(child: AppSections(isDesktop: isDesktop)),
                 ],
               ),
             ),
           ),
           bottomNavigationBar: isDesktop
               ? null
-              : _MobileBottomNavigation(
-                  currentDestination: selectedDestination,
-                  onDestinationSelected: onDestinationSelected,
-                ),
+              : const _MobileBottomNavigation(),
         );
       },
     );
   }
 }
 
-class _DesktopTopBar extends StatelessWidget {
-  const _DesktopTopBar({
-    required this.credentials,
-    required this.isLoading,
-    required this.selectedDestination,
-    required this.onDestinationSelected,
-    required this.onLogin,
-    required this.onLogout,
-  });
+class _DesktopAppBar extends StatelessWidget implements PreferredSizeWidget {
+  const _DesktopAppBar();
 
-  final Credentials? credentials;
-  final bool isLoading;
-  final AppDestination selectedDestination;
-  final ValueChanged<AppDestination> onDestinationSelected;
-  final Future<void> Function() onLogin;
-  final Future<void> Function() onLogout;
+  @override
+  Size get preferredSize => const Size.fromHeight(94);
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 94,
-      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 3),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.88),
-        border: Border(
-          bottom: BorderSide(color: Colors.black.withValues(alpha: 0.06)),
+    final scheme = Theme.of(context).colorScheme;
+    final selectedDestination = context.select<NavigationState, AppDestination>(
+      (state) => state.selectedDestination,
+    );
+
+    return AppBar(
+      automaticallyImplyLeading: false,
+      toolbarHeight: preferredSize.height,
+      titleSpacing: 0,
+      shape: Border(
+        bottom: BorderSide(
+          color: scheme.outlineVariant.withValues(alpha: 0.45),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
-          ),
-        ],
       ),
-      child: Row(
-        children: [
-          const _BrandLockup(showSubtitle: true),
-          const Spacer(),
-          _DesktopAccountControl(
-            credentials: credentials,
-            isLoading: isLoading,
-            onLogin: onLogin,
-            onLogout: onLogout,
-          ),
-          const SizedBox(width: 12),
-          MenuAnchor(
-            menuChildren: AppDestination.values
-                .map(
-                  (destination) => MenuItemButton(
-                    leadingIcon: Icon(destination.icon),
-                    onPressed: () => onDestinationSelected(destination),
-                    child: Text(destination.label),
-                  ),
-                )
-                .toList(),
-            builder: (context, controller, child) {
-              return IconButton.filledTonal(
-                iconSize: 36,
-                tooltip: 'Open navigation',
-                onPressed: () {
-                  if (controller.isOpen) {
-                    controller.close();
-                  } else {
-                    controller.open();
-                  }
-                },
-                icon: const Icon(Icons.menu_rounded),
-              );
-            },
-          ),
-          const SizedBox(width: 12),
-          Text(
-            selectedDestination.label,
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-          ),
-        ],
+      title: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 6),
+        child: Row(
+          children: [
+            const _BrandLockup(showSubtitle: true),
+            const Spacer(),
+            const _DesktopAccountControl(),
+            const SizedBox(width: 12),
+            MenuAnchor(
+              menuChildren: AppDestination.values
+                  .map(
+                    (destination) => MenuItemButton(
+                      leadingIcon: Icon(destination.icon),
+                      onPressed: () {
+                        context.read<NavigationState>().selectDestination(
+                          destination,
+                        );
+                      },
+                      child: Text(destination.label),
+                    ),
+                  )
+                  .toList(),
+              builder: (context, controller, child) {
+                return IconButton.filledTonal(
+                  iconSize: 36,
+                  tooltip: 'Open navigation',
+                  onPressed: () {
+                    if (controller.isOpen) {
+                      controller.close();
+                    } else {
+                      controller.open();
+                    }
+                  },
+                  icon: const Icon(Icons.menu_rounded),
+                );
+              },
+            ),
+            const SizedBox(width: 12),
+            Text(
+              selectedDestination.label,
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
 class _MobileTopBar extends StatelessWidget {
-  const _MobileTopBar({required this.selectedDestination});
-
-  final AppDestination selectedDestination;
+  const _MobileTopBar();
 
   @override
   Widget build(BuildContext context) {
+    final selectedDestination = context.select<NavigationState, AppDestination>(
+      (state) => state.selectedDestination,
+    );
+    final greeting = context.select<AuthSessionState, String>(
+      (state) => state.greeting,
+    );
+    final scheme = Theme.of(context).colorScheme;
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.84),
+          color: scheme.surface.withValues(alpha: 0.90),
           borderRadius: BorderRadius.circular(28),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.7)),
+          border: Border.all(
+            color: scheme.outlineVariant.withValues(alpha: 0.5),
+          ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
+              color: scheme.shadow.withValues(alpha: 0.12),
               blurRadius: 20,
               offset: const Offset(0, 10),
             ),
@@ -202,25 +156,33 @@ class _MobileTopBar extends StatelessWidget {
           child: Row(
             children: [
               const _BrandLockup(showSubtitle: false),
-              const Spacer(),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    selectedDestination.label,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      greeting,
+                      maxLines: 1,
+                      softWrap: false,
+                      overflow: TextOverflow.fade,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Shared debt and receipts',
-                    style: Theme.of(
-                      context,
-                    ).textTheme.labelMedium?.copyWith(color: Colors.black54),
-                  ),
-                ],
+                    const SizedBox(height: 2),
+                    Text(
+                      selectedDestination.label,
+                      maxLines: 1,
+                      softWrap: false,
+                      overflow: TextOverflow.fade,
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: mutedForegroundColor(context),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -231,21 +193,25 @@ class _MobileTopBar extends StatelessWidget {
 }
 
 class _DesktopAccountControl extends StatelessWidget {
-  const _DesktopAccountControl({
-    required this.credentials,
-    required this.isLoading,
-    required this.onLogin,
-    required this.onLogout,
-  });
-
-  final Credentials? credentials;
-  final bool isLoading;
-  final Future<void> Function() onLogin;
-  final Future<void> Function() onLogout;
+  const _DesktopAccountControl();
 
   @override
   Widget build(BuildContext context) {
-    if (isLoading) {
+    final authView = context
+        .select<
+          AuthSessionState,
+          ({bool isLoading, String? name, String? email, bool isAuthenticated})
+        >(
+          (state) => (
+            isLoading: state.isLoading,
+            name: state.displayName,
+            email: state.userEmail,
+            isAuthenticated: state.isAuthenticated,
+          ),
+        );
+    final scheme = Theme.of(context).colorScheme;
+
+    if (authView.isLoading) {
       return const SizedBox(
         width: 46,
         height: 46,
@@ -256,9 +222,11 @@ class _DesktopAccountControl extends StatelessWidget {
       );
     }
 
-    if (credentials == null) {
+    if (!authView.isAuthenticated) {
       return FilledButton.icon(
-        onPressed: onLogin,
+        onPressed: () {
+          context.read<AuthSessionState>().login();
+        },
         icon: const Icon(Icons.login_rounded),
         label: const Text('Log in'),
       );
@@ -267,37 +235,46 @@ class _DesktopAccountControl extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: scheme.surfaceContainerHighest.withValues(alpha: 0.72),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.black.withValues(alpha: 0.06)),
+        border: Border.all(
+          color: scheme.outlineVariant.withValues(alpha: 0.42),
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          UserAvatar(credentials: credentials, radius: 28),
+          Selector<AuthSessionState, Credentials?>(
+            selector: (_, state) => state.credentials,
+            builder: (context, credentials, child) {
+              return UserAvatar(credentials: credentials, radius: 28);
+            },
+          ),
           const SizedBox(width: 10),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                credentials?.user.name ?? 'User',
+                authView.name ?? 'User',
                 style: Theme.of(
                   context,
                 ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
               ),
               Text(
-                credentials?.user.email ?? '',
-                style: Theme.of(
-                  context,
-                ).textTheme.labelMedium?.copyWith(color: Colors.black54),
+                authView.email ?? '',
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: mutedForegroundColor(context),
+                ),
               ),
             ],
           ),
           const SizedBox(width: 12),
           IconButton(
             tooltip: 'Log out',
-            onPressed: onLogout,
+            onPressed: () {
+              context.read<AuthSessionState>().logout();
+            },
             icon: const Icon(Icons.logout_rounded),
             iconSize: 36,
           ),
@@ -321,9 +298,13 @@ class _BrandLockup extends StatelessWidget {
           width: showSubtitle ? 86 : 58,
           height: showSubtitle ? 86 : 58,
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(showSubtitle ? 14 : 12),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.75)),
+            border: Border.all(
+              color: Theme.of(
+                context,
+              ).colorScheme.outlineVariant.withValues(alpha: 0.45),
+            ),
           ),
           padding: const EdgeInsets.all(6),
           child: ClipRRect(
@@ -345,10 +326,10 @@ class _BrandLockup extends StatelessWidget {
             ),
             if (showSubtitle)
               Text(
-                'Username Here',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyLarge?.copyWith(color: Colors.black54),
+                'Shared debt and receipts',
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: mutedForegroundColor(context),
+                ),
               ),
           ],
         ),
@@ -358,28 +339,29 @@ class _BrandLockup extends StatelessWidget {
 }
 
 class _MobileBottomNavigation extends StatelessWidget {
-  const _MobileBottomNavigation({
-    required this.currentDestination,
-    required this.onDestinationSelected,
-  });
-
-  final AppDestination currentDestination;
-  final ValueChanged<AppDestination> onDestinationSelected;
+  const _MobileBottomNavigation();
 
   @override
   Widget build(BuildContext context) {
+    final currentDestination = context.select<NavigationState, AppDestination>(
+      (state) => state.selectedDestination,
+    );
+    final scheme = Theme.of(context).colorScheme;
+
     return SafeArea(
       top: false,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 4, 14, 14),
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.94),
+            color: scheme.surface.withValues(alpha: 0.95),
             borderRadius: BorderRadius.circular(30),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.6)),
+            border: Border.all(
+              color: scheme.outlineVariant.withValues(alpha: 0.55),
+            ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
+                color: scheme.shadow.withValues(alpha: 0.18),
                 blurRadius: 28,
                 offset: const Offset(0, 14),
               ),
@@ -391,7 +373,6 @@ class _MobileBottomNavigation extends StatelessWidget {
             height: 72,
             elevation: 0,
             labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-            indicatorColor: brandPrimary.withValues(alpha: 0.14),
             destinations: AppDestination.values
                 .map(
                   (destination) => NavigationDestination(
@@ -401,7 +382,9 @@ class _MobileBottomNavigation extends StatelessWidget {
                 )
                 .toList(),
             onDestinationSelected: (index) {
-              onDestinationSelected(AppDestination.values[index]);
+              context.read<NavigationState>().selectDestination(
+                AppDestination.values[index],
+              );
             },
           ),
         ),
