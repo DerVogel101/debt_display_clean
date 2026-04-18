@@ -7,7 +7,6 @@ from backend.api import api_app
 from backend.config import settings
 
 app = FastAPI(title="root")
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins_list,

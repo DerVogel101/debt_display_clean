@@ -6,8 +6,6 @@ __pycache__/
 backend/database.sqlite
 database.sqlite
 
-assets/env/app.env
-
 # Miscellaneous
 *.class
 *.log

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 abstract final class AppConfig {
@@ -33,8 +34,23 @@ abstract final class AppConfig {
       values[key] = value;
     }
 
-    backendUrl = values['BACKEND_URL'] ?? 'http://localhost:3300';
-    frontendUrl = values['FRONTEND_URL'] ?? 'http://localhost:3000';
+    final isDebugBuild = kDebugMode && !kReleaseMode;
+    backendUrl =
+        isDebugBuild
+            ? (values['BACKEND_URL_DEBUG'] ??
+                values['BACKEND_URL'] ??
+                'http://localhost:3300')
+            : (values['BACKEND_URL_RELEASE'] ??
+                values['BACKEND_URL'] ??
+                'http://localhost:3300');
+    frontendUrl =
+        isDebugBuild
+            ? (values['FRONTEND_URL_DEBUG'] ??
+                values['FRONTEND_URL'] ??
+                'http://localhost:3000')
+            : (values['FRONTEND_URL_RELEASE'] ??
+                values['FRONTEND_URL'] ??
+                'http://localhost:3000');
     auth0Domain = values['AUTH0_DOMAIN'] ?? '';
     auth0ClientId = values['AUTH0_CLIENT_ID'] ?? '';
     auth0Audience = values['AUTH0_AUDIENCE'] ?? '';
