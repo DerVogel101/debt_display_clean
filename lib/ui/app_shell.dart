@@ -29,7 +29,7 @@ class ResponsiveShell extends StatelessWidget {
               gradient: buildAppBackgroundGradient(theme),
             ),
             child: SafeArea(
-              top: false,
+              top: !isDesktop,
               bottom: !isDesktop,
               child: Stack(
                 children: [
@@ -83,44 +83,62 @@ class _DesktopAppBar extends StatelessWidget implements PreferredSizeWidget {
         child: Row(
           children: [
             const _BrandLockup(showSubtitle: true),
-            const Spacer(),
-            const _DesktopAccountControl(),
-            const SizedBox(width: 12),
-            MenuAnchor(
-              menuChildren: AppDestination.values
-                  .map(
-                    (destination) => MenuItemButton(
-                      leadingIcon: Icon(destination.icon),
-                      onPressed: () {
-                        context.read<NavigationState>().selectDestination(
-                          destination,
+            Expanded(
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Flexible(
+                      fit: FlexFit.loose,
+                      child: _DesktopAccountControl(),
+                    ),
+                    const SizedBox(width: 12),
+                    MenuAnchor(
+                      menuChildren: AppDestination.values
+                          .map(
+                            (destination) => MenuItemButton(
+                              leadingIcon: Icon(destination.icon),
+                              onPressed: () {
+                                context
+                                    .read<NavigationState>()
+                                    .selectDestination(destination);
+                              },
+                              child: Text(destination.label),
+                            ),
+                          )
+                          .toList(),
+                      builder: (context, controller, child) {
+                        return IconButton.filledTonal(
+                          iconSize: 36,
+                          tooltip: 'Open navigation',
+                          onPressed: () {
+                            if (controller.isOpen) {
+                              controller.close();
+                            } else {
+                              controller.open();
+                            }
+                          },
+                          icon: const Icon(Icons.menu_rounded),
                         );
                       },
-                      child: Text(destination.label),
                     ),
-                  )
-                  .toList(),
-              builder: (context, controller, child) {
-                return IconButton.filledTonal(
-                  iconSize: 36,
-                  tooltip: 'Open navigation',
-                  onPressed: () {
-                    if (controller.isOpen) {
-                      controller.close();
-                    } else {
-                      controller.open();
-                    }
-                  },
-                  icon: const Icon(Icons.menu_rounded),
-                );
-              },
-            ),
-            const SizedBox(width: 12),
-            Text(
-              selectedDestination.label,
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                    const SizedBox(width: 12),
+                    Flexible(
+                      fit: FlexFit.loose,
+                      child: Text(
+                        selectedDestination.label,
+                        maxLines: 1,
+                        softWrap: false,
+                        overflow: TextOverflow.fade,
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ],
         ),
@@ -257,23 +275,47 @@ class _DesktopAccountControl extends StatelessWidget {
             },
           ),
           const SizedBox(width: 10),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                authView.name ?? 'User',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-              ),
-              Text(
-                authView.email ?? '',
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: mutedForegroundColor(context),
-                ),
-              ),
-            ],
+          Flexible(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final maxWidth = constraints.maxWidth;
+                final preferredWidth = maxWidth.isFinite
+                    ? (maxWidth >= 130
+                          ? maxWidth.clamp(130.0, 200.0)
+                          : maxWidth)
+                    : 200.0;
+
+                return SizedBox(
+                  width: preferredWidth.toDouble(),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        authView.name ?? 'User',
+                        maxLines: 1,
+                        softWrap: false,
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              overflow: TextOverflow.fade,
+                            ),
+                      ),
+                      Text(
+                        authView.email ?? '',
+                        maxLines: 1,
+                        softWrap: false,
+                        style: Theme.of(context).textTheme.labelMedium
+                            ?.copyWith(
+                              color: mutedForegroundColor(context),
+                              overflow: TextOverflow.fade,
+                            ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
           ),
           const SizedBox(width: 12),
           IconButton(
