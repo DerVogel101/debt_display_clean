@@ -9,9 +9,16 @@ import '../theme/app_themes.dart';
 import 'app_shared.dart';
 
 class AppSections extends StatefulWidget {
-  const AppSections({super.key, required this.isDesktop});
+  const AppSections({
+    super.key,
+    required this.isDesktop,
+    required this.mobileBottomInset,
+    this.mobileHeader,
+  });
 
   final bool isDesktop;
+  final double mobileBottomInset;
+  final Widget? mobileHeader;
 
   @override
   State<AppSections> createState() => _AppSectionsState();
@@ -61,13 +68,22 @@ class _AppSectionsState extends State<AppSections> {
         widget.isDesktop ? 32 : 16,
         widget.isDesktop ? 28 : 16,
         widget.isDesktop ? 32 : 16,
-        widget.isDesktop ? 32 : 118,
+        widget.isDesktop ? 32 : widget.mobileBottomInset,
       ),
-      child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 220),
-        switchInCurve: Curves.easeOutCubic,
-        switchOutCurve: Curves.easeInCubic,
-        child: _buildContent(context),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (!widget.isDesktop && widget.mobileHeader != null) ...[
+            widget.mobileHeader!,
+            const SizedBox(height: 10),
+          ],
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 220),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeInCubic,
+            child: _buildContent(context),
+          ),
+        ],
       ),
     );
 
@@ -75,28 +91,34 @@ class _AppSectionsState extends State<AppSections> {
       alignment: Alignment.topCenter,
       child: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: maxWidth),
-        child: widget.isDesktop || !_showTopFade
-            ? scrollView
-            : ShaderMask(
-                blendMode: BlendMode.dstIn,
-                shaderCallback: (bounds) {
-                  final fadeStop = (_topFadeHeight / bounds.height).clamp(
-                    0.0,
-                    1.0,
-                  );
-                  return LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: const [
-                      Colors.transparent,
-                      Colors.black,
-                      Colors.black,
-                    ],
-                    stops: [0, fadeStop, 1],
-                  ).createShader(bounds);
-                },
-                child: scrollView,
+        child: Stack(
+          children: [
+            scrollView,
+            if (!widget.isDesktop && _showTopFade)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Theme.of(context).colorScheme.surface,
+                          Theme.of(
+                            context,
+                          ).colorScheme.surface.withValues(alpha: 0),
+                        ],
+                      ),
+                    ),
+                    child: const SizedBox(height: _topFadeHeight),
+                  ),
+                ),
               ),
+          ],
+        ),
       ),
     );
   }
@@ -369,12 +391,10 @@ class _HeroCopy extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
+        GlassPanel.secondary(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: brandPrimary.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(999),
-          ),
+          borderRadius: const BorderRadius.all(Radius.circular(999)),
+          tone: brandPrimary,
           child: Text(
             'Responsive web shell',
             style: Theme.of(context).textTheme.labelLarge?.copyWith(
@@ -415,34 +435,26 @@ class _StatusCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isLoggedIn = credentials != null;
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
+    final scheme = Theme.of(context).colorScheme;
     final tone = isLoggedIn ? Colors.green : scheme.error;
     final iconTone = isLoggedIn ? Colors.green.shade700 : scheme.error;
-    final bg = isLoggedIn
-        ? Colors.green.withValues(
-            alpha: theme.brightness == Brightness.dark ? 0.12 : 0.08,
-          )
-        : scheme.error.withValues(
-            alpha: theme.brightness == Brightness.dark ? 0.14 : 0.08,
-          );
 
-    return Container(
+    return GlassPanel.secondary(
       padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: tone.withValues(alpha: 0.16)),
-      ),
+      borderRadius: const BorderRadius.all(Radius.circular(28)),
+      tone: tone,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             width: 52,
             height: 52,
-            decoration: BoxDecoration(
-              color: tone.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(18),
+            decoration: glassSurfaceDecoration(
+              context,
+              variant: AppGlassVariant.secondary,
+              tone: tone,
+              borderRadius: const BorderRadius.all(Radius.circular(18)),
+              includeShadows: false,
             ),
             child: Icon(
               isLoggedIn
@@ -547,13 +559,10 @@ class _LoggedInProfileCard extends StatelessWidget {
           ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 12),
-        Container(
+        GlassPanel.secondary(
           width: double.infinity,
           padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: tileSurfaceColor(context),
-            borderRadius: BorderRadius.circular(20),
-          ),
+          borderRadius: const BorderRadius.all(Radius.circular(20)),
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: SelectableText(
@@ -592,37 +601,31 @@ class _ProfileInfoTable extends StatelessWidget {
     return Column(
       children: rows
           .map(
-            (row) => Container(
-              width: double.infinity,
-              margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: tileSurfaceColor(context),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.outlineVariant.withValues(alpha: 0.35),
+            (row) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: GlassPanel.secondary(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                borderRadius: const BorderRadius.all(Radius.circular(20)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      row.$1,
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: mutedForegroundColor(context),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    SelectableText(
+                      row.$2,
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    row.$1,
-                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: mutedForegroundColor(context),
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  SelectableText(
-                    row.$2,
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
               ),
             ),
           )
@@ -651,18 +654,22 @@ class _MenuActionTile extends StatelessWidget {
       onTap: onTap,
       child: Ink(
         padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: tileSurfaceColor(context),
-          borderRadius: BorderRadius.circular(24),
+        decoration: glassSurfaceDecoration(
+          context,
+          variant: AppGlassVariant.secondary,
+          borderRadius: const BorderRadius.all(Radius.circular(24)),
         ),
         child: Row(
           children: [
             Container(
               width: 48,
               height: 48,
-              decoration: BoxDecoration(
-                color: brandPrimary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(16),
+              decoration: glassSurfaceDecoration(
+                context,
+                variant: AppGlassVariant.secondary,
+                tone: brandPrimary,
+                borderRadius: const BorderRadius.all(Radius.circular(16)),
+                includeShadows: false,
               ),
               child: Icon(icon, color: brandPrimary),
             ),
@@ -717,13 +724,10 @@ class _ThemeSettingsCard extends StatelessWidget {
           ),
         );
 
-    return Container(
+    return GlassPanel.secondary(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: tileSurfaceColor(context),
-        borderRadius: BorderRadius.circular(24),
-      ),
+      borderRadius: const BorderRadius.all(Radius.circular(24)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

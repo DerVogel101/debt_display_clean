@@ -1,3 +1,5 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:auth0_flutter/auth0_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -11,6 +13,22 @@ import 'app_sections.dart';
 export 'app_shared.dart';
 
 const desktopBreakpoint = 768.0;
+const desktopContentMaxWidth = 1180.0;
+const desktopTopBarTopPadding = 5.0;
+const mobileBottomNavigationHeight = 72.0;
+const mobileBottomNavigationHorizontalPadding = 14.0;
+const mobileBottomNavigationTopPadding = 4.0;
+const mobileBottomNavigationBottomPadding = 14.0;
+const mobileBottomNavigationOuterPadding = EdgeInsets.fromLTRB(
+  mobileBottomNavigationHorizontalPadding,
+  mobileBottomNavigationTopPadding,
+  mobileBottomNavigationHorizontalPadding,
+  mobileBottomNavigationBottomPadding,
+);
+const mobileBottomNavigationReservedHeight =
+    mobileBottomNavigationHeight +
+    mobileBottomNavigationTopPadding +
+    mobileBottomNavigationBottomPadding;
 
 class ResponsiveShell extends StatelessWidget {
   const ResponsiveShell({super.key});
@@ -21,33 +39,46 @@ class ResponsiveShell extends StatelessWidget {
       builder: (context, constraints) {
         final isDesktop = constraints.maxWidth >= desktopBreakpoint;
         final theme = Theme.of(context);
+        final safeAreaBottom = MediaQuery.paddingOf(context).bottom;
 
         return Scaffold(
-          appBar: isDesktop ? const _DesktopAppBar() : null,
           body: Container(
             decoration: BoxDecoration(
               gradient: buildAppBackgroundGradient(theme),
             ),
             child: SafeArea(
               top: !isDesktop,
-              bottom: !isDesktop,
-              child: Stack(
-                children: [
-                  Column(
-                    children: [
-                      if (!isDesktop) const _MobileTopBar(),
-                      Expanded(child: AppSections(isDesktop: isDesktop)),
-                    ],
-                  ),
-                  if (!isDesktop)
-                    const Positioned(
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      child: _MobileBottomNavigation(),
+              bottom: false,
+              child: isDesktop
+                  ? const Column(
+                      children: [
+                        SizedBox(height: desktopTopBarTopPadding),
+                        _DesktopAppBar(),
+                        Expanded(
+                          child: AppSections(
+                            isDesktop: true,
+                            mobileBottomInset: mobileBottomNavigationReservedHeight,
+                          ),
+                        ),
+                      ],
+                    )
+                  : Stack(
+                      children: [
+                        AppSections(
+                          isDesktop: false,
+                          mobileBottomInset:
+                              mobileBottomNavigationReservedHeight +
+                              safeAreaBottom,
+                          mobileHeader: const _MobileTopBar(),
+                        ),
+                        const Positioned(
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          child: _MobileBottomNavigation(),
+                        ),
+                      ],
                     ),
-                ],
-              ),
             ),
           ),
         );
@@ -56,91 +87,81 @@ class ResponsiveShell extends StatelessWidget {
   }
 }
 
-class _DesktopAppBar extends StatelessWidget implements PreferredSizeWidget {
+class _DesktopAppBar extends StatelessWidget {
   const _DesktopAppBar();
 
   @override
-  Size get preferredSize => const Size.fromHeight(94);
-
-  @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     final selectedDestination = context.select<NavigationState, AppDestination>(
       (state) => state.selectedDestination,
     );
 
-    return AppBar(
-      automaticallyImplyLeading: false,
-      toolbarHeight: preferredSize.height,
-      titleSpacing: 0,
-      shape: Border(
-        bottom: BorderSide(
-          color: scheme.outlineVariant.withValues(alpha: 0.45),
-        ),
-      ),
-      title: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 6),
-        child: Row(
-          children: [
-            const _BrandLockup(showSubtitle: true),
-            Expanded(
-              child: Align(
-                alignment: Alignment.centerRight,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Flexible(
-                      fit: FlexFit.loose,
-                      child: _DesktopAccountControl(),
-                    ),
-                    const SizedBox(width: 12),
-                    MenuAnchor(
-                      menuChildren: AppDestination.values
-                          .map(
-                            (destination) => MenuItemButton(
-                              leadingIcon: Icon(destination.icon),
-                              onPressed: () {
-                                context
-                                    .read<NavigationState>()
-                                    .selectDestination(destination);
-                              },
-                              child: Text(destination.label),
-                            ),
-                          )
-                          .toList(),
-                      builder: (context, controller, child) {
-                        return IconButton.filledTonal(
-                          iconSize: 36,
-                          tooltip: 'Open navigation',
-                          onPressed: () {
-                            if (controller.isOpen) {
-                              controller.close();
-                            } else {
-                              controller.open();
-                            }
-                          },
-                          icon: const Icon(Icons.menu_rounded),
-                        );
-                      },
-                    ),
-                    const SizedBox(width: 12),
-                    Flexible(
-                      fit: FlexFit.loose,
-                      child: Text(
-                        selectedDestination.label,
-                        maxLines: 1,
-                        softWrap: false,
-                        overflow: TextOverflow.fade,
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w700,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 28),
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: desktopContentMaxWidth),
+          child: GlassPanel.chrome(
+            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
+            borderRadius: const BorderRadius.all(Radius.circular(32)),
+            child: Row(
+              children: [
+                const _BrandLockup(showSubtitle: true),
+                const SizedBox(width: 18),
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          fit: FlexFit.loose,
+                          child: _TopBarDestinationChip(
+                            destination: selectedDestination,
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 12),
+                        const Flexible(
+                          fit: FlexFit.loose,
+                          child: _DesktopAccountControl(),
+                        ),
+                        const SizedBox(width: 12),
+                        MenuAnchor(
+                          menuChildren: AppDestination.values
+                              .map(
+                                (destination) => MenuItemButton(
+                                  leadingIcon: Icon(destination.icon),
+                                  onPressed: () {
+                                    context
+                                        .read<NavigationState>()
+                                        .selectDestination(destination);
+                                  },
+                                  child: Text(destination.label),
+                                ),
+                              )
+                              .toList(),
+                          builder: (context, controller, child) {
+                            return _TopBarIconButton(
+                              tooltip: 'Open navigation',
+                              icon: Icons.menu_rounded,
+                              onPressed: () {
+                                if (controller.isOpen) {
+                                  controller.close();
+                                } else {
+                                  controller.open();
+                                }
+                              },
+                            );
+                          },
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -158,59 +179,135 @@ class _MobileTopBar extends StatelessWidget {
     final greeting = context.select<AuthSessionState, String>(
       (state) => state.greeting,
     );
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final backgroundColor = theme.brightness == Brightness.dark
-        ? scheme.surfaceContainerHigh
-        : scheme.surface;
+
+    return GlassPanel.chrome(
+      padding: EdgeInsets.zero,
+      borderRadius: const BorderRadius.all(Radius.circular(32)),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Expanded(child: _BrandLockup(showSubtitle: false)),
+                const SizedBox(width: 12),
+                Flexible(
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: _TopBarDestinationChip(
+                      destination: selectedDestination,
+                      compact: true,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              greeting,
+              maxLines: 1,
+              softWrap: false,
+              overflow: TextOverflow.fade,
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Shared debt and receipts',
+              maxLines: 1,
+              softWrap: false,
+              overflow: TextOverflow.fade,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: mutedForegroundColor(context),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TopBarDestinationChip extends StatelessWidget {
+  const _TopBarDestinationChip({
+    required this.destination,
+    this.compact = false,
+  });
+
+  final AppDestination destination;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final labelStyle =
+        compact
+            ? Theme.of(context).textTheme.labelLarge
+            : Theme.of(context).textTheme.titleSmall;
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 12, 16, 6),
-      child: Material(
-        color: backgroundColor,
-        elevation: 0,
-        shadowColor: scheme.shadow.withValues(alpha: 0.12),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(28),
-          side: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.5)),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-          child: Row(
-            children: [
-              const _BrandLockup(showSubtitle: false),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      greeting,
-                      maxLines: 1,
-                      softWrap: false,
-                      overflow: TextOverflow.fade,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      selectedDestination.label,
-                      maxLines: 1,
-                      softWrap: false,
-                      overflow: TextOverflow.fade,
-                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        color: mutedForegroundColor(context),
-                      ),
-                    ),
-                  ],
-                ),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 12 : 14,
+        vertical: compact ? 10 : 12,
+      ),
+      decoration: glassSurfaceDecoration(
+        context,
+        variant: AppGlassVariant.secondary,
+        borderRadius: const BorderRadius.all(Radius.circular(999)),
+        tone: brandPrimary,
+        includeShadows: false,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(destination.icon, size: compact ? 18 : 20, color: brandPrimary),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              destination.label,
+              maxLines: 1,
+              softWrap: false,
+              overflow: TextOverflow.fade,
+              style: labelStyle?.copyWith(
+                color: Theme.of(context).colorScheme.onSurface,
+                fontWeight: FontWeight.w700,
               ),
-            ],
+            ),
           ),
-        ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TopBarIconButton extends StatelessWidget {
+  const _TopBarIconButton({
+    required this.tooltip,
+    required this.icon,
+    required this.onPressed,
+  });
+
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: glassSurfaceDecoration(
+        context,
+        variant: AppGlassVariant.secondary,
+        borderRadius: const BorderRadius.all(Radius.circular(18)),
+        includeShadows: false,
+      ),
+      child: IconButton(
+        tooltip: tooltip,
+        onPressed: onPressed,
+        icon: Icon(icon),
+        iconSize: 28,
+        constraints: const BoxConstraints.tightFor(width: 52, height: 52),
+        padding: EdgeInsets.zero,
       ),
     );
   }
@@ -233,8 +330,6 @@ class _DesktopAccountControl extends StatelessWidget {
             isAuthenticated: state.isAuthenticated,
           ),
         );
-    final scheme = Theme.of(context).colorScheme;
-
     if (authView.isLoading) {
       return const SizedBox(
         width: 46,
@@ -256,15 +351,9 @@ class _DesktopAccountControl extends StatelessWidget {
       );
     }
 
-    return Container(
+    return GlassPanel.chrome(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerHighest.withValues(alpha: 0.72),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: scheme.outlineVariant.withValues(alpha: 0.42),
-        ),
-      ),
+      borderRadius: const BorderRadius.all(Radius.circular(999)),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -342,22 +431,18 @@ class _BrandLockup extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          width: showSubtitle ? 86 : 58,
-          height: showSubtitle ? 86 : 58,
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(showSubtitle ? 14 : 12),
-            border: Border.all(
-              color: Theme.of(
-                context,
-              ).colorScheme.outlineVariant.withValues(alpha: 0.45),
-            ),
-          ),
+        GlassPanel.secondary(
           padding: const EdgeInsets.all(6),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(showSubtitle ? 12 : 10),
-            child: Image.asset('assets/logo.png', fit: BoxFit.cover),
+          borderRadius: BorderRadius.all(
+            Radius.circular(showSubtitle ? 14 : 12),
+          ),
+          child: SizedBox(
+            width: showSubtitle ? 74 : 46,
+            height: showSubtitle ? 74 : 46,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(showSubtitle ? 12 : 10),
+              child: Image.asset('assets/logo.png', fit: BoxFit.cover),
+            ),
           ),
         ),
         const SizedBox(width: 12),
@@ -389,28 +474,22 @@ class _BrandLockup extends StatelessWidget {
 class _MobileBottomNavigation extends StatelessWidget {
   const _MobileBottomNavigation();
 
+  static const _blurSigma = 6.0;
+
   @override
   Widget build(BuildContext context) {
     final currentDestination = context.select<NavigationState, AppDestination>(
       (state) => state.selectedDestination,
     );
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final backgroundColor = theme.brightness == Brightness.dark
-        ? scheme.surfaceContainerHigh.withValues(alpha: 0.96)
-        : scheme.surface.withValues(alpha: 0.95);
+    final scheme = Theme.of(context).colorScheme;
 
     return SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 4, 14, 14),
+        padding: mobileBottomNavigationOuterPadding,
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: backgroundColor,
             borderRadius: BorderRadius.circular(30),
-            border: Border.all(
-              color: scheme.outlineVariant.withValues(alpha: 0.55),
-            ),
             boxShadow: [
               BoxShadow(
                 color: scheme.shadow.withValues(alpha: 0.18),
@@ -421,25 +500,38 @@ class _MobileBottomNavigation extends StatelessWidget {
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(30),
-            child: NavigationBar(
-              backgroundColor: backgroundColor,
-              selectedIndex: AppDestination.values.indexOf(currentDestination),
-              height: 72,
-              elevation: 0,
-              labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-              destinations: AppDestination.values
-                  .map(
-                    (destination) => NavigationDestination(
-                      icon: Icon(destination.icon),
-                      label: destination.label,
-                    ),
-                  )
-                  .toList(),
-              onDestinationSelected: (index) {
-                context.read<NavigationState>().selectDestination(
-                  AppDestination.values[index],
-                );
-              },
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: _blurSigma, sigmaY: _blurSigma),
+              child: DecoratedBox(
+                decoration: glassSurfaceDecoration(
+                  context,
+                  variant: AppGlassVariant.chrome,
+                  borderRadius: const BorderRadius.all(Radius.circular(30)),
+                  includeShadows: false,
+                ),
+                child: NavigationBar(
+                  backgroundColor: Colors.transparent,
+                  selectedIndex: AppDestination.values.indexOf(
+                    currentDestination,
+                  ),
+                  height: mobileBottomNavigationHeight,
+                  elevation: 0,
+                  labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+                  destinations: AppDestination.values
+                      .map(
+                        (destination) => NavigationDestination(
+                          icon: Icon(destination.icon),
+                          label: destination.label,
+                        ),
+                      )
+                      .toList(),
+                  onDestinationSelected: (index) {
+                    context.read<NavigationState>().selectDestination(
+                      AppDestination.values[index],
+                    );
+                  },
+                ),
+              ),
             ),
           ),
         ),

@@ -1,5 +1,6 @@
 .env
-backend/web/
+backend/web/*
+!backend/web/.gitkeep
 backend/__pycache__/
 backend/proto/__pycache__/
 __pycache__/

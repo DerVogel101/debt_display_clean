@@ -1,6 +1,20 @@
 import 'package:flutter/material.dart';
 
-import '../ui/app_shared.dart';
+const brandPrimary = Color(0xFF667EEA);
+
+enum AppGlassVariant { primary, secondary, chrome }
+
+class AppGlassStyle {
+  const AppGlassStyle({
+    required this.fillGradient,
+    required this.borderColor,
+    required this.shadows,
+  });
+
+  final Gradient fillGradient;
+  final Color borderColor;
+  final List<BoxShadow> shadows;
+}
 
 enum AppThemeMode { light, auto, dark }
 
@@ -20,6 +34,137 @@ extension DarkThemePaletteLabel on DarkThemePalette {
     DarkThemePalette.moonlight => 'Moonlight',
     DarkThemePalette.nightOwl => 'Night Owl',
   };
+}
+
+Color _blendColor(Color base, Color tint, double alpha) {
+  return Color.alphaBlend(tint.withValues(alpha: alpha), base);
+}
+
+AppGlassStyle appGlassStyle(
+  ThemeData theme, {
+  AppGlassVariant variant = AppGlassVariant.primary,
+  Color? tone,
+}) {
+  final scheme = theme.colorScheme;
+  final isDark = theme.brightness == Brightness.dark;
+  final baseSurface = switch (variant) {
+    AppGlassVariant.primary => scheme.surface,
+    AppGlassVariant.secondary => _blendColor(
+      scheme.surface,
+      scheme.surfaceContainerHighest,
+      isDark ? 0.46 : 0.22,
+    ),
+    AppGlassVariant.chrome => _blendColor(
+      scheme.surface,
+      scheme.primary,
+      isDark ? 0.12 : 0.05,
+    ),
+  };
+  final fillBase = baseSurface.withValues(
+    alpha: switch (variant) {
+      AppGlassVariant.primary => isDark ? 0.84 : 0.74,
+      AppGlassVariant.secondary => isDark ? 0.78 : 0.68,
+      AppGlassVariant.chrome => isDark ? 0.74 : 0.64,
+    },
+  );
+
+  var topColor = _blendColor(
+    fillBase,
+    Colors.white,
+    switch (variant) {
+      AppGlassVariant.primary => isDark ? 0.12 : 0.58,
+      AppGlassVariant.secondary => isDark ? 0.09 : 0.44,
+      AppGlassVariant.chrome => isDark ? 0.18 : 0.74,
+    },
+  );
+  var middleColor = _blendColor(
+    fillBase,
+    scheme.primary,
+    switch (variant) {
+      AppGlassVariant.primary => isDark ? 0.12 : 0.05,
+      AppGlassVariant.secondary => isDark ? 0.09 : 0.04,
+      AppGlassVariant.chrome => isDark ? 0.18 : 0.08,
+    },
+  );
+  var bottomColor = _blendColor(
+    fillBase,
+    scheme.secondary,
+    switch (variant) {
+      AppGlassVariant.primary => isDark ? 0.10 : 0.05,
+      AppGlassVariant.secondary => isDark ? 0.08 : 0.04,
+      AppGlassVariant.chrome => isDark ? 0.12 : 0.06,
+    },
+  );
+
+  if (tone != null) {
+    topColor = _blendColor(topColor, tone, isDark ? 0.20 : 0.12);
+    middleColor = _blendColor(middleColor, tone, isDark ? 0.16 : 0.10);
+    bottomColor = _blendColor(bottomColor, tone, isDark ? 0.12 : 0.08);
+  }
+
+  final borderBase = scheme.outlineVariant.withValues(
+    alpha: switch (variant) {
+      AppGlassVariant.primary => isDark ? 0.62 : 0.24,
+      AppGlassVariant.secondary => isDark ? 0.52 : 0.20,
+      AppGlassVariant.chrome => isDark ? 0.70 : 0.30,
+    },
+  );
+  final borderColor = tone == null
+      ? borderBase
+      : _blendColor(borderBase, tone, isDark ? 0.36 : 0.18);
+
+  final shadowColor = scheme.shadow.withValues(
+    alpha: switch (variant) {
+      AppGlassVariant.primary => isDark ? 0.22 : 0.09,
+      AppGlassVariant.secondary => isDark ? 0.18 : 0.06,
+      AppGlassVariant.chrome => isDark ? 0.20 : 0.08,
+    },
+  );
+  final ambientShadowColor = scheme.shadow.withValues(
+    alpha: switch (variant) {
+      AppGlassVariant.primary => isDark ? 0.08 : 0.03,
+      AppGlassVariant.secondary => isDark ? 0.06 : 0.02,
+      AppGlassVariant.chrome => isDark ? 0.07 : 0.025,
+    },
+  );
+
+  return AppGlassStyle(
+    fillGradient: LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [topColor, middleColor, bottomColor],
+      stops: const [0, 0.38, 1],
+    ),
+    borderColor: borderColor,
+    shadows: [
+      BoxShadow(
+        color: shadowColor,
+        blurRadius: switch (variant) {
+          AppGlassVariant.primary => 30,
+          AppGlassVariant.secondary => 22,
+          AppGlassVariant.chrome => 26,
+        },
+        offset: switch (variant) {
+          AppGlassVariant.primary => const Offset(0, 18),
+          AppGlassVariant.secondary => const Offset(0, 12),
+          AppGlassVariant.chrome => const Offset(0, 14),
+        },
+      ),
+      BoxShadow(
+        color: ambientShadowColor,
+        blurRadius: switch (variant) {
+          AppGlassVariant.primary => 14,
+          AppGlassVariant.secondary => 10,
+          AppGlassVariant.chrome => 12,
+        },
+        offset: switch (variant) {
+          AppGlassVariant.primary => const Offset(0, 6),
+          AppGlassVariant.secondary => const Offset(0, 4),
+          AppGlassVariant.chrome => const Offset(0, 5),
+        },
+      ),
+    ],
+  );
 }
 
 ThemeData buildLightTheme() {
@@ -135,13 +280,14 @@ ThemeData _buildThemeData(ColorScheme scheme) {
     useMaterial3: true,
     scaffoldBackgroundColor: Colors.transparent,
   );
+  final isDark = scheme.brightness == Brightness.dark;
 
   return base.copyWith(
     appBarTheme: AppBarTheme(
-      backgroundColor: scheme.surface.withValues(alpha: 0.96),
+      backgroundColor: scheme.surface.withValues(alpha: isDark ? 0.82 : 0.68),
       foregroundColor: scheme.onSurface,
       surfaceTintColor: Colors.transparent,
-      shadowColor: scheme.shadow.withValues(alpha: 0.14),
+      shadowColor: scheme.shadow.withValues(alpha: isDark ? 0.18 : 0.08),
       elevation: 0,
       scrolledUnderElevation: 0,
       titleTextStyle: base.textTheme.titleLarge?.copyWith(
@@ -151,8 +297,17 @@ ThemeData _buildThemeData(ColorScheme scheme) {
     ),
     menuTheme: MenuThemeData(
       style: MenuStyle(
-        backgroundColor: WidgetStatePropertyAll(scheme.surfaceContainerHighest),
+        backgroundColor: WidgetStatePropertyAll(
+          _blendColor(
+            scheme.surface.withValues(alpha: isDark ? 0.92 : 0.86),
+            Colors.white,
+            isDark ? 0.06 : 0.12,
+          ),
+        ),
         surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
+        side: WidgetStatePropertyAll(
+          BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.34)),
+        ),
         shape: WidgetStatePropertyAll(
           RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         ),
@@ -186,18 +341,22 @@ ThemeData _buildThemeData(ColorScheme scheme) {
         }),
         backgroundColor: WidgetStateProperty.resolveWith((states) {
           return states.contains(WidgetState.selected)
-              ? scheme.primary
-              : scheme.surfaceContainerHigh;
+              ? scheme.primary.withValues(alpha: isDark ? 0.86 : 0.90)
+              : scheme.surface.withValues(alpha: isDark ? 0.34 : 0.44);
         }),
         side: WidgetStatePropertyAll(
-          BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.6)),
+          BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.42)),
         ),
       ),
     ),
     chipTheme: base.chipTheme.copyWith(
-      backgroundColor: scheme.surfaceContainerHigh,
+      backgroundColor: _blendColor(
+        scheme.surface.withValues(alpha: isDark ? 0.42 : 0.56),
+        scheme.primary,
+        isDark ? 0.10 : 0.04,
+      ),
       selectedColor: scheme.primary.withValues(alpha: 0.2),
-      side: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.55)),
+      side: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.42)),
       labelStyle: base.textTheme.labelLarge?.copyWith(
         color: scheme.onSurface,
         fontWeight: FontWeight.w600,
@@ -216,15 +375,19 @@ LinearGradient buildAppBackgroundGradient(ThemeData theme) {
       colors: [
         scheme.surface,
         Color.alphaBlend(
-          scheme.primary.withValues(alpha: 0.16),
+          scheme.primary.withValues(alpha: 0.18),
           scheme.surface,
         ),
         Color.alphaBlend(
           scheme.secondary.withValues(alpha: 0.12),
           scheme.surface,
         ),
+        Color.alphaBlend(
+          scheme.tertiary.withValues(alpha: 0.08),
+          scheme.surface,
+        ),
       ],
-      stops: const [0, 0.5, 1],
+      stops: const [0, 0.38, 0.74, 1],
     );
   }
 
@@ -232,10 +395,20 @@ LinearGradient buildAppBackgroundGradient(ThemeData theme) {
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
     colors: [
-      Color.alphaBlend(scheme.primary.withValues(alpha: 0.10), Colors.white),
-      Color.alphaBlend(scheme.tertiary.withValues(alpha: 0.08), Colors.white),
-      Color.alphaBlend(scheme.secondary.withValues(alpha: 0.06), Colors.white),
+      Color.alphaBlend(scheme.primary.withValues(alpha: 0.12), Colors.white),
+      Color.alphaBlend(
+        scheme.tertiary.withValues(alpha: 0.10),
+        const Color(0xFFFCFDFF),
+      ),
+      Color.alphaBlend(
+        scheme.secondary.withValues(alpha: 0.07),
+        const Color(0xFFF6FAFF),
+      ),
+      Color.alphaBlend(
+        scheme.primary.withValues(alpha: 0.04),
+        const Color(0xFFFDFEFF),
+      ),
     ],
-    stops: const [0, 0.55, 1],
+    stops: const [0, 0.34, 0.72, 1],
   );
 }
