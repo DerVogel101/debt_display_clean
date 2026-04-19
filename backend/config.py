@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "./uploads"
 
     # Built frontend output directory mounted by FastAPI.
+    # Relative paths are resolved from the backend config directory.
     FRONTEND_STATIC_DIR: str = str(DEFAULT_FRONTEND_STATIC_DIR)
     FRONTEND_HTML_CACHE_SECONDS: int = 0
     FRONTEND_SHELL_CACHE_SECONDS: int = 0
@@ -46,7 +47,10 @@ class Settings(BaseSettings):
 
     @property
     def frontend_static_dir_path(self) -> Path:
-        return Path(self.FRONTEND_STATIC_DIR).resolve()
+        frontend_static_dir = Path(self.FRONTEND_STATIC_DIR)
+        if frontend_static_dir.is_absolute():
+            return frontend_static_dir.resolve()
+        return (ENV_FILE.parent / frontend_static_dir).resolve()
 
 
 settings = Settings()

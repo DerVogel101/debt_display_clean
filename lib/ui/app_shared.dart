@@ -1,7 +1,7 @@
 import 'package:auth0_flutter/auth0_flutter.dart';
 import 'package:flutter/material.dart';
 
-const brandPrimary = Color(0xFF667EEA);
+import '../theme/app_themes.dart';
 
 enum AppDestination {
   home('Home', Icons.home_rounded),
@@ -22,35 +22,86 @@ class PageSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-
-    return Container(
-      width: double.infinity,
+    return GlassPanel(
       padding: padding,
-      decoration: BoxDecoration(
-        color: scheme.surface.withValues(
-          alpha: theme.brightness == Brightness.dark ? 0.92 : 0.88,
-        ),
-        borderRadius: BorderRadius.circular(32),
-        border: Border.all(
-          color: scheme.outlineVariant.withValues(
-            alpha: theme.brightness == Brightness.dark ? 0.65 : 0.35,
-          ),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: scheme.shadow.withValues(
-              alpha: theme.brightness == Brightness.dark ? 0.22 : 0.07,
-            ),
-            blurRadius: 30,
-            offset: const Offset(0, 18),
-          ),
-        ],
+      borderRadius: const BorderRadius.all(Radius.circular(32)),
+      width: double.infinity,
+      child: child,
+    );
+  }
+}
+
+class GlassPanel extends StatelessWidget {
+  const GlassPanel({
+    super.key,
+    required this.child,
+    required this.padding,
+    this.borderRadius = const BorderRadius.all(Radius.circular(32)),
+    this.variant = AppGlassVariant.primary,
+    this.tone,
+    this.width,
+  });
+
+  const GlassPanel.secondary({
+    super.key,
+    required this.child,
+    required this.padding,
+    this.borderRadius = const BorderRadius.all(Radius.circular(24)),
+    this.tone,
+    this.width,
+  }) : variant = AppGlassVariant.secondary;
+
+  const GlassPanel.chrome({
+    super.key,
+    required this.child,
+    required this.padding,
+    this.borderRadius = const BorderRadius.all(Radius.circular(28)),
+    this.tone,
+    this.width,
+  }) : variant = AppGlassVariant.chrome;
+
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+  final BorderRadiusGeometry borderRadius;
+  final AppGlassVariant variant;
+  final Color? tone;
+  final double? width;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      padding: padding,
+      decoration: glassSurfaceDecoration(
+        context,
+        variant: variant,
+        borderRadius: borderRadius,
+        tone: tone,
       ),
       child: child,
     );
   }
+}
+
+BoxDecoration glassSurfaceDecoration(
+  BuildContext context, {
+  AppGlassVariant variant = AppGlassVariant.primary,
+  required BorderRadiusGeometry borderRadius,
+  Color? tone,
+  bool includeShadows = true,
+}) {
+  final style = appGlassStyle(
+    Theme.of(context),
+    variant: variant,
+    tone: tone,
+  );
+
+  return BoxDecoration(
+    gradient: style.fillGradient,
+    borderRadius: borderRadius,
+    border: Border.all(color: style.borderColor),
+    boxShadow: includeShadows ? style.shadows : null,
+  );
 }
 
 class ErrorSection extends StatelessWidget {
@@ -62,8 +113,10 @@ class ErrorSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
-    return PageSection(
+    return GlassPanel(
       padding: const EdgeInsets.all(22),
+      borderRadius: const BorderRadius.all(Radius.circular(28)),
+      tone: scheme.error,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -157,12 +210,4 @@ class UserAvatar extends StatelessWidget {
 
 Color mutedForegroundColor(BuildContext context, {double alpha = 0.72}) {
   return Theme.of(context).colorScheme.onSurface.withValues(alpha: alpha);
-}
-
-Color tileSurfaceColor(BuildContext context) {
-  final theme = Theme.of(context);
-  final scheme = theme.colorScheme;
-  return theme.brightness == Brightness.dark
-      ? scheme.surfaceContainerHigh.withValues(alpha: 0.92)
-      : scheme.surfaceContainerHigh.withValues(alpha: 0.66);
 }
