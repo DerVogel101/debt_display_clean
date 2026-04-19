@@ -11,6 +11,20 @@ import 'app_sections.dart';
 export 'app_shared.dart';
 
 const desktopBreakpoint = 768.0;
+const mobileBottomNavigationHeight = 72.0;
+const mobileBottomNavigationHorizontalPadding = 14.0;
+const mobileBottomNavigationTopPadding = 4.0;
+const mobileBottomNavigationBottomPadding = 14.0;
+const mobileBottomNavigationOuterPadding = EdgeInsets.fromLTRB(
+  mobileBottomNavigationHorizontalPadding,
+  mobileBottomNavigationTopPadding,
+  mobileBottomNavigationHorizontalPadding,
+  mobileBottomNavigationBottomPadding,
+);
+const mobileBottomNavigationReservedHeight =
+    mobileBottomNavigationHeight +
+    mobileBottomNavigationTopPadding +
+    mobileBottomNavigationBottomPadding;
 
 class ResponsiveShell extends StatelessWidget {
   const ResponsiveShell({super.key});
@@ -21,6 +35,7 @@ class ResponsiveShell extends StatelessWidget {
       builder: (context, constraints) {
         final isDesktop = constraints.maxWidth >= desktopBreakpoint;
         final theme = Theme.of(context);
+        final safeAreaBottom = MediaQuery.paddingOf(context).bottom;
 
         return Scaffold(
           appBar: isDesktop ? const _DesktopAppBar() : null,
@@ -30,14 +45,15 @@ class ResponsiveShell extends StatelessWidget {
             ),
             child: SafeArea(
               top: !isDesktop,
-              bottom: !isDesktop,
+              bottom: false,
               child: Stack(
                 children: [
-                  Column(
-                    children: [
-                      if (!isDesktop) const _MobileTopBar(),
-                      Expanded(child: AppSections(isDesktop: isDesktop)),
-                    ],
+                  AppSections(
+                    isDesktop: isDesktop,
+                    mobileBottomInset: isDesktop
+                        ? mobileBottomNavigationReservedHeight
+                        : mobileBottomNavigationReservedHeight + safeAreaBottom,
+                    mobileHeader: isDesktop ? null : const _MobileTopBar(),
                   ),
                   if (!isDesktop)
                     const Positioned(
@@ -164,52 +180,49 @@ class _MobileTopBar extends StatelessWidget {
         ? scheme.surfaceContainerHigh
         : scheme.surface;
 
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 12, 16, 6),
-      child: Material(
-        color: backgroundColor,
-        elevation: 0,
-        shadowColor: scheme.shadow.withValues(alpha: 0.12),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(28),
-          side: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.5)),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-          child: Row(
-            children: [
-              const _BrandLockup(showSubtitle: false),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      greeting,
-                      maxLines: 1,
-                      softWrap: false,
-                      overflow: TextOverflow.fade,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
+    return Material(
+      color: backgroundColor,
+      elevation: 0,
+      shadowColor: scheme.shadow.withValues(alpha: 0.12),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(28),
+        side: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.5)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        child: Row(
+          children: [
+            const _BrandLockup(showSubtitle: false),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    greeting,
+                    maxLines: 1,
+                    softWrap: false,
+                    overflow: TextOverflow.fade,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      selectedDestination.label,
-                      maxLines: 1,
-                      softWrap: false,
-                      overflow: TextOverflow.fade,
-                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        color: mutedForegroundColor(context),
-                      ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    selectedDestination.label,
+                    maxLines: 1,
+                    softWrap: false,
+                    overflow: TextOverflow.fade,
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: mutedForegroundColor(context),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -403,7 +416,7 @@ class _MobileBottomNavigation extends StatelessWidget {
     return SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 4, 14, 14),
+        padding: mobileBottomNavigationOuterPadding,
         child: DecoratedBox(
           decoration: BoxDecoration(
             color: backgroundColor,
@@ -424,7 +437,7 @@ class _MobileBottomNavigation extends StatelessWidget {
             child: NavigationBar(
               backgroundColor: backgroundColor,
               selectedIndex: AppDestination.values.indexOf(currentDestination),
-              height: 72,
+              height: mobileBottomNavigationHeight,
               elevation: 0,
               labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
               destinations: AppDestination.values

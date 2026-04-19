@@ -4,6 +4,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 ENV_FILE = Path(__file__).resolve().parent / ".env"
+DEFAULT_FRONTEND_STATIC_DIR = Path(__file__).resolve().parent / "web"
 
 
 class Settings(BaseSettings):
@@ -19,6 +20,11 @@ class Settings(BaseSettings):
 
     # File upload root directory
     UPLOAD_DIR: str = "./uploads"
+
+    # Built frontend output directory mounted by FastAPI.
+    FRONTEND_STATIC_DIR: str = str(DEFAULT_FRONTEND_STATIC_DIR)
+    FRONTEND_HTML_CACHE_SECONDS: int = 0
+    FRONTEND_SHELL_CACHE_SECONDS: int = 0
 
     # ── Server ports ──────────────────────────────────────────────────────────
     # Dev:  Flutter runs on :3000, backend on :3300
@@ -37,6 +43,10 @@ class Settings(BaseSettings):
     @property
     def allowed_origins_list(self) -> list[str]:
         return [o.strip() for o in self.ALLOWED_ORIGINS.split(",") if o.strip()]
+
+    @property
+    def frontend_static_dir_path(self) -> Path:
+        return Path(self.FRONTEND_STATIC_DIR).resolve()
 
 
 settings = Settings()

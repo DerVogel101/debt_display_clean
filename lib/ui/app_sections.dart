@@ -9,9 +9,16 @@ import '../theme/app_themes.dart';
 import 'app_shared.dart';
 
 class AppSections extends StatefulWidget {
-  const AppSections({super.key, required this.isDesktop});
+  const AppSections({
+    super.key,
+    required this.isDesktop,
+    required this.mobileBottomInset,
+    this.mobileHeader,
+  });
 
   final bool isDesktop;
+  final double mobileBottomInset;
+  final Widget? mobileHeader;
 
   @override
   State<AppSections> createState() => _AppSectionsState();
@@ -61,13 +68,22 @@ class _AppSectionsState extends State<AppSections> {
         widget.isDesktop ? 32 : 16,
         widget.isDesktop ? 28 : 16,
         widget.isDesktop ? 32 : 16,
-        widget.isDesktop ? 32 : 118,
+        widget.isDesktop ? 32 : widget.mobileBottomInset,
       ),
-      child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 220),
-        switchInCurve: Curves.easeOutCubic,
-        switchOutCurve: Curves.easeInCubic,
-        child: _buildContent(context),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (!widget.isDesktop && widget.mobileHeader != null) ...[
+            widget.mobileHeader!,
+            const SizedBox(height: 10),
+          ],
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 220),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeInCubic,
+            child: _buildContent(context),
+          ),
+        ],
       ),
     );
 
@@ -75,28 +91,34 @@ class _AppSectionsState extends State<AppSections> {
       alignment: Alignment.topCenter,
       child: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: maxWidth),
-        child: widget.isDesktop || !_showTopFade
-            ? scrollView
-            : ShaderMask(
-                blendMode: BlendMode.dstIn,
-                shaderCallback: (bounds) {
-                  final fadeStop = (_topFadeHeight / bounds.height).clamp(
-                    0.0,
-                    1.0,
-                  );
-                  return LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: const [
-                      Colors.transparent,
-                      Colors.black,
-                      Colors.black,
-                    ],
-                    stops: [0, fadeStop, 1],
-                  ).createShader(bounds);
-                },
-                child: scrollView,
+        child: Stack(
+          children: [
+            scrollView,
+            if (!widget.isDesktop && _showTopFade)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Theme.of(context).colorScheme.surface,
+                          Theme.of(
+                            context,
+                          ).colorScheme.surface.withValues(alpha: 0),
+                        ],
+                      ),
+                    ),
+                    child: const SizedBox(height: _topFadeHeight),
+                  ),
+                ),
               ),
+          ],
+        ),
       ),
     );
   }

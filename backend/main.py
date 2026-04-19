@@ -1,10 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 import uvicorn
 
 from backend.api import api_app
 from backend.config import settings
+from backend.frontend import FrontendStaticFiles
 
 app = FastAPI(title="root")
 app.add_middleware(
@@ -17,7 +17,16 @@ app.add_middleware(
 
 # API must be mounted before the catch-all static mount.
 app.mount("/api", api_app)
-app.mount("/", StaticFiles(directory="web/", html=True), name="frontend")
+app.mount(
+    "/",
+    FrontendStaticFiles(
+        directory=settings.frontend_static_dir_path,
+        html=True,
+        html_cache_seconds=settings.FRONTEND_HTML_CACHE_SECONDS,
+        shell_cache_seconds=settings.FRONTEND_SHELL_CACHE_SECONDS,
+    ),
+    name="frontend",
+)
 
 if __name__ == "__main__":
     uvicorn.run(app, host=settings.BACKEND_HOST, port=settings.BACKEND_PORT)
