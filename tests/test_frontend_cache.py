@@ -12,7 +12,9 @@ from backend.frontend import FrontendStaticFiles
 class FrontendCacheHeadersTests(unittest.TestCase):
     def setUp(self) -> None:
         self._frontend_dir = (
-            Path(__file__).resolve().parents[1] / "backend" / "web"
+            Path(__file__).resolve().parent
+            / "fixtures"
+            / "frontend_static"
         )
 
         app = FastAPI()
