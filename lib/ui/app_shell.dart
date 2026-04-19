@@ -1,3 +1,5 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:auth0_flutter/auth0_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -402,6 +404,8 @@ class _BrandLockup extends StatelessWidget {
 class _MobileBottomNavigation extends StatelessWidget {
   const _MobileBottomNavigation();
 
+  static const _blurSigma = 6.0;
+
   @override
   Widget build(BuildContext context) {
     final currentDestination = context.select<NavigationState, AppDestination>(
@@ -419,11 +423,7 @@ class _MobileBottomNavigation extends StatelessWidget {
         padding: mobileBottomNavigationOuterPadding,
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: backgroundColor,
             borderRadius: BorderRadius.circular(30),
-            border: Border.all(
-              color: scheme.outlineVariant.withValues(alpha: 0.55),
-            ),
             boxShadow: [
               BoxShadow(
                 color: scheme.shadow.withValues(alpha: 0.18),
@@ -434,25 +434,39 @@ class _MobileBottomNavigation extends StatelessWidget {
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(30),
-            child: NavigationBar(
-              backgroundColor: backgroundColor,
-              selectedIndex: AppDestination.values.indexOf(currentDestination),
-              height: mobileBottomNavigationHeight,
-              elevation: 0,
-              labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-              destinations: AppDestination.values
-                  .map(
-                    (destination) => NavigationDestination(
-                      icon: Icon(destination.icon),
-                      label: destination.label,
-                    ),
-                  )
-                  .toList(),
-              onDestinationSelected: (index) {
-                context.read<NavigationState>().selectDestination(
-                  AppDestination.values[index],
-                );
-              },
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: _blurSigma, sigmaY: _blurSigma),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: backgroundColor,
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(
+                    color: scheme.outlineVariant.withValues(alpha: 0.42),
+                  ),
+                ),
+                child: NavigationBar(
+                  backgroundColor: Colors.transparent,
+                  selectedIndex: AppDestination.values.indexOf(
+                    currentDestination,
+                  ),
+                  height: mobileBottomNavigationHeight,
+                  elevation: 0,
+                  labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+                  destinations: AppDestination.values
+                      .map(
+                        (destination) => NavigationDestination(
+                          icon: Icon(destination.icon),
+                          label: destination.label,
+                        ),
+                      )
+                      .toList(),
+                  onDestinationSelected: (index) {
+                    context.read<NavigationState>().selectDestination(
+                      AppDestination.values[index],
+                    );
+                  },
+                ),
+              ),
             ),
           ),
         ),
