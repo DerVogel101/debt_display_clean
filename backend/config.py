@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     AUTH0_DOMAIN: str = ""
     AUTH0_AUDIENCE: str = ""
     AUTH0_JWT_LEEWAY_SECONDS: int = 60
+    AUTH0_FULL_NAME_CLAIM: str = "https://debt-display.dervogel101.de/fullName"
 
     # SQLite file path
     DATABASE_URL: str = "sqlite+aiosqlite:///./database.sqlite"

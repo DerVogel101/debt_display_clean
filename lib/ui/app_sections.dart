@@ -273,11 +273,12 @@ class ProfileSection extends StatelessWidget {
     final authView = context
         .select<
           AuthSessionState,
-          ({Credentials? credentials, String? backendError})
+          ({Credentials? credentials, String? backendError, String? displayName})
         >(
           (state) => (
             credentials: state.credentials,
             backendError: state.backendError,
+            displayName: state.displayName,
           ),
         );
 
@@ -287,7 +288,10 @@ class ProfileSection extends StatelessWidget {
           padding: const EdgeInsets.all(24),
           child: authView.credentials == null
               ? const _LoggedOutProfileCard()
-              : _LoggedInProfileCard(credentials: authView.credentials!),
+              : _LoggedInProfileCard(
+                  credentials: authView.credentials!,
+                  displayName: authView.displayName ?? 'User',
+                ),
         ),
         if (authView.backendError != null) ...[
           const SizedBox(height: 18),
@@ -523,9 +527,13 @@ class _LoggedOutProfileCard extends StatelessWidget {
 }
 
 class _LoggedInProfileCard extends StatelessWidget {
-  const _LoggedInProfileCard({required this.credentials});
+  const _LoggedInProfileCard({
+    required this.credentials,
+    required this.displayName,
+  });
 
   final Credentials credentials;
+  final String displayName;
 
   @override
   Widget build(BuildContext context) {
@@ -533,11 +541,15 @@ class _LoggedInProfileCard extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (credentials.user.pictureUrl != null) ...[
-          UserAvatar(credentials: credentials, radius: 42),
+          UserAvatar(
+            credentials: credentials,
+            radius: 42,
+            displayName: displayName,
+          ),
           const SizedBox(height: 18),
         ],
         Text(
-          credentials.user.name ?? 'User',
+          displayName,
           style: Theme.of(
             context,
           ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
@@ -550,7 +562,10 @@ class _LoggedInProfileCard extends StatelessWidget {
           ).textTheme.bodyLarge?.copyWith(color: mutedForegroundColor(context)),
         ),
         const SizedBox(height: 24),
-        _ProfileInfoTable(credentials: credentials),
+        _ProfileInfoTable(
+          credentials: credentials,
+          displayName: displayName,
+        ),
         const SizedBox(height: 24),
         Text(
           'Raw user object',
@@ -585,15 +600,19 @@ class _LoggedInProfileCard extends StatelessWidget {
 }
 
 class _ProfileInfoTable extends StatelessWidget {
-  const _ProfileInfoTable({required this.credentials});
+  const _ProfileInfoTable({
+    required this.credentials,
+    required this.displayName,
+  });
 
   final Credentials credentials;
+  final String displayName;
 
   @override
   Widget build(BuildContext context) {
     final rows = [
       ('Email', credentials.user.email ?? 'N/A'),
-      ('Name', credentials.user.name ?? 'N/A'),
+      ('Display name', displayName),
       ('Nickname', credentials.user.nickname ?? 'N/A'),
       ('User ID', credentials.user.sub),
     ];

@@ -3,12 +3,15 @@ import 'package:flutter/services.dart';
 
 abstract final class AppConfig {
   static const String _assetPath = 'assets/env/app.env';
+  static const String defaultAuth0FullNameClaim =
+      'https://debt-display.dervogel101.de/fullName';
 
   static late final String backendUrl;
   static late final String frontendUrl;
   static late final String auth0Domain;
   static late final String auth0ClientId;
   static late final String auth0Audience;
+  static late final String auth0FullNameClaim;
 
   static bool _loaded = false;
 
@@ -54,6 +57,8 @@ abstract final class AppConfig {
     auth0Domain = values['AUTH0_DOMAIN'] ?? '';
     auth0ClientId = values['AUTH0_CLIENT_ID'] ?? '';
     auth0Audience = values['AUTH0_AUDIENCE'] ?? '';
+    auth0FullNameClaim =
+        values['AUTH0_FULL_NAME_CLAIM'] ?? defaultAuth0FullNameClaim;
     _loaded = true;
   }
 }

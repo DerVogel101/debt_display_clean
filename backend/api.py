@@ -51,6 +51,13 @@ def _first_non_empty(*values: str | None) -> str | None:
     return None
 
 
+def _trimmed_non_empty_string(value: object | None) -> str | None:
+    if not isinstance(value, str):
+        return None
+    trimmed = value.strip()
+    return trimmed or None
+
+
 def _pb_response(message, status_code: int = 200) -> ProtobufResponse:
     return ProtobufResponse(content=message.SerializeToString(), status_code=status_code)
 
@@ -219,8 +226,15 @@ async def login(request: Request, session: AsyncSession = Depends(get_session)) 
     proto_req.ParseFromString(body)
     try:
         claims = await verify_token(proto_req.access_token)
+        full_name_claim = _trimmed_non_empty_string(
+            claims.get(settings.AUTH0_FULL_NAME_CLAIM)
+        )
+        token_name = _trimmed_non_empty_string(claims.get("name"))
         userinfo = {}
-        if any(claims.get(field) is None for field in ("email", "name", "picture")):
+        if (
+            any(claims.get(field) is None for field in ("email", "picture"))
+            or (full_name_claim is None and token_name is None)
+        ):
             userinfo = await fetch_userinfo(proto_req.access_token)
 
         user = await get_or_create_user(
@@ -232,9 +246,10 @@ async def login(request: Request, session: AsyncSession = Depends(get_session)) 
                 proto_req.email,
             ),
             name=_first_non_empty(
-                claims.get("name"),
-                userinfo.get("name"),
-                proto_req.name,
+                full_name_claim,
+                token_name,
+                _trimmed_non_empty_string(userinfo.get("name")),
+                _trimmed_non_empty_string(proto_req.name),
             ),
             avatar_url=_first_non_empty(
                 claims.get("picture"),

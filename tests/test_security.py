@@ -147,6 +147,87 @@ class LoginHardeningTests(AsyncDatabaseTestCase):
         self.assertEqual(user.name, userinfo["name"])
         self.assertEqual(user.avatar_url, userinfo["picture"])
 
+    async def test_login_prefers_custom_full_name_claim_over_other_name_sources(self) -> None:
+        claims = {
+            "sub": "auth0|owner",
+            "email": "claim@example.com",
+            "name": "Claim Name",
+            "picture": "https://example.com/claim.png",
+            settings.AUTH0_FULL_NAME_CLAIM: "Metadata Full Name",
+        }
+        conflicting_userinfo = {
+            "email": "userinfo@example.com",
+            "name": "Userinfo Name",
+            "picture": "https://example.com/userinfo.png",
+        }
+        request = auth_pb2.LoginRequest(
+            access_token="valid-token",
+            email="body@example.com",
+            name="Body Name",
+            avatar_url="https://example.com/body.png",
+        )
+
+        with (
+            patch("backend.api.verify_token", new=AsyncMock(return_value=claims)),
+            patch("backend.api.fetch_userinfo", new=AsyncMock(return_value=conflicting_userinfo)),
+        ):
+            transport = ASGITransport(app=main.app)
+            async with AsyncClient(
+                transport=transport,
+                base_url="http://testserver",
+            ) as client:
+                response = await client.post(
+                    "/api/auth/login",
+                    content=request.SerializeToString(),
+                    headers={"Content-Type": "application/x-protobuf"},
+                )
+
+        self.assertEqual(response.status_code, 200)
+
+        async with db.async_session_maker() as session:
+            result = await session.execute(
+                select(db.User).where(db.User.sub == claims["sub"])
+            )
+            user = result.scalar_one()
+
+        self.assertEqual(user.name, claims[settings.AUTH0_FULL_NAME_CLAIM])
+
+    async def test_login_skips_userinfo_when_custom_full_name_claim_is_present(self) -> None:
+        claims = {
+            "sub": "auth0|owner",
+            "email": "claim@example.com",
+            "picture": "https://example.com/claim.png",
+            settings.AUTH0_FULL_NAME_CLAIM: "Metadata Full Name",
+        }
+        fetch_userinfo = AsyncMock(return_value={"name": "Userinfo Name"})
+        request = auth_pb2.LoginRequest(access_token="valid-token")
+
+        with (
+            patch("backend.api.verify_token", new=AsyncMock(return_value=claims)),
+            patch("backend.api.fetch_userinfo", new=fetch_userinfo),
+        ):
+            transport = ASGITransport(app=main.app)
+            async with AsyncClient(
+                transport=transport,
+                base_url="http://testserver",
+            ) as client:
+                response = await client.post(
+                    "/api/auth/login",
+                    content=request.SerializeToString(),
+                    headers={"Content-Type": "application/x-protobuf"},
+                )
+
+        self.assertEqual(response.status_code, 200)
+        fetch_userinfo.assert_not_awaited()
+
+        async with db.async_session_maker() as session:
+            result = await session.execute(
+                select(db.User).where(db.User.sub == claims["sub"])
+            )
+            user = result.scalar_one()
+
+        self.assertEqual(user.name, claims[settings.AUTH0_FULL_NAME_CLAIM])
+
     async def test_login_uses_request_profile_as_last_resort(self) -> None:
         claims_without_profile = {"sub": "auth0|owner"}
         request = auth_pb2.LoginRequest(

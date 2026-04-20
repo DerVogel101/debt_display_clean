@@ -1,6 +1,8 @@
 import 'package:auth0_flutter/auth0_flutter.dart';
 import 'package:flutter/material.dart';
 
+import '../config/app_config.dart';
+import '../state/auth_session_state.dart';
 import '../theme/app_themes.dart';
 
 enum AppDestination {
@@ -172,23 +174,47 @@ class UserAvatar extends StatelessWidget {
     super.key,
     required this.credentials,
     required this.radius,
+    this.displayName,
   });
 
   final Credentials? credentials;
   final double radius;
+  final String? displayName;
 
   @override
   Widget build(BuildContext context) {
-    final name = credentials?.user.name ?? credentials?.user.nickname ?? 'U';
+    final name =
+        displayName ??
+        AuthSessionState.resolveDisplayNameForUser(
+          credentials?.user,
+          claimKey: AppConfig.auth0FullNameClaim,
+        ) ??
+        'U';
     final pictureUrl = credentials?.user.pictureUrl?.toString();
 
     if (pictureUrl != null && pictureUrl.isNotEmpty) {
-      return CircleAvatar(
-        radius: radius,
-        backgroundImage: NetworkImage(pictureUrl),
+      return SizedBox(
+        width: radius * 2,
+        height: radius * 2,
+        child: ClipOval(
+          child: Image.network(
+            pictureUrl,
+            width: radius * 2,
+            height: radius * 2,
+            fit: BoxFit.cover,
+            webHtmlElementStrategy: WebHtmlElementStrategy.fallback,
+            errorBuilder: (context, error, stackTrace) {
+              return _buildFallbackAvatar(context, name);
+            },
+          ),
+        ),
       );
     }
 
+    return _buildFallbackAvatar(context, name);
+  }
+
+  Widget _buildFallbackAvatar(BuildContext context, String name) {
     final trimmed = name.trim();
     final initial = trimmed.isNotEmpty
         ? trimmed.substring(0, 1).toUpperCase()

@@ -321,13 +321,20 @@ class _DesktopAccountControl extends StatelessWidget {
     final authView = context
         .select<
           AuthSessionState,
-          ({bool isLoading, String? name, String? email, bool isAuthenticated})
+          ({
+            bool isLoading,
+            String? name,
+            String? email,
+            bool isAuthenticated,
+            Credentials? credentials,
+          })
         >(
           (state) => (
             isLoading: state.isLoading,
             name: state.displayName,
             email: state.userEmail,
             isAuthenticated: state.isAuthenticated,
+            credentials: state.credentials,
           ),
         );
     if (authView.isLoading) {
@@ -357,11 +364,10 @@ class _DesktopAccountControl extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Selector<AuthSessionState, Credentials?>(
-            selector: (_, state) => state.credentials,
-            builder: (context, credentials, child) {
-              return UserAvatar(credentials: credentials, radius: 28);
-            },
+          UserAvatar(
+            credentials: authView.credentials,
+            radius: 28,
+            displayName: authView.name,
           ),
           const SizedBox(width: 10),
           Flexible(

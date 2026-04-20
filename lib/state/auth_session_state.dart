@@ -18,6 +18,7 @@ class AuthSessionState extends ChangeNotifier {
   Credentials? _credentials;
   bool _isLoading = true;
   String? _backendError;
+  String? _backendDisplayName;
   bool _hasStarted = false;
 
   Credentials? get credentials => _credentials;
@@ -25,6 +26,52 @@ class AuthSessionState extends ChangeNotifier {
   String? get backendError => _backendError;
   bool get isAuthenticated => _credentials != null;
   String? get userEmail => _credentials?.user.email;
+
+  static String? resolvePersistedNameForUser(
+    UserProfile? user, {
+    String claimKey = AppConfig.defaultAuth0FullNameClaim,
+    String? backendName,
+  }) {
+    final resolvedBackendName = _trimmedNonEmptyString(backendName);
+    if (resolvedBackendName != null) {
+      return resolvedBackendName;
+    }
+
+    final customFullName = _trimmedNonEmptyString(user?.customClaims?[claimKey]);
+    if (customFullName != null) {
+      return customFullName;
+    }
+
+    return _trimmedNonEmptyString(user?.name);
+  }
+
+  static String? resolveDisplayNameForUser(
+    UserProfile? user, {
+    String claimKey = AppConfig.defaultAuth0FullNameClaim,
+    String? backendName,
+  }) {
+    final name = resolvePersistedNameForUser(
+      user,
+      claimKey: claimKey,
+      backendName: backendName,
+    );
+    if (name != null) {
+      return name;
+    }
+
+    final nickname = _trimmedNonEmptyString(user?.nickname);
+    if (nickname != null) {
+      return nickname;
+    }
+
+    final email = _trimmedNonEmptyString(user?.email);
+    if (email != null) {
+      return email.split('@').first;
+    }
+
+    return null;
+  }
+
   String get greeting {
     final name = displayName;
     if (name == null || name.isEmpty) {
@@ -34,23 +81,11 @@ class AuthSessionState extends ChangeNotifier {
   }
 
   String? get displayName {
-    final user = _credentials?.user;
-    final name = user?.name?.trim();
-    if (name != null && name.isNotEmpty) {
-      return name;
-    }
-
-    final nickname = user?.nickname?.trim();
-    if (nickname != null && nickname.isNotEmpty) {
-      return nickname;
-    }
-
-    final email = user?.email?.trim();
-    if (email != null && email.isNotEmpty) {
-      return email.split('@').first;
-    }
-
-    return null;
+    return resolveDisplayNameForUser(
+      _credentials?.user,
+      claimKey: AppConfig.auth0FullNameClaim,
+      backendName: _backendDisplayName,
+    );
   }
 
   Future<void> initialize() async {
@@ -66,10 +101,14 @@ class AuthSessionState extends ChangeNotifier {
             : null,
       );
       if (credentials != null) {
+        final persistedName = resolvePersistedNameForUser(
+          credentials.user,
+          claimKey: AppConfig.auth0FullNameClaim,
+        );
         final backendResp = await _authBackendService.login(
           credentials.accessToken,
           email: credentials.user.email,
-          name: credentials.user.name,
+          name: persistedName,
           avatarUrl: credentials.user.pictureUrl?.toString(),
         );
 
@@ -83,6 +122,10 @@ class AuthSessionState extends ChangeNotifier {
           notifyListeners();
           return;
         }
+
+        await _refreshBackendDisplayName(credentials.accessToken);
+      } else {
+        _backendDisplayName = null;
       }
 
       _credentials = credentials;
@@ -139,9 +182,38 @@ class AuthSessionState extends ChangeNotifier {
       await _auth0Service.auth0Web.logout(returnToUrl: AppConfig.frontendUrl);
     } catch (_) {
       _credentials = null;
+      _backendDisplayName = null;
       _backendError = 'Your session expired. Please log in again.';
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  Future<void> _refreshBackendDisplayName(String accessToken) async {
+    final response = await _authBackendService.getMe(accessToken);
+    if (!response.success) {
+      if (_authBackendService.isExpiredTokenMessage(response.message)) {
+        await _handleExpiredSession();
+        return;
+      }
+      _backendDisplayName = null;
+      return;
+    }
+
+    if (response.hasUser() && response.user.hasName()) {
+      _backendDisplayName = _trimmedNonEmptyString(response.user.name);
+      return;
+    }
+
+    _backendDisplayName = null;
+  }
+
+  static String? _trimmedNonEmptyString(Object? value) {
+    if (value is! String) {
+      return null;
+    }
+
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? null : trimmed;
   }
 }

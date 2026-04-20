@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:debt_display/generated/auth.pb.dart';
+import 'package:debt_display/generated/debt.pb.dart';
 import 'package:debt_display/config/app_config.dart';
 import 'dart:typed_data';
 
@@ -70,6 +71,15 @@ class AuthBackendService {
       data: req.writeToBuffer(),
     );
     return _parseProtobufResponse(response, LoginResponse.fromBuffer);
+  }
+
+  Future<UserResponse> getMe(String accessToken) async {
+    final response = await _dio.post(
+      '/api/users/me',
+      data: EmptyRequest().writeToBuffer(),
+      options: withAuthToken(accessToken),
+    );
+    return _parseProtobufResponse(response, UserResponse.fromBuffer);
   }
 
   /// Check token validity before any protected API call.
