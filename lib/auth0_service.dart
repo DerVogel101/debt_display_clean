@@ -1,5 +1,5 @@
 import 'package:auth0_flutter/auth0_flutter_web.dart';
-import 'config/app_config.dart';
+import 'package:debt_display/config/app_config.dart';
 
 class Auth0Service {
   static Auth0Service? _instance;

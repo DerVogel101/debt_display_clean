@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
-import '../theme/app_themes.dart';
+import 'package:debt_display/theme/app_themes.dart';
 
 class ThemeState extends ChangeNotifier {
   static const _themeModeKey = 'theme.mode';

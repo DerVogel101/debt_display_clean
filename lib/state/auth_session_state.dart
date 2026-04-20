@@ -1,9 +1,8 @@
 import 'package:auth0_flutter/auth0_flutter.dart';
+import 'package:debt_display/auth0_service.dart';
+import 'package:debt_display/config/app_config.dart';
+import 'package:debt_display/services/auth_backend_service.dart';
 import 'package:flutter/foundation.dart';
-
-import '../auth0_service.dart';
-import '../config/app_config.dart';
-import '../services/auth_backend_service.dart';
 
 class AuthSessionState extends ChangeNotifier {
   AuthSessionState({

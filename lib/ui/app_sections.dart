@@ -1,12 +1,11 @@
 import 'package:auth0_flutter/auth0_flutter.dart';
+import 'package:debt_display/state/auth_session_state.dart';
+import 'package:debt_display/state/navigation_state.dart';
+import 'package:debt_display/state/theme_state.dart';
+import 'package:debt_display/theme/app_themes.dart';
+import 'package:debt_display/ui/app_shared.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
-import '../state/auth_session_state.dart';
-import '../state/navigation_state.dart';
-import '../state/theme_state.dart';
-import '../theme/app_themes.dart';
-import 'app_shared.dart';
 
 class AppSections extends StatefulWidget {
   const AppSections({

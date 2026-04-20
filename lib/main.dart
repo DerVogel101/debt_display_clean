@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import 'auth0_service.dart';
-import 'config/app_config.dart';
-import 'services/auth_backend_service.dart';
-import 'state/auth_session_state.dart';
-import 'state/navigation_state.dart';
-import 'state/theme_state.dart';
-import 'ui/app_shell.dart';
+import 'package:debt_display/auth0_service.dart';
+import 'package:debt_display/config/app_config.dart';
+import 'package:debt_display/services/auth_backend_service.dart';
+import 'package:debt_display/state/auth_session_state.dart';
+import 'package:debt_display/state/navigation_state.dart';
+import 'package:debt_display/state/theme_state.dart';
+import 'package:debt_display/ui/app_shell.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();

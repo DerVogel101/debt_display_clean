@@ -1,9 +1,8 @@
 import 'package:auth0_flutter/auth0_flutter.dart';
+import 'package:debt_display/config/app_config.dart';
+import 'package:debt_display/state/auth_session_state.dart';
+import 'package:debt_display/theme/app_themes.dart';
 import 'package:flutter/material.dart';
-
-import '../config/app_config.dart';
-import '../state/auth_session_state.dart';
-import '../theme/app_themes.dart';
 
 enum AppDestination {
   home('Home', Icons.home_rounded),

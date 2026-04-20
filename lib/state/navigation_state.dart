@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 
-import '../ui/app_shared.dart';
+import 'package:debt_display/ui/app_shared.dart';
 
 class NavigationState extends ChangeNotifier {
   AppDestination _selectedDestination = AppDestination.home;
