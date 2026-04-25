@@ -5,6 +5,7 @@ import 'package:debt_display/state/theme_state.dart';
 import 'package:debt_display/theme/app_themes.dart';
 import 'package:debt_display/ui/app_shared.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 class AppSections extends StatefulWidget {
@@ -156,49 +157,142 @@ class HomeSection extends StatelessWidget {
 
   final bool isDesktop;
 
+  static final NumberFormat _currencyFormat = NumberFormat.currency(
+    locale: 'de_DE',
+    symbol: '',
+    decimalDigits: 2,
+  );
+  static final DateFormat _dueDateFormat = DateFormat('dd.MM.yy');
+  static final List<_PlaceholderBill> _placeholderBills = [
+    _PlaceholderBill(
+      title: 'Studio rent top-up',
+      dueDate: DateTime(2026, 5, 2),
+      amount: 427.00,
+      tags: [
+        _PlaceholderTag(icon: '🏠', text: 'Home', color: '#FFB74D'),
+        _PlaceholderTag(icon: '⚠️', text: 'Due soon', color: '#E57373'),
+        _PlaceholderTag(icon: '👥', text: 'Shared household', color: '#81C784'),
+        _PlaceholderTag(icon: '📆', text: 'Monthly cycle', color: '#64B5F6'),
+        _PlaceholderTag(icon: '📌', text: 'Fixed cost', color: '#BA68C8'),
+      ],
+    ),
+    _PlaceholderBill(
+      title: 'Quarterly electricity bill',
+      dueDate: DateTime(2026, 4, 30),
+      amount: 248.40,
+      tags: [
+        _PlaceholderTag(icon: '⚡', text: 'Utilities', color: '#FFD54F'),
+        _PlaceholderTag(icon: '🧾', text: 'Invoice', color: '#90A4AE'),
+      ],
+    ),
+    _PlaceholderBill(
+      title: 'Spring grocery split',
+      dueDate: DateTime(2026, 4, 29),
+      amount: 413.78,
+      tags: [
+        _PlaceholderTag(icon: '🛒', text: 'Groceries', color: '#81C784'),
+        _PlaceholderTag(icon: '👥', text: 'Shared', color: '#4DB6AC'),
+      ],
+    ),
+    _PlaceholderBill(
+      title: 'Weekend train tickets',
+      dueDate: DateTime(2026, 4, 27),
+      amount: 176.30,
+      tags: [
+        _PlaceholderTag(icon: '🚆', text: 'Travel', color: '#64B5F6'),
+        _PlaceholderTag(icon: '🤝', text: 'Split', color: '#A1887F'),
+      ],
+    ),
+    _PlaceholderBill(
+      title: 'Internet renewal',
+      dueDate: DateTime(2026, 4, 26),
+      amount: 92.15,
+      tags: [
+        _PlaceholderTag(icon: '🌐', text: 'Internet', color: '#4FC3F7'),
+        _PlaceholderTag(icon: '🔁', text: 'Renewal', color: '#9575CD'),
+      ],
+    ),
+  ];
+
+  static String _formatCurrency(double amount) {
+    return '${_currencyFormat.format(amount).trimRight()}€';
+  }
+
   @override
   Widget build(BuildContext context) {
-    final authView = context
-        .select<
-          AuthSessionState,
-          ({Credentials? credentials, String? backendError})
-        >(
-          (state) => (
-            credentials: state.credentials,
-            backendError: state.backendError,
-          ),
-        );
+    final backendError = context.select<AuthSessionState, String?>(
+      (state) => state.backendError,
+    );
+    final totalStillOwed = _placeholderBills.fold<double>(
+      0,
+      (sum, bill) => sum + bill.amount,
+    );
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         PageSection(
-          padding: EdgeInsets.all(isDesktop ? 36 : 24),
-          child: isDesktop
-              ? Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: _HeroCopy(credentials: authView.credentials),
+          padding: EdgeInsets.all(isDesktop ? 28 : 22),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                alignment: WrapAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Recent outstanding bills',
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w900,
                     ),
-                    const SizedBox(width: 24),
-                    SizedBox(
-                      width: 360,
-                      child: _StatusCard(credentials: authView.credentials),
-                    ),
-                  ],
-                )
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _HeroCopy(credentials: authView.credentials),
-                    const SizedBox(height: 20),
-                    _StatusCard(credentials: authView.credentials),
-                  ],
+                  ),
+                  OutlinedButton.icon(
+                    key: const ValueKey('open-bill-list-button'),
+                    onPressed: () {
+                      ScaffoldMessenger.of(context)
+                        ..hideCurrentSnackBar()
+                        ..showSnackBar(
+                          const SnackBar(
+                            content: Text('Bill list placeholder coming soon.'),
+                          ),
+                        );
+                    },
+                    icon: const Icon(Icons.receipt_long_rounded),
+                    label: const Text('Open bill list'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Static placeholder data for the upcoming home dashboard.',
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: mutedForegroundColor(context, alpha: 0.88),
+                  height: 1.45,
                 ),
+              ),
+              const SizedBox(height: 20),
+              ..._placeholderBills.asMap().entries.map(
+                (entry) => Padding(
+                  padding: EdgeInsets.only(
+                    bottom: entry.key == _placeholderBills.length - 1 ? 0 : 12,
+                  ),
+                  child: _PlaceholderBillTile(
+                    title: entry.value.title,
+                    dueLabel:
+                        'Due ${_dueDateFormat.format(entry.value.dueDate)}',
+                    amountLabel: _formatCurrency(entry.value.amount),
+                    tags: entry.value.tags,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 18),
-        if (authView.backendError != null) ...[
-          ErrorSection(message: authView.backendError!),
+        if (backendError != null) ...[
+          ErrorSection(message: backendError),
           const SizedBox(height: 18),
         ],
         PageSection(
@@ -207,54 +301,45 @@ class HomeSection extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Next step',
+                'Total still owed',
                 style: Theme.of(
                   context,
                 ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 10),
               Text(
-                authView.credentials == null
-                    ? 'Authenticate to sync your account with the backend and unlock the profile workspace.'
-                    : 'Open your profile to review synced account data and session details.',
+                'Combined balance across the same five placeholder bills.',
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   color: mutedForegroundColor(context, alpha: 0.88),
                   height: 1.45,
                 ),
               ),
               const SizedBox(height: 18),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: [
-                  if (authView.credentials == null)
-                    FilledButton.icon(
-                      onPressed: () {
-                        context.read<AuthSessionState>().login();
-                      },
-                      icon: const Icon(Icons.login_rounded),
-                      label: const Text('Log in'),
-                    )
-                  else
-                    FilledButton.icon(
-                      onPressed: () {
-                        context.read<NavigationState>().selectDestination(
-                          AppDestination.profile,
-                        );
-                      },
-                      icon: const Icon(Icons.person_rounded),
-                      label: const Text('Open profile'),
+              GlassPanel.secondary(
+                width: double.infinity,
+                padding: EdgeInsets.all(isDesktop ? 24 : 20),
+                borderRadius: const BorderRadius.all(Radius.circular(24)),
+                tone: brandPrimary,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _formatCurrency(totalStillOwed),
+                      style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -1,
+                      ),
                     ),
-                  OutlinedButton.icon(
-                    onPressed: () {
-                      context.read<NavigationState>().selectDestination(
-                        AppDestination.profile,
-                      );
-                    },
-                    icon: const Icon(Icons.arrow_forward_rounded),
-                    label: const Text('Go to profile'),
-                  ),
-                ],
+                    const SizedBox(height: 8),
+                    Text(
+                      '${_placeholderBills.length} unpaid placeholder bills',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: mutedForegroundColor(context, alpha: 0.8),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -272,7 +357,11 @@ class ProfileSection extends StatelessWidget {
     final authView = context
         .select<
           AuthSessionState,
-          ({Credentials? credentials, String? backendError, String? displayName})
+          ({
+            Credentials? credentials,
+            String? backendError,
+            String? displayName,
+          })
         >(
           (state) => (
             credentials: state.credentials,
@@ -319,14 +408,15 @@ class MenuSection extends StatelessWidget {
     final items = [
       (
         title: 'Home',
-        body: 'Return to the landing view and authentication summary.',
+        body:
+            'Return to the placeholder dashboard and outstanding bill overview.',
         icon: Icons.home_rounded,
         destination: AppDestination.home,
       ),
       (
         title: 'Profile',
         body: authView.credentials == null
-            ? 'Open the account tab to sign in and inspect your user data.'
+            ? 'Open your account details to sign in and inspect your user data.'
             : 'Review the synced account profile and active session details.',
         icon: Icons.person_rounded,
         destination: AppDestination.profile,
@@ -348,7 +438,7 @@ class MenuSection extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               Text(
-                'This destination works as the current overflow area and keeps future sections visible in the navigation model.',
+                'Use this overflow area for profile access and appearance settings, especially on mobile where the bottom bar stays compact.',
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   color: mutedForegroundColor(context, alpha: 0.88),
                   height: 1.45,
@@ -384,110 +474,284 @@ class MenuSection extends StatelessWidget {
   }
 }
 
-class _HeroCopy extends StatelessWidget {
-  const _HeroCopy({required this.credentials});
+class _PlaceholderBillTile extends StatelessWidget {
+  const _PlaceholderBillTile({
+    required this.title,
+    required this.dueLabel,
+    required this.amountLabel,
+    required this.tags,
+  });
 
-  final Credentials? credentials;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        GlassPanel.secondary(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          borderRadius: const BorderRadius.all(Radius.circular(999)),
-          tone: brandPrimary,
-          child: Text(
-            'Responsive web shell',
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-              color: brandPrimary,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ),
-        const SizedBox(height: 18),
-        Text(
-          'Manage authentication across desktop and phone-sized browsers.',
-          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-            fontWeight: FontWeight.w900,
-            height: 1.1,
-            letterSpacing: -0.8,
-          ),
-        ),
-        const SizedBox(height: 14),
-        Text(
-          credentials == null
-              ? 'Desktop gets a persistent top bar and menu-driven navigation. On smartphones, the interface collapses into touch-first sheets with bottom navigation.'
-              : 'Your session is active. Desktop keeps account controls in the top bar, while smartphone actions live under the profile tab.',
-          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-            color: mutedForegroundColor(context, alpha: 0.88),
-            height: 1.5,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _StatusCard extends StatelessWidget {
-  const _StatusCard({required this.credentials});
-
-  final Credentials? credentials;
+  final String title;
+  final String dueLabel;
+  final String amountLabel;
+  final List<_PlaceholderTag> tags;
 
   @override
   Widget build(BuildContext context) {
-    final isLoggedIn = credentials != null;
-    final scheme = Theme.of(context).colorScheme;
-    final tone = isLoggedIn ? Colors.green : scheme.error;
-    final iconTone = isLoggedIn ? Colors.green.shade700 : scheme.error;
-
     return GlassPanel.secondary(
-      padding: const EdgeInsets.all(22),
-      borderRadius: const BorderRadius.all(Radius.circular(28)),
-      tone: tone,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      borderRadius: const BorderRadius.all(Radius.circular(24)),
+      child: Row(
         children: [
           Container(
-            width: 52,
-            height: 52,
+            width: 44,
+            height: 44,
             decoration: glassSurfaceDecoration(
               context,
               variant: AppGlassVariant.secondary,
-              tone: tone,
-              borderRadius: const BorderRadius.all(Radius.circular(18)),
+              tone: brandPrimary,
+              borderRadius: const BorderRadius.all(Radius.circular(16)),
               includeShadows: false,
             ),
-            child: Icon(
-              isLoggedIn
-                  ? Icons.verified_user_rounded
-                  : Icons.lock_outline_rounded,
-              color: iconTone,
-              size: 28,
+            child: const Icon(Icons.receipt_long_rounded, color: brandPrimary),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  dueLabel,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: mutedForegroundColor(context, alpha: 0.82),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                _PlaceholderTagRow(tags: tags),
+              ],
             ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(width: 12),
           Text(
-            isLoggedIn ? 'You are logged in' : 'You are logged out',
+            amountLabel,
             style: Theme.of(
               context,
-            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            isLoggedIn
-                ? credentials?.user.email ?? 'Authenticated session'
-                : 'Start an Auth0 login to create or restore a browser session.',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: mutedForegroundColor(context, alpha: 0.88),
-              height: 1.45,
-            ),
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
           ),
         ],
       ),
     );
   }
+}
+
+class _PlaceholderBill {
+  const _PlaceholderBill({
+    required this.title,
+    required this.dueDate,
+    required this.amount,
+    required this.tags,
+  });
+
+  final String title;
+  final DateTime dueDate;
+  final double amount;
+  final List<_PlaceholderTag> tags;
+}
+
+class _PlaceholderTag {
+  const _PlaceholderTag({
+    required this.icon,
+    required this.text,
+    required this.color,
+  });
+
+  final String icon;
+  final String text;
+  final String color;
+}
+
+class _PlaceholderTagRow extends StatelessWidget {
+  const _PlaceholderTagRow({required this.tags});
+
+  static const _chipSpacing = 8.0;
+  static const _chipHorizontalPadding = 10.0;
+  static const _iconSpacing = 6.0;
+
+  final List<_PlaceholderTag> tags;
+
+  @override
+  Widget build(BuildContext context) {
+    if (tags.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (!constraints.maxWidth.isFinite || constraints.maxWidth <= 0) {
+          return const SizedBox.shrink();
+        }
+
+        final labelStyle = Theme.of(
+          context,
+        ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700);
+        final iconStyle = Theme.of(
+          context,
+        ).textTheme.bodyMedium?.copyWith(fontSize: 15);
+
+        final visibleTags = <_PlaceholderTag>[];
+        final tagWidths = tags
+            .map((tag) => _measureTagWidth(context, tag, labelStyle, iconStyle))
+            .toList();
+
+        var usedWidth = 0.0;
+        for (var index = 0; index < tags.length; index++) {
+          final hiddenAfterCurrent = tags.length - (index + 1);
+          final tagWidth =
+              (visibleTags.isEmpty ? 0 : _chipSpacing) + tagWidths[index];
+          final overflowWidth = hiddenAfterCurrent > 0
+              ? _chipSpacing +
+                    _measureOverflowWidth(
+                      context,
+                      hiddenAfterCurrent,
+                      labelStyle,
+                    )
+              : 0.0;
+
+          if (usedWidth + tagWidth + overflowWidth > constraints.maxWidth) {
+            break;
+          }
+
+          visibleTags.add(tags[index]);
+          usedWidth += tagWidth;
+        }
+
+        final hiddenCount = tags.length - visibleTags.length;
+        final children = <Widget>[
+          for (final tag in visibleTags) _PlaceholderTagChip(tag: tag),
+          if (hiddenCount > 0)
+            _PlaceholderTagOverflowChip(hiddenCount: hiddenCount),
+        ];
+
+        return Wrap(
+          spacing: _chipSpacing,
+          runSpacing: _chipSpacing,
+          children: children,
+        );
+      },
+    );
+  }
+
+  static double _measureTagWidth(
+    BuildContext context,
+    _PlaceholderTag tag,
+    TextStyle? labelStyle,
+    TextStyle? iconStyle,
+  ) {
+    final iconWidth = _measureTextWidth(context, tag.icon, iconStyle);
+    final textWidth = _measureTextWidth(context, tag.text, labelStyle);
+
+    return (_chipHorizontalPadding * 2) + iconWidth + _iconSpacing + textWidth;
+  }
+
+  static double _measureOverflowWidth(
+    BuildContext context,
+    int hiddenCount,
+    TextStyle? labelStyle,
+  ) {
+    final textWidth = _measureTextWidth(context, '+$hiddenCount', labelStyle);
+    return (_chipHorizontalPadding * 2) + textWidth;
+  }
+
+  static double _measureTextWidth(
+    BuildContext context,
+    String text,
+    TextStyle? style,
+  ) {
+    final painter = TextPainter(
+      text: TextSpan(text: text, style: style),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+      maxLines: 1,
+    )..layout();
+
+    return painter.width;
+  }
+}
+
+class _PlaceholderTagChip extends StatelessWidget {
+  const _PlaceholderTagChip({required this.tag});
+
+  final _PlaceholderTag tag;
+
+  @override
+  Widget build(BuildContext context) {
+    final tone = _parseTagColor(tag.color);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: glassSurfaceDecoration(
+        context,
+        variant: AppGlassVariant.secondary,
+        tone: tone,
+        borderRadius: const BorderRadius.all(Radius.circular(999)),
+        includeShadows: false,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            tag.icon,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(fontSize: 15),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            tag.text,
+            style: Theme.of(
+              context,
+            ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PlaceholderTagOverflowChip extends StatelessWidget {
+  const _PlaceholderTagOverflowChip({required this.hiddenCount});
+
+  final int hiddenCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: glassSurfaceDecoration(
+        context,
+        variant: AppGlassVariant.secondary,
+        borderRadius: const BorderRadius.all(Radius.circular(999)),
+        includeShadows: false,
+      ),
+      child: Text(
+        '+$hiddenCount',
+        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+          fontWeight: FontWeight.w800,
+          color: mutedForegroundColor(context, alpha: 0.9),
+        ),
+      ),
+    );
+  }
+}
+
+Color _parseTagColor(String value) {
+  final normalized = value.trim().replaceFirst('#', '');
+  if (normalized.length == 6) {
+    return Color(int.parse('FF$normalized', radix: 16));
+  }
+  if (normalized.length == 8) {
+    return Color(int.parse(normalized, radix: 16));
+  }
+  return brandPrimary;
 }
 
 class _LoggedOutProfileCard extends StatelessWidget {
@@ -561,10 +825,7 @@ class _LoggedInProfileCard extends StatelessWidget {
           ).textTheme.bodyLarge?.copyWith(color: mutedForegroundColor(context)),
         ),
         const SizedBox(height: 24),
-        _ProfileInfoTable(
-          credentials: credentials,
-          displayName: displayName,
-        ),
+        _ProfileInfoTable(credentials: credentials, displayName: displayName),
         const SizedBox(height: 24),
         Text(
           'Raw user object',

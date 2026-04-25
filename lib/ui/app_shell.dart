@@ -56,7 +56,8 @@ class ResponsiveShell extends StatelessWidget {
                         Expanded(
                           child: AppSections(
                             isDesktop: true,
-                            mobileBottomInset: mobileBottomNavigationReservedHeight,
+                            mobileBottomInset:
+                                mobileBottomNavigationReservedHeight,
                           ),
                         ),
                       ],
@@ -208,9 +209,9 @@ class _MobileTopBar extends StatelessWidget {
               maxLines: 1,
               softWrap: false,
               overflow: TextOverflow.fade,
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 4),
             Text(
@@ -240,42 +241,54 @@ class _TopBarDestinationChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final labelStyle =
-        compact
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final labelStyle = compact
             ? Theme.of(context).textTheme.labelLarge
             : Theme.of(context).textTheme.titleSmall;
+        final showLabel =
+            !constraints.maxWidth.isFinite ||
+            constraints.maxWidth > (compact ? 88 : 110);
 
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: compact ? 12 : 14,
-        vertical: compact ? 10 : 12,
-      ),
-      decoration: glassSurfaceDecoration(
-        context,
-        variant: AppGlassVariant.secondary,
-        borderRadius: const BorderRadius.all(Radius.circular(999)),
-        tone: brandPrimary,
-        includeShadows: false,
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(destination.icon, size: compact ? 18 : 20, color: brandPrimary),
-          const SizedBox(width: 8),
-          Flexible(
-            child: Text(
-              destination.label,
-              maxLines: 1,
-              softWrap: false,
-              overflow: TextOverflow.fade,
-              style: labelStyle?.copyWith(
-                color: Theme.of(context).colorScheme.onSurface,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+        return Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: showLabel ? (compact ? 12 : 14) : 10,
+            vertical: compact ? 10 : 12,
           ),
-        ],
-      ),
+          decoration: glassSurfaceDecoration(
+            context,
+            variant: AppGlassVariant.secondary,
+            borderRadius: const BorderRadius.all(Radius.circular(999)),
+            tone: brandPrimary,
+            includeShadows: false,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                destination.icon,
+                size: compact ? 18 : 20,
+                color: brandPrimary,
+              ),
+              if (showLabel) ...[
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    destination.label,
+                    maxLines: 1,
+                    softWrap: false,
+                    overflow: TextOverflow.fade,
+                    style: labelStyle?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -358,61 +371,77 @@ class _DesktopAccountControl extends StatelessWidget {
     }
 
     return GlassPanel.chrome(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       borderRadius: const BorderRadius.all(Radius.circular(999)),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          UserAvatar(
-            credentials: authView.credentials,
-            radius: 28,
-            displayName: authView.name,
-          ),
-          const SizedBox(width: 10),
           Flexible(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final maxWidth = constraints.maxWidth;
-                final preferredWidth = maxWidth.isFinite
-                    ? (maxWidth >= 130
-                          ? maxWidth.clamp(130.0, 200.0)
-                          : maxWidth)
-                    : 200.0;
-
-                return SizedBox(
-                  width: preferredWidth.toDouble(),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+            fit: FlexFit.loose,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                key: const ValueKey('desktop-account-summary'),
+                borderRadius: BorderRadius.circular(999),
+                onTap: () {
+                  context.read<NavigationState>().selectDestination(
+                    AppDestination.profile,
+                  );
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        authView.name ?? 'User',
-                        maxLines: 1,
-                        softWrap: false,
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              overflow: TextOverflow.fade,
-                            ),
+                      UserAvatar(
+                        credentials: authView.credentials,
+                        radius: 28,
+                        displayName: authView.name,
                       ),
-                      Text(
-                        authView.email ?? '',
-                        maxLines: 1,
-                        softWrap: false,
-                        style: Theme.of(context).textTheme.labelMedium
-                            ?.copyWith(
-                              color: mutedForegroundColor(context),
-                              overflow: TextOverflow.fade,
-                            ),
+                      const SizedBox(width: 10),
+                      Flexible(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 200),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                authView.name ?? 'User',
+                                maxLines: 1,
+                                softWrap: false,
+                                style: Theme.of(context).textTheme.titleMedium
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                      overflow: TextOverflow.fade,
+                                    ),
+                              ),
+                              Text(
+                                authView.email ?? '',
+                                maxLines: 1,
+                                softWrap: false,
+                                style: Theme.of(context).textTheme.labelMedium
+                                    ?.copyWith(
+                                      color: mutedForegroundColor(context),
+                                      overflow: TextOverflow.fade,
+                                    ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ],
                   ),
-                );
-              },
+                ),
+              ),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 6),
           IconButton(
+            key: const ValueKey('desktop-logout-button'),
             tooltip: 'Log out',
             onPressed: () {
               context.read<AuthSessionState>().logout();
@@ -451,25 +480,34 @@ class _BrandLockup extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 12),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Debt Display',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.2,
-              ),
-            ),
-            if (showSubtitle)
+        Flexible(
+          fit: FlexFit.loose,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
               Text(
-                'Shared debt and receipts',
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: mutedForegroundColor(context),
+                'Debt Display',
+                maxLines: 1,
+                softWrap: false,
+                overflow: TextOverflow.fade,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.2,
                 ),
               ),
-          ],
+              if (showSubtitle)
+                Text(
+                  'Shared debt and receipts',
+                  maxLines: 1,
+                  softWrap: false,
+                  overflow: TextOverflow.fade,
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: mutedForegroundColor(context),
+                  ),
+                ),
+            ],
+          ),
         ),
       ],
     );
@@ -480,12 +518,18 @@ class _MobileBottomNavigation extends StatelessWidget {
   const _MobileBottomNavigation();
 
   static const _blurSigma = 6.0;
+  static const _mobileDestinations = [AppDestination.home, AppDestination.menu];
 
   @override
   Widget build(BuildContext context) {
     final currentDestination = context.select<NavigationState, AppDestination>(
       (state) => state.selectedDestination,
     );
+    final selectedDestination = switch (currentDestination) {
+      AppDestination.profile => AppDestination.menu,
+      AppDestination.home => AppDestination.home,
+      AppDestination.menu => AppDestination.menu,
+    };
     final scheme = Theme.of(context).colorScheme;
 
     return SafeArea(
@@ -515,14 +559,15 @@ class _MobileBottomNavigation extends StatelessWidget {
                   includeShadows: false,
                 ),
                 child: NavigationBar(
+                  key: const ValueKey('mobile-navigation-bar'),
                   backgroundColor: Colors.transparent,
-                  selectedIndex: AppDestination.values.indexOf(
-                    currentDestination,
+                  selectedIndex: _mobileDestinations.indexOf(
+                    selectedDestination,
                   ),
                   height: mobileBottomNavigationHeight,
                   elevation: 0,
                   labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-                  destinations: AppDestination.values
+                  destinations: _mobileDestinations
                       .map(
                         (destination) => NavigationDestination(
                           icon: Icon(destination.icon),
@@ -532,7 +577,7 @@ class _MobileBottomNavigation extends StatelessWidget {
                       .toList(),
                   onDestinationSelected: (index) {
                     context.read<NavigationState>().selectDestination(
-                      AppDestination.values[index],
+                      _mobileDestinations[index],
                     );
                   },
                 ),
