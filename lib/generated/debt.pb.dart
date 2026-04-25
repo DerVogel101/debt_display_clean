@@ -485,6 +485,312 @@ class TagIndex extends $pb.GeneratedMessage {
   void clearColor() => $_clearField(4);
 }
 
+class ReceiptRecipientShareInput extends $pb.GeneratedMessage {
+  factory ReceiptRecipientShareInput({
+    $fixnum.Int64? userId,
+    $core.double? sharePercent,
+  }) {
+    final result = create();
+    if (userId != null) result.userId = userId;
+    if (sharePercent != null) result.sharePercent = sharePercent;
+    return result;
+  }
+
+  ReceiptRecipientShareInput._();
+
+  factory ReceiptRecipientShareInput.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ReceiptRecipientShareInput.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ReceiptRecipientShareInput',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'debt'),
+      createEmptyInstance: create)
+    ..aInt64(1, _omitFieldNames ? '' : 'userId')
+    ..aD(2, _omitFieldNames ? '' : 'sharePercent')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ReceiptRecipientShareInput clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ReceiptRecipientShareInput copyWith(
+          void Function(ReceiptRecipientShareInput) updates) =>
+      super.copyWith(
+              (message) => updates(message as ReceiptRecipientShareInput))
+          as ReceiptRecipientShareInput;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ReceiptRecipientShareInput create() => ReceiptRecipientShareInput._();
+  @$core.override
+  ReceiptRecipientShareInput createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ReceiptRecipientShareInput getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ReceiptRecipientShareInput>(create);
+  static ReceiptRecipientShareInput? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get userId => $_getI64(0);
+  @$pb.TagNumber(1)
+  set userId($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasUserId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearUserId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.double get sharePercent => $_getN(1);
+  @$pb.TagNumber(2)
+  set sharePercent($core.double value) => $_setDouble(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasSharePercent() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearSharePercent() => $_clearField(2);
+}
+
+class ReceiptSplitInput extends $pb.GeneratedMessage {
+  factory ReceiptSplitInput({
+    $core.double? ownerSharePercent,
+    $core.Iterable<ReceiptRecipientShareInput>? recipientShares,
+  }) {
+    final result = create();
+    if (ownerSharePercent != null) result.ownerSharePercent = ownerSharePercent;
+    if (recipientShares != null) result.recipientShares.addAll(recipientShares);
+    return result;
+  }
+
+  ReceiptSplitInput._();
+
+  factory ReceiptSplitInput.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ReceiptSplitInput.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ReceiptSplitInput',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'debt'),
+      createEmptyInstance: create)
+    ..aD(1, _omitFieldNames ? '' : 'ownerSharePercent')
+    ..pPM<ReceiptRecipientShareInput>(
+        2, _omitFieldNames ? '' : 'recipientShares',
+        subBuilder: ReceiptRecipientShareInput.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ReceiptSplitInput clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ReceiptSplitInput copyWith(void Function(ReceiptSplitInput) updates) =>
+      super.copyWith((message) => updates(message as ReceiptSplitInput))
+          as ReceiptSplitInput;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ReceiptSplitInput create() => ReceiptSplitInput._();
+  @$core.override
+  ReceiptSplitInput createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ReceiptSplitInput getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ReceiptSplitInput>(create);
+  static ReceiptSplitInput? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.double get ownerSharePercent => $_getN(0);
+  @$pb.TagNumber(1)
+  set ownerSharePercent($core.double value) => $_setDouble(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasOwnerSharePercent() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearOwnerSharePercent() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $pb.PbList<ReceiptRecipientShareInput> get recipientShares => $_getList(1);
+}
+
+class ReceiptRecipientShare extends $pb.GeneratedMessage {
+  factory ReceiptRecipientShare({
+    $fixnum.Int64? userId,
+    $core.double? sharePercent,
+    $core.double? amount,
+    $core.String? userName,
+    $core.String? userEmail,
+  }) {
+    final result = create();
+    if (userId != null) result.userId = userId;
+    if (sharePercent != null) result.sharePercent = sharePercent;
+    if (amount != null) result.amount = amount;
+    if (userName != null) result.userName = userName;
+    if (userEmail != null) result.userEmail = userEmail;
+    return result;
+  }
+
+  ReceiptRecipientShare._();
+
+  factory ReceiptRecipientShare.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ReceiptRecipientShare.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ReceiptRecipientShare',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'debt'),
+      createEmptyInstance: create)
+    ..aInt64(1, _omitFieldNames ? '' : 'userId')
+    ..aD(2, _omitFieldNames ? '' : 'sharePercent')
+    ..aD(3, _omitFieldNames ? '' : 'amount')
+    ..aOS(4, _omitFieldNames ? '' : 'userName')
+    ..aOS(5, _omitFieldNames ? '' : 'userEmail')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ReceiptRecipientShare clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ReceiptRecipientShare copyWith(
+          void Function(ReceiptRecipientShare) updates) =>
+      super.copyWith((message) => updates(message as ReceiptRecipientShare))
+          as ReceiptRecipientShare;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ReceiptRecipientShare create() => ReceiptRecipientShare._();
+  @$core.override
+  ReceiptRecipientShare createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ReceiptRecipientShare getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ReceiptRecipientShare>(create);
+  static ReceiptRecipientShare? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get userId => $_getI64(0);
+  @$pb.TagNumber(1)
+  set userId($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasUserId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearUserId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.double get sharePercent => $_getN(1);
+  @$pb.TagNumber(2)
+  set sharePercent($core.double value) => $_setDouble(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasSharePercent() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearSharePercent() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.double get amount => $_getN(2);
+  @$pb.TagNumber(3)
+  set amount($core.double value) => $_setDouble(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasAmount() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearAmount() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get userName => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set userName($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasUserName() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearUserName() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get userEmail => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set userEmail($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasUserEmail() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearUserEmail() => $_clearField(5);
+}
+
+class ReceiptSplit extends $pb.GeneratedMessage {
+  factory ReceiptSplit({
+    $core.double? ownerSharePercent,
+    $core.double? ownerAmount,
+    $core.Iterable<ReceiptRecipientShare>? recipientShares,
+  }) {
+    final result = create();
+    if (ownerSharePercent != null) result.ownerSharePercent = ownerSharePercent;
+    if (ownerAmount != null) result.ownerAmount = ownerAmount;
+    if (recipientShares != null) result.recipientShares.addAll(recipientShares);
+    return result;
+  }
+
+  ReceiptSplit._();
+
+  factory ReceiptSplit.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ReceiptSplit.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ReceiptSplit',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'debt'),
+      createEmptyInstance: create)
+    ..aD(1, _omitFieldNames ? '' : 'ownerSharePercent')
+    ..aD(2, _omitFieldNames ? '' : 'ownerAmount')
+    ..pPM<ReceiptRecipientShare>(3, _omitFieldNames ? '' : 'recipientShares',
+        subBuilder: ReceiptRecipientShare.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ReceiptSplit clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ReceiptSplit copyWith(void Function(ReceiptSplit) updates) =>
+      super.copyWith((message) => updates(message as ReceiptSplit))
+          as ReceiptSplit;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ReceiptSplit create() => ReceiptSplit._();
+  @$core.override
+  ReceiptSplit createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ReceiptSplit getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ReceiptSplit>(create);
+  static ReceiptSplit? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.double get ownerSharePercent => $_getN(0);
+  @$pb.TagNumber(1)
+  set ownerSharePercent($core.double value) => $_setDouble(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasOwnerSharePercent() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearOwnerSharePercent() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.double get ownerAmount => $_getN(1);
+  @$pb.TagNumber(2)
+  set ownerAmount($core.double value) => $_setDouble(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasOwnerAmount() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearOwnerAmount() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $pb.PbList<ReceiptRecipientShare> get recipientShares => $_getList(2);
+}
+
 class Receipt extends $pb.GeneratedMessage {
   factory Receipt({
     $fixnum.Int64? id,
@@ -505,6 +811,7 @@ class Receipt extends $pb.GeneratedMessage {
     Recipient? recipient,
     $core.Iterable<ReceiptFile>? files,
     $core.Iterable<TagIndex>? tags,
+    ReceiptSplit? split,
   }) {
     final result = create();
     if (id != null) result.id = id;
@@ -525,6 +832,7 @@ class Receipt extends $pb.GeneratedMessage {
     if (recipient != null) result.recipient = recipient;
     if (files != null) result.files.addAll(files);
     if (tags != null) result.tags.addAll(tags);
+    if (split != null) result.split = split;
     return result;
   }
 
@@ -562,6 +870,8 @@ class Receipt extends $pb.GeneratedMessage {
         subBuilder: ReceiptFile.create)
     ..pPM<TagIndex>(18, _omitFieldNames ? '' : 'tags',
         subBuilder: TagIndex.create)
+    ..aOM<ReceiptSplit>(19, _omitFieldNames ? '' : 'split',
+        subBuilder: ReceiptSplit.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -733,6 +1043,17 @@ class Receipt extends $pb.GeneratedMessage {
 
   @$pb.TagNumber(18)
   $pb.PbList<TagIndex> get tags => $_getList(17);
+
+  @$pb.TagNumber(19)
+  ReceiptSplit get split => $_getN(18);
+  @$pb.TagNumber(19)
+  set split(ReceiptSplit value) => $_setField(19, value);
+  @$pb.TagNumber(19)
+  $core.bool hasSplit() => $_has(18);
+  @$pb.TagNumber(19)
+  void clearSplit() => $_clearField(19);
+  @$pb.TagNumber(19)
+  ReceiptSplit ensureSplit() => $_ensure(18);
 }
 
 class ActionResponse extends $pb.GeneratedMessage {
@@ -1931,6 +2252,7 @@ class CreateReceiptRequest extends $pb.GeneratedMessage {
     $core.String? description,
     $core.String? dueDate,
     $core.String? notes,
+    ReceiptSplitInput? split,
   }) {
     final result = create();
     if (title != null) result.title = title;
@@ -1940,6 +2262,7 @@ class CreateReceiptRequest extends $pb.GeneratedMessage {
     if (description != null) result.description = description;
     if (dueDate != null) result.dueDate = dueDate;
     if (notes != null) result.notes = notes;
+    if (split != null) result.split = split;
     return result;
   }
 
@@ -1963,6 +2286,8 @@ class CreateReceiptRequest extends $pb.GeneratedMessage {
     ..aOS(5, _omitFieldNames ? '' : 'description')
     ..aOS(6, _omitFieldNames ? '' : 'dueDate')
     ..aOS(7, _omitFieldNames ? '' : 'notes')
+    ..aOM<ReceiptSplitInput>(8, _omitFieldNames ? '' : 'split',
+        subBuilder: ReceiptSplitInput.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2046,6 +2371,17 @@ class CreateReceiptRequest extends $pb.GeneratedMessage {
   $core.bool hasNotes() => $_has(6);
   @$pb.TagNumber(7)
   void clearNotes() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  ReceiptSplitInput get split => $_getN(7);
+  @$pb.TagNumber(8)
+  set split(ReceiptSplitInput value) => $_setField(8, value);
+  @$pb.TagNumber(8)
+  $core.bool hasSplit() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearSplit() => $_clearField(8);
+  @$pb.TagNumber(8)
+  ReceiptSplitInput ensureSplit() => $_ensure(7);
 }
 
 class ReceiptLookupRequest extends $pb.GeneratedMessage {
@@ -2196,6 +2532,8 @@ class UpdateReceiptRequest extends $pb.GeneratedMessage {
     $core.String? dueDate,
     $core.String? notes,
     $core.String? currency,
+    ReceiptSplitInput? split,
+    $core.bool? clearSplit_10,
   }) {
     final result = create();
     if (receiptId != null) result.receiptId = receiptId;
@@ -2206,6 +2544,8 @@ class UpdateReceiptRequest extends $pb.GeneratedMessage {
     if (dueDate != null) result.dueDate = dueDate;
     if (notes != null) result.notes = notes;
     if (currency != null) result.currency = currency;
+    if (split != null) result.split = split;
+    if (clearSplit_10 != null) result.clearSplit_10 = clearSplit_10;
     return result;
   }
 
@@ -2230,6 +2570,9 @@ class UpdateReceiptRequest extends $pb.GeneratedMessage {
     ..aOS(6, _omitFieldNames ? '' : 'dueDate')
     ..aOS(7, _omitFieldNames ? '' : 'notes')
     ..aOS(8, _omitFieldNames ? '' : 'currency')
+    ..aOM<ReceiptSplitInput>(9, _omitFieldNames ? '' : 'split',
+        subBuilder: ReceiptSplitInput.create)
+    ..aOB(10, _omitFieldNames ? '' : 'clearSplit')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2322,6 +2665,26 @@ class UpdateReceiptRequest extends $pb.GeneratedMessage {
   $core.bool hasCurrency() => $_has(7);
   @$pb.TagNumber(8)
   void clearCurrency() => $_clearField(8);
+
+  @$pb.TagNumber(9)
+  ReceiptSplitInput get split => $_getN(8);
+  @$pb.TagNumber(9)
+  set split(ReceiptSplitInput value) => $_setField(9, value);
+  @$pb.TagNumber(9)
+  $core.bool hasSplit() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearSplit() => $_clearField(9);
+  @$pb.TagNumber(9)
+  ReceiptSplitInput ensureSplit() => $_ensure(8);
+
+  @$pb.TagNumber(10)
+  $core.bool get clearSplit_10 => $_getBF(9);
+  @$pb.TagNumber(10)
+  set clearSplit_10($core.bool value) => $_setBool(9, value);
+  @$pb.TagNumber(10)
+  $core.bool hasClearSplit_10() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearClearSplit_10() => $_clearField(10);
 }
 
 class MarkReceiptPaidRequest extends $pb.GeneratedMessage {

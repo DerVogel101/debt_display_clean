@@ -161,6 +161,118 @@ final $typed_data.Uint8List tagIndexDescriptor = $convert.base64Decode(
     'CghUYWdJbmRleBIOCgJpZBgBIAEoA1ICaWQSEgoEaWNvbhgCIAEoCVIEaWNvbhISCgR0ZXh0GA'
     'MgASgJUgR0ZXh0EhQKBWNvbG9yGAQgASgJUgVjb2xvcg==');
 
+@$core.Deprecated('Use receiptRecipientShareInputDescriptor instead')
+const ReceiptRecipientShareInput$json = {
+  '1': 'ReceiptRecipientShareInput',
+  '2': [
+    {'1': 'user_id', '3': 1, '4': 1, '5': 3, '10': 'userId'},
+    {'1': 'share_percent', '3': 2, '4': 1, '5': 1, '10': 'sharePercent'},
+  ],
+};
+
+/// Descriptor for `ReceiptRecipientShareInput`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List receiptRecipientShareInputDescriptor =
+    $convert.base64Decode(
+        'ChpSZWNlaXB0UmVjaXBpZW50U2hhcmVJbnB1dBIXCgd1c2VyX2lkGAEgASgDUgZ1c2VySWQSIw'
+        'oNc2hhcmVfcGVyY2VudBgCIAEoAVIMc2hhcmVQZXJjZW50');
+
+@$core.Deprecated('Use receiptSplitInputDescriptor instead')
+const ReceiptSplitInput$json = {
+  '1': 'ReceiptSplitInput',
+  '2': [
+    {
+      '1': 'owner_share_percent',
+      '3': 1,
+      '4': 1,
+      '5': 1,
+      '10': 'ownerSharePercent'
+    },
+    {
+      '1': 'recipient_shares',
+      '3': 2,
+      '4': 3,
+      '5': 11,
+      '6': '.debt.ReceiptRecipientShareInput',
+      '10': 'recipientShares'
+    },
+  ],
+};
+
+/// Descriptor for `ReceiptSplitInput`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List receiptSplitInputDescriptor = $convert.base64Decode(
+    'ChFSZWNlaXB0U3BsaXRJbnB1dBIuChNvd25lcl9zaGFyZV9wZXJjZW50GAEgASgBUhFvd25lcl'
+    'NoYXJlUGVyY2VudBJLChByZWNpcGllbnRfc2hhcmVzGAIgAygLMiAuZGVidC5SZWNlaXB0UmVj'
+    'aXBpZW50U2hhcmVJbnB1dFIPcmVjaXBpZW50U2hhcmVz');
+
+@$core.Deprecated('Use receiptRecipientShareDescriptor instead')
+const ReceiptRecipientShare$json = {
+  '1': 'ReceiptRecipientShare',
+  '2': [
+    {'1': 'user_id', '3': 1, '4': 1, '5': 3, '10': 'userId'},
+    {'1': 'share_percent', '3': 2, '4': 1, '5': 1, '10': 'sharePercent'},
+    {'1': 'amount', '3': 3, '4': 1, '5': 1, '10': 'amount'},
+    {
+      '1': 'user_name',
+      '3': 4,
+      '4': 1,
+      '5': 9,
+      '9': 0,
+      '10': 'userName',
+      '17': true
+    },
+    {
+      '1': 'user_email',
+      '3': 5,
+      '4': 1,
+      '5': 9,
+      '9': 1,
+      '10': 'userEmail',
+      '17': true
+    },
+  ],
+  '8': [
+    {'1': '_user_name'},
+    {'1': '_user_email'},
+  ],
+};
+
+/// Descriptor for `ReceiptRecipientShare`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List receiptRecipientShareDescriptor = $convert.base64Decode(
+    'ChVSZWNlaXB0UmVjaXBpZW50U2hhcmUSFwoHdXNlcl9pZBgBIAEoA1IGdXNlcklkEiMKDXNoYX'
+    'JlX3BlcmNlbnQYAiABKAFSDHNoYXJlUGVyY2VudBIWCgZhbW91bnQYAyABKAFSBmFtb3VudBIg'
+    'Cgl1c2VyX25hbWUYBCABKAlIAFIIdXNlck5hbWWIAQESIgoKdXNlcl9lbWFpbBgFIAEoCUgBUg'
+    'l1c2VyRW1haWyIAQFCDAoKX3VzZXJfbmFtZUINCgtfdXNlcl9lbWFpbA==');
+
+@$core.Deprecated('Use receiptSplitDescriptor instead')
+const ReceiptSplit$json = {
+  '1': 'ReceiptSplit',
+  '2': [
+    {
+      '1': 'owner_share_percent',
+      '3': 1,
+      '4': 1,
+      '5': 1,
+      '10': 'ownerSharePercent'
+    },
+    {'1': 'owner_amount', '3': 2, '4': 1, '5': 1, '10': 'ownerAmount'},
+    {
+      '1': 'recipient_shares',
+      '3': 3,
+      '4': 3,
+      '5': 11,
+      '6': '.debt.ReceiptRecipientShare',
+      '10': 'recipientShares'
+    },
+  ],
+};
+
+/// Descriptor for `ReceiptSplit`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List receiptSplitDescriptor = $convert.base64Decode(
+    'CgxSZWNlaXB0U3BsaXQSLgoTb3duZXJfc2hhcmVfcGVyY2VudBgBIAEoAVIRb3duZXJTaGFyZV'
+    'BlcmNlbnQSIQoMb3duZXJfYW1vdW50GAIgASgBUgtvd25lckFtb3VudBJGChByZWNpcGllbnRf'
+    'c2hhcmVzGAMgAygLMhsuZGVidC5SZWNlaXB0UmVjaXBpZW50U2hhcmVSD3JlY2lwaWVudFNoYX'
+    'Jlcw==');
+
 @$core.Deprecated('Use receiptDescriptor instead')
 const Receipt$json = {
   '1': 'Receipt',
@@ -262,6 +374,16 @@ const Receipt$json = {
       '6': '.debt.TagIndex',
       '10': 'tags'
     },
+    {
+      '1': 'split',
+      '3': 19,
+      '4': 1,
+      '5': 11,
+      '6': '.debt.ReceiptSplit',
+      '9': 9,
+      '10': 'split',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_description'},
@@ -273,6 +395,7 @@ const Receipt$json = {
     {'1': '_recipient_id'},
     {'1': '_recipient_name'},
     {'1': '_recipient'},
+    {'1': '_split'},
   ],
 };
 
@@ -288,10 +411,11 @@ final $typed_data.Uint8List receiptDescriptor = $convert.base64Decode(
     '5lcklkEiYKDHJlY2lwaWVudF9pZBgOIAEoA0gGUgtyZWNpcGllbnRJZIgBARIqCg5yZWNpcGll'
     'bnRfbmFtZRgPIAEoCUgHUg1yZWNpcGllbnROYW1liAEBEjIKCXJlY2lwaWVudBgQIAEoCzIPLm'
     'RlYnQuUmVjaXBpZW50SAhSCXJlY2lwaWVudIgBARInCgVmaWxlcxgRIAMoCzIRLmRlYnQuUmVj'
-    'ZWlwdEZpbGVSBWZpbGVzEiIKBHRhZ3MYEiADKAsyDi5kZWJ0LlRhZ0luZGV4UgR0YWdzQg4KDF'
-    '9kZXNjcmlwdGlvbkIOCgxfYW1vdW50X3BhaWRCCwoJX2R1ZV9kYXRlQgoKCF9wYWlkX2F0QggK'
-    'Bl9ub3Rlc0INCgtfdXBkYXRlZF9hdEIPCg1fcmVjaXBpZW50X2lkQhEKD19yZWNpcGllbnRfbm'
-    'FtZUIMCgpfcmVjaXBpZW50');
+    'ZWlwdEZpbGVSBWZpbGVzEiIKBHRhZ3MYEiADKAsyDi5kZWJ0LlRhZ0luZGV4UgR0YWdzEi0KBX'
+    'NwbGl0GBMgASgLMhIuZGVidC5SZWNlaXB0U3BsaXRICVIFc3BsaXSIAQFCDgoMX2Rlc2NyaXB0'
+    'aW9uQg4KDF9hbW91bnRfcGFpZEILCglfZHVlX2RhdGVCCgoIX3BhaWRfYXRCCAoGX25vdGVzQg'
+    '0KC191cGRhdGVkX2F0Qg8KDV9yZWNpcGllbnRfaWRCEQoPX3JlY2lwaWVudF9uYW1lQgwKCl9y'
+    'ZWNpcGllbnRCCAoGX3NwbGl0');
 
 @$core.Deprecated('Use actionResponseDescriptor instead')
 const ActionResponse$json = {
@@ -658,6 +782,16 @@ const CreateReceiptRequest$json = {
       '17': true
     },
     {'1': 'notes', '3': 7, '4': 1, '5': 9, '9': 4, '10': 'notes', '17': true},
+    {
+      '1': 'split',
+      '3': 8,
+      '4': 1,
+      '5': 11,
+      '6': '.debt.ReceiptSplitInput',
+      '9': 5,
+      '10': 'split',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_currency'},
@@ -665,6 +799,7 @@ const CreateReceiptRequest$json = {
     {'1': '_description'},
     {'1': '_due_date'},
     {'1': '_notes'},
+    {'1': '_split'},
   ],
 };
 
@@ -674,8 +809,9 @@ final $typed_data.Uint8List createReceiptRequestDescriptor = $convert.base64Deco
     '93ZWQYAiABKAFSCmFtb3VudE93ZWQSHwoIY3VycmVuY3kYAyABKAlIAFIIY3VycmVuY3mIAQES'
     'JgoMcmVjaXBpZW50X2lkGAQgASgDSAFSC3JlY2lwaWVudElkiAEBEiUKC2Rlc2NyaXB0aW9uGA'
     'UgASgJSAJSC2Rlc2NyaXB0aW9uiAEBEh4KCGR1ZV9kYXRlGAYgASgJSANSB2R1ZURhdGWIAQES'
-    'GQoFbm90ZXMYByABKAlIBFIFbm90ZXOIAQFCCwoJX2N1cnJlbmN5Qg8KDV9yZWNpcGllbnRfaW'
-    'RCDgoMX2Rlc2NyaXB0aW9uQgsKCV9kdWVfZGF0ZUIICgZfbm90ZXM=');
+    'GQoFbm90ZXMYByABKAlIBFIFbm90ZXOIAQESMgoFc3BsaXQYCCABKAsyFy5kZWJ0LlJlY2VpcH'
+    'RTcGxpdElucHV0SAVSBXNwbGl0iAEBQgsKCV9jdXJyZW5jeUIPCg1fcmVjaXBpZW50X2lkQg4K'
+    'DF9kZXNjcmlwdGlvbkILCglfZHVlX2RhdGVCCAoGX25vdGVzQggKBl9zcGxpdA==');
 
 @$core.Deprecated('Use receiptLookupRequestDescriptor instead')
 const ReceiptLookupRequest$json = {
@@ -771,6 +907,25 @@ const UpdateReceiptRequest$json = {
       '10': 'currency',
       '17': true
     },
+    {
+      '1': 'split',
+      '3': 9,
+      '4': 1,
+      '5': 11,
+      '6': '.debt.ReceiptSplitInput',
+      '9': 7,
+      '10': 'split',
+      '17': true
+    },
+    {
+      '1': 'clear_split',
+      '3': 10,
+      '4': 1,
+      '5': 8,
+      '9': 8,
+      '10': 'clearSplit',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_title'},
@@ -780,6 +935,8 @@ const UpdateReceiptRequest$json = {
     {'1': '_due_date'},
     {'1': '_notes'},
     {'1': '_currency'},
+    {'1': '_split'},
+    {'1': '_clear_split'},
   ],
 };
 
@@ -790,8 +947,10 @@ final $typed_data.Uint8List updateReceiptRequestDescriptor = $convert.base64Deco
     'cHRpb26IAQESJAoLYW1vdW50X293ZWQYBCABKAFIAlIKYW1vdW50T3dlZIgBARIkCgthbW91bn'
     'RfcGFpZBgFIAEoAUgDUgphbW91bnRQYWlkiAEBEh4KCGR1ZV9kYXRlGAYgASgJSARSB2R1ZURh'
     'dGWIAQESGQoFbm90ZXMYByABKAlIBVIFbm90ZXOIAQESHwoIY3VycmVuY3kYCCABKAlIBlIIY3'
-    'VycmVuY3mIAQFCCAoGX3RpdGxlQg4KDF9kZXNjcmlwdGlvbkIOCgxfYW1vdW50X293ZWRCDgoM'
-    'X2Ftb3VudF9wYWlkQgsKCV9kdWVfZGF0ZUIICgZfbm90ZXNCCwoJX2N1cnJlbmN5');
+    'VycmVuY3mIAQESMgoFc3BsaXQYCSABKAsyFy5kZWJ0LlJlY2VpcHRTcGxpdElucHV0SAdSBXNw'
+    'bGl0iAEBEiQKC2NsZWFyX3NwbGl0GAogASgISAhSCmNsZWFyU3BsaXSIAQFCCAoGX3RpdGxlQg'
+    '4KDF9kZXNjcmlwdGlvbkIOCgxfYW1vdW50X293ZWRCDgoMX2Ftb3VudF9wYWlkQgsKCV9kdWVf'
+    'ZGF0ZUIICgZfbm90ZXNCCwoJX2N1cnJlbmN5QggKBl9zcGxpdEIOCgxfY2xlYXJfc3BsaXQ=');
 
 @$core.Deprecated('Use markReceiptPaidRequestDescriptor instead')
 const MarkReceiptPaidRequest$json = {

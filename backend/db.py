@@ -4,6 +4,7 @@ Stores a local user record keyed by the Auth0 `sub` claim.
 Auth0 owns authentication – we only store what we need for our app.
 """
 from datetime import datetime, timezone
+import math
 
 from collections.abc import AsyncGenerator
 from sqlalchemy import (
@@ -84,6 +85,7 @@ class Receipt(Base):
 
     amount_owed: Mapped[float]         = mapped_column(nullable=False)
     amount_paid: Mapped[float|None]    = mapped_column(nullable=True, default=0.0)
+    owner_share_percent: Mapped[float|None] = mapped_column(nullable=True)
     due_date:    Mapped[datetime|None] = mapped_column(DateTime(timezone=True), nullable=True)
     is_paid:     Mapped[bool]          = mapped_column(Boolean, default=False, nullable=False)
     currency:    Mapped[str]           = mapped_column(String(8), default="EUR", nullable=False)
@@ -129,6 +131,11 @@ class Receipt(Base):
         back_populates="receipt",
         cascade="all, delete-orphan",
     )
+    recipient_shares: Mapped[list["ReceiptRecipientShare"]] = relationship(
+        back_populates="receipt",
+        cascade="all, delete-orphan",
+        order_by="ReceiptRecipientShare.user_id",
+    )
     tagged_receipts: Mapped[list["TaggedReceipt"]] = relationship(
         back_populates="receipt",
         cascade="all, delete-orphan",
@@ -139,6 +146,29 @@ class Receipt(Base):
         back_populates="receipts",
         viewonly=True,
     )
+
+
+class ReceiptRecipientShare(Base):
+    __tablename__ = "receipt_recipient_shares"
+    __table_args__ = (
+        Index("ix_receipt_recipient_shares_receipt_id", "receipt_id"),
+        Index("ix_receipt_recipient_shares_user_id", "user_id"),
+    )
+
+    receipt_id: Mapped[int] = mapped_column(
+        ForeignKey("receipts.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    share_percent: Mapped[float] = mapped_column(nullable=False)
+    user_name_snapshot: Mapped[str|None] = mapped_column(String(256), nullable=True)
+    user_email_snapshot: Mapped[str|None] = mapped_column(String(256), nullable=True)
+
+    receipt: Mapped["Receipt"] = relationship(back_populates="recipient_shares")
+    user: Mapped["User"] = relationship()
 
 
 class ReceiptFile(Base):
@@ -461,6 +491,7 @@ async def get_receipt_by_id(
         .where(Receipt.id == receipt_id)
         .options(
             selectinload(Receipt.recipient),
+            selectinload(Receipt.recipient_shares),
             selectinload(Receipt.files),
             selectinload(Receipt.tags),
         )
@@ -500,6 +531,7 @@ async def list_receipts_for_owner(
     stmt = stmt.order_by(Receipt.id).limit(limit)
     stmt = stmt.options(
         selectinload(Receipt.recipient),
+        selectinload(Receipt.recipient_shares),
         selectinload(Receipt.files),
         selectinload(Receipt.tags),
     )
@@ -537,6 +569,119 @@ async def update_receipt(
         receipt.notes = notes
     if currency is not None:
         receipt.currency = currency
+    await session.flush()
+    return receipt
+
+
+def _validate_percent(value: float, field_name: str) -> None:
+    if not math.isfinite(value):
+        raise ValueError(f"{field_name} must be finite")
+
+
+async def set_receipt_split(
+    session: AsyncSession,
+    receipt_id: int,
+    owner_share_percent: float,
+    recipient_shares: list[tuple[int, float]],
+) -> "Receipt":
+    """
+    Full-replaces a receipt split. Recipient share users must be current
+    members of the receipt's recipient group. Percentages sum to 100.
+    """
+    result = await session.execute(
+        select(Receipt)
+        .where(Receipt.id == receipt_id)
+        .options(selectinload(Receipt.recipient_shares))
+    )
+    receipt = result.scalar_one_or_none()
+    if receipt is None:
+        raise ValueError(f"Receipt {receipt_id} not found")
+
+    _validate_percent(owner_share_percent, "owner_share_percent")
+    if owner_share_percent < 0 or owner_share_percent > 100:
+        raise ValueError("owner_share_percent must be between 0 and 100")
+
+    seen_user_ids: set[int] = set()
+    recipient_user_ids = [user_id for user_id, _ in recipient_shares]
+    for user_id, share_percent in recipient_shares:
+        if user_id in seen_user_ids:
+            raise ValueError(f"Duplicate split user {user_id}")
+        seen_user_ids.add(user_id)
+        _validate_percent(share_percent, "share_percent")
+        if share_percent <= 0 or share_percent > 100:
+            raise ValueError("recipient share_percent must be > 0 and <= 100")
+        if user_id == receipt.owner_id:
+            raise ValueError("Receipt owner share must use owner_share_percent")
+
+    total_percent = owner_share_percent + sum(
+        share_percent for _, share_percent in recipient_shares
+    )
+    if abs(total_percent - 100.0) > 1e-6:
+        raise ValueError("Receipt split percentages must sum to 100")
+
+    members_by_id: dict[int, User] = {}
+    if recipient_user_ids:
+        if receipt.recipient_id is None:
+            raise ValueError("Receipt split recipient shares require recipient_id")
+
+        result = await session.execute(
+            select(User)
+            .join(recipient_members, recipient_members.c.user_id == User.id)
+            .where(recipient_members.c.recipient_id == receipt.recipient_id)
+            .where(User.id.in_(recipient_user_ids))
+        )
+        members_by_id = {member.id: member for member in result.scalars().all()}
+        missing_user_ids = [user_id for user_id in recipient_user_ids if user_id not in members_by_id]
+        if missing_user_ids:
+            raise ValueError(
+                "Receipt split users must be current members of the recipient"
+            )
+
+    receipt.owner_share_percent = owner_share_percent
+    existing_shares = {share.user_id: share for share in receipt.recipient_shares}
+    next_shares: list[ReceiptRecipientShare] = []
+
+    for user_id, share_percent in recipient_shares:
+        user = members_by_id[user_id]
+        share = existing_shares.pop(user_id, None)
+        if share is None:
+            share = ReceiptRecipientShare(
+                receipt_id=receipt_id,
+                user_id=user_id,
+            )
+            session.add(share)
+        share.share_percent = share_percent
+        share.user_name_snapshot = user.name
+        share.user_email_snapshot = user.email
+        next_shares.append(share)
+
+    for stale_share in existing_shares.values():
+        await session.delete(stale_share)
+
+    receipt.recipient_shares = next_shares
+
+    await session.flush()
+    return receipt
+
+
+async def clear_receipt_split(
+    session: AsyncSession,
+    receipt_id: int,
+) -> "Receipt":
+    result = await session.execute(
+        select(Receipt)
+        .where(Receipt.id == receipt_id)
+        .options(selectinload(Receipt.recipient_shares))
+    )
+    receipt = result.scalar_one_or_none()
+    if receipt is None:
+        raise ValueError(f"Receipt {receipt_id} not found")
+
+    receipt.owner_share_percent = None
+    for stale_share in list(receipt.recipient_shares):
+        await session.delete(stale_share)
+    receipt.recipient_shares = []
+
     await session.flush()
     return receipt
 
@@ -804,17 +949,60 @@ async def set_receipt_tags(
 
 # ── DB Lifecycle & Utilities ──────────────────────────────────────────────────
 
+async def migrate_db_schema() -> None:
+    """Idempotently creates current tables and patches older SQLite files."""
+    from sqlalchemy import text
+
+    async with engine.begin() as conn:  # type: ignore[arg-type]
+        await conn.run_sync(Base.metadata.create_all)
+
+        result = await conn.execute(text("PRAGMA table_info(receipts)"))
+        receipt_columns = {row[1] for row in result.fetchall()}
+        if "owner_share_percent" not in receipt_columns:
+            await conn.execute(
+                text("ALTER TABLE receipts ADD COLUMN owner_share_percent FLOAT")
+            )
+
+        await conn.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS receipt_recipient_shares (
+                    receipt_id INTEGER NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    share_percent FLOAT NOT NULL,
+                    user_name_snapshot VARCHAR(256),
+                    user_email_snapshot VARCHAR(256),
+                    PRIMARY KEY (receipt_id, user_id),
+                    FOREIGN KEY(receipt_id) REFERENCES receipts (id) ON DELETE CASCADE,
+                    FOREIGN KEY(user_id) REFERENCES users (id) ON DELETE CASCADE
+                )
+                """
+            )
+        )
+        await conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_receipt_recipient_shares_receipt_id "
+                "ON receipt_recipient_shares (receipt_id)"
+            )
+        )
+        await conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_receipt_recipient_shares_user_id "
+                "ON receipt_recipient_shares (user_id)"
+            )
+        )
+
+
 async def create_db_and_tables() -> None:
-    """
-    Creates all tables if they do not exist.
-    WARNING: The current implementation also calls drop_all — remove drop_all
-    before production use. Only call create_all in normal startup.
-    """
-    if __name__ == "__main__":
-        if input("Drop and recreate database? (y/n): ").lower() == "y":
-            async with engine.begin() as conn:  # type: ignore[arg-type]
-                await conn.run_sync(Base.metadata.drop_all)
-                await conn.run_sync(Base.metadata.create_all)
+    """Creates missing tables and applies lightweight SQLite schema patches."""
+    await migrate_db_schema()
+
+
+async def reset_db() -> None:
+    """Drops and recreates all tables for local recovery workflows."""
+    async with engine.begin() as conn:  # type: ignore[arg-type]
+        await conn.run_sync(Base.metadata.drop_all)
+        await conn.run_sync(Base.metadata.create_all)
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
@@ -837,4 +1025,4 @@ async def check_db_connection() -> bool:
 if __name__ == "__main__":
     import asyncio
     if input("Drop and recreate database? (y/n): ").lower() == "y":
-        asyncio.run(create_db_and_tables())
+        asyncio.run(reset_db())

@@ -55,6 +55,7 @@ async def get_visible_receipt(
         )
         .options(
             selectinload(Receipt.recipient),
+            selectinload(Receipt.recipient_shares),
             selectinload(Receipt.files),
             selectinload(Receipt.tags),
         )
@@ -119,6 +120,7 @@ async def get_owned_receipt(
         .where(Receipt.id == receipt_id)
         .options(
             selectinload(Receipt.recipient),
+            selectinload(Receipt.recipient_shares),
             selectinload(Receipt.files),
             selectinload(Receipt.tags),
         )
@@ -164,6 +166,7 @@ async def list_visible_receipts(
 
     stmt = stmt.order_by(Receipt.id).limit(limit).options(
         selectinload(Receipt.recipient),
+        selectinload(Receipt.recipient_shares),
         selectinload(Receipt.files),
         selectinload(Receipt.tags),
     )
@@ -180,6 +183,31 @@ async def update_receipt_for_owner(
 ) -> Receipt:
     await get_owned_receipt(session, actor_user_id, receipt_id)
     return await db.update_receipt(session, receipt_id, **changes)
+
+
+async def set_receipt_split_for_owner(
+    session: AsyncSession,
+    actor_user_id: int,
+    receipt_id: int,
+    owner_share_percent: float,
+    recipient_shares: list[tuple[int, float]],
+) -> Receipt:
+    await get_owned_receipt(session, actor_user_id, receipt_id)
+    return await db.set_receipt_split(
+        session,
+        receipt_id=receipt_id,
+        owner_share_percent=owner_share_percent,
+        recipient_shares=recipient_shares,
+    )
+
+
+async def clear_receipt_split_for_owner(
+    session: AsyncSession,
+    actor_user_id: int,
+    receipt_id: int,
+) -> Receipt:
+    await get_owned_receipt(session, actor_user_id, receipt_id)
+    return await db.clear_receipt_split(session, receipt_id=receipt_id)
 
 
 async def mark_receipt_paid_for_owner(
