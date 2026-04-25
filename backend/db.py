@@ -159,16 +159,12 @@ class ReceiptRecipientShare(Base):
         ForeignKey("receipts.id", ondelete="CASCADE"),
         primary_key=True,
     )
-    user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"),
-        primary_key=True,
-    )
+    user_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     share_percent: Mapped[float] = mapped_column(nullable=False)
     user_name_snapshot: Mapped[str|None] = mapped_column(String(256), nullable=True)
     user_email_snapshot: Mapped[str|None] = mapped_column(String(256), nullable=True)
 
     receipt: Mapped["Receipt"] = relationship(back_populates="recipient_shares")
-    user: Mapped["User"] = relationship()
 
 
 class ReceiptFile(Base):
@@ -973,12 +969,62 @@ async def migrate_db_schema() -> None:
                     user_name_snapshot VARCHAR(256),
                     user_email_snapshot VARCHAR(256),
                     PRIMARY KEY (receipt_id, user_id),
-                    FOREIGN KEY(receipt_id) REFERENCES receipts (id) ON DELETE CASCADE,
-                    FOREIGN KEY(user_id) REFERENCES users (id) ON DELETE CASCADE
+                    FOREIGN KEY(receipt_id) REFERENCES receipts (id) ON DELETE CASCADE
                 )
                 """
             )
         )
+        result = await conn.execute(
+            text("PRAGMA foreign_key_list(receipt_recipient_shares)")
+        )
+        has_user_fk = any(
+            row[2] == "users" and row[3] == "user_id"
+            for row in result.fetchall()
+        )
+        if has_user_fk:
+            await conn.execute(text("DROP TABLE IF EXISTS receipt_recipient_shares_new"))
+            await conn.execute(
+                text(
+                    """
+                    CREATE TABLE receipt_recipient_shares_new (
+                        receipt_id INTEGER NOT NULL,
+                        user_id INTEGER NOT NULL,
+                        share_percent FLOAT NOT NULL,
+                        user_name_snapshot VARCHAR(256),
+                        user_email_snapshot VARCHAR(256),
+                        PRIMARY KEY (receipt_id, user_id),
+                        FOREIGN KEY(receipt_id) REFERENCES receipts (id) ON DELETE CASCADE
+                    )
+                    """
+                )
+            )
+            await conn.execute(
+                text(
+                    """
+                    INSERT INTO receipt_recipient_shares_new (
+                        receipt_id,
+                        user_id,
+                        share_percent,
+                        user_name_snapshot,
+                        user_email_snapshot
+                    )
+                    SELECT
+                        receipt_id,
+                        user_id,
+                        share_percent,
+                        user_name_snapshot,
+                        user_email_snapshot
+                    FROM receipt_recipient_shares
+                    """
+                )
+            )
+            await conn.execute(text("DROP TABLE receipt_recipient_shares"))
+            await conn.execute(
+                text(
+                    "ALTER TABLE receipt_recipient_shares_new "
+                    "RENAME TO receipt_recipient_shares"
+                )
+            )
         await conn.execute(
             text(
                 "CREATE INDEX IF NOT EXISTS ix_receipt_recipient_shares_receipt_id "

@@ -623,6 +623,71 @@ class ReceiptSplitTests(AsyncDatabaseTestCase):
                     recipient_shares=[(self.stranger.id, 50.0)],
                 )
 
+    async def test_delete_user_preserves_split_rows_and_snapshots(self) -> None:
+        async with db.async_session_maker() as session:
+            receipt = await db.create_receipt(
+                session=session,
+                owner_id=self.owner.id,
+                title="Dinner",
+                amount_owed=100.0,
+                recipient_id=self.recipient.id,
+            )
+            await db.set_receipt_split(
+                session=session,
+                receipt_id=receipt.id,
+                owner_share_percent=25.0,
+                recipient_shares=[(self.member_a.id, 75.0)],
+            )
+            await session.commit()
+
+        async with db.async_session_maker() as session:
+            deleted_storage_keys = await db.delete_user(session, self.member_a.id)
+            await session.commit()
+
+        self.assertEqual(deleted_storage_keys, [])
+
+        async with db.async_session_maker() as session:
+            stored = await db.get_receipt_by_id(session, receipt.id)
+
+        self.assertIsNotNone(stored)
+        self.assertEqual(stored.owner_share_percent, 25.0)
+        self.assertEqual(
+            [
+                (
+                    share.user_id,
+                    share.share_percent,
+                    share.user_name_snapshot,
+                    share.user_email_snapshot,
+                )
+                for share in stored.recipient_shares
+            ],
+            [(self.member_a.id, 75.0, "Member A", "member-a@example.com")],
+        )
+
+        response = await self._post_protobuf(
+            "/api/receipts/get",
+            debt_pb2.ReceiptLookupRequest(receipt_id=receipt.id),
+            "owner-token",
+        )
+        parsed = self._parse_message(debt_pb2.ReceiptResponse, response)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(parsed.success)
+        self.assertTrue(parsed.receipt.HasField("split"))
+        self.assertEqual(parsed.receipt.split.owner_share_percent, 25.0)
+        self.assertEqual(
+            [
+                (
+                    share.user_id,
+                    share.share_percent,
+                    share.user_name,
+                    share.user_email,
+                )
+                for share in parsed.receipt.split.recipient_shares
+            ],
+            [(self.member_a.id, 75.0, "Member A", "member-a@example.com")],
+        )
+
     async def test_update_receipt_split_fully_replaces_old_rows(self) -> None:
         async with db.async_session_maker() as session:
             receipt = await db.create_receipt(
