@@ -153,20 +153,19 @@ class _AppSectionsState extends State<AppSections> {
 }
 
 class HomeSection extends StatelessWidget {
-  const HomeSection({super.key, required this.isDesktop});
+  const HomeSection({
+    super.key,
+    required this.isDesktop,
+    this.referenceDate,
+  });
 
   final bool isDesktop;
+  final DateTime? referenceDate;
 
-  static final NumberFormat _currencyFormat = NumberFormat.currency(
-    locale: 'de_DE',
-    symbol: '',
-    decimalDigits: 2,
-  );
-  static final DateFormat _dueDateFormat = DateFormat('dd.MM.yy');
-  static final List<_PlaceholderBill> _placeholderBills = [
-    _PlaceholderBill(
+  static const List<_PlaceholderBillSeed> _placeholderBillSeeds = [
+    _PlaceholderBillSeed(
       title: 'Studio rent top-up',
-      dueDate: DateTime(2026, 5, 2),
+      dueInDays: 7,
       amount: 427.00,
       tags: [
         _PlaceholderTag(icon: '🏠', text: 'Home', color: '#FFB74D'),
@@ -176,36 +175,36 @@ class HomeSection extends StatelessWidget {
         _PlaceholderTag(icon: '📌', text: 'Fixed cost', color: '#BA68C8'),
       ],
     ),
-    _PlaceholderBill(
+    _PlaceholderBillSeed(
       title: 'Quarterly electricity bill',
-      dueDate: DateTime(2026, 4, 30),
+      dueInDays: 5,
       amount: 248.40,
       tags: [
         _PlaceholderTag(icon: '⚡', text: 'Utilities', color: '#FFD54F'),
         _PlaceholderTag(icon: '🧾', text: 'Invoice', color: '#90A4AE'),
       ],
     ),
-    _PlaceholderBill(
+    _PlaceholderBillSeed(
       title: 'Spring grocery split',
-      dueDate: DateTime(2026, 4, 29),
+      dueInDays: 4,
       amount: 413.78,
       tags: [
         _PlaceholderTag(icon: '🛒', text: 'Groceries', color: '#81C784'),
         _PlaceholderTag(icon: '👥', text: 'Shared', color: '#4DB6AC'),
       ],
     ),
-    _PlaceholderBill(
+    _PlaceholderBillSeed(
       title: 'Weekend train tickets',
-      dueDate: DateTime(2026, 4, 27),
+      dueInDays: 2,
       amount: 176.30,
       tags: [
         _PlaceholderTag(icon: '🚆', text: 'Travel', color: '#64B5F6'),
         _PlaceholderTag(icon: '🤝', text: 'Split', color: '#A1887F'),
       ],
     ),
-    _PlaceholderBill(
+    _PlaceholderBillSeed(
       title: 'Internet renewal',
-      dueDate: DateTime(2026, 4, 26),
+      dueInDays: 1,
       amount: 92.15,
       tags: [
         _PlaceholderTag(icon: '🌐', text: 'Internet', color: '#4FC3F7'),
@@ -214,8 +213,23 @@ class HomeSection extends StatelessWidget {
     ),
   ];
 
-  static String _formatCurrency(double amount) {
-    return '${_currencyFormat.format(amount).trimRight()}€';
+  static DateTime _dateOnly(DateTime value) {
+    return DateTime(value.year, value.month, value.day);
+  }
+
+  static List<_PlaceholderBill> _buildPlaceholderBills(DateTime referenceDate) {
+    final baseDate = _dateOnly(referenceDate);
+
+    return _placeholderBillSeeds
+        .map(
+          (seed) => _PlaceholderBill(
+            title: seed.title,
+            dueDate: baseDate.add(Duration(days: seed.dueInDays)),
+            amount: seed.amount,
+            tags: seed.tags,
+          ),
+        )
+        .toList(growable: false);
   }
 
   @override
@@ -223,7 +237,15 @@ class HomeSection extends StatelessWidget {
     final backendError = context.select<AuthSessionState, String?>(
       (state) => state.backendError,
     );
-    final totalStillOwed = _placeholderBills.fold<double>(
+    final locale = Localizations.localeOf(context);
+    final materialLocalizations = MaterialLocalizations.of(context);
+    final placeholderBills = _buildPlaceholderBills(referenceDate ?? DateTime.now());
+    final currencyFormat = NumberFormat.currency(
+      locale: locale.toString(),
+      symbol: '€',
+      decimalDigits: 2,
+    );
+    final totalStillOwed = placeholderBills.fold<double>(
       0,
       (sum, bill) => sum + bill.amount,
     );
@@ -273,16 +295,16 @@ class HomeSection extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 20),
-              ..._placeholderBills.asMap().entries.map(
+              ...placeholderBills.asMap().entries.map(
                 (entry) => Padding(
                   padding: EdgeInsets.only(
-                    bottom: entry.key == _placeholderBills.length - 1 ? 0 : 12,
+                    bottom: entry.key == placeholderBills.length - 1 ? 0 : 12,
                   ),
                   child: _PlaceholderBillTile(
                     title: entry.value.title,
                     dueLabel:
-                        'Due ${_dueDateFormat.format(entry.value.dueDate)}',
-                    amountLabel: _formatCurrency(entry.value.amount),
+                        'Due ${materialLocalizations.formatShortDate(entry.value.dueDate)}',
+                    amountLabel: currencyFormat.format(entry.value.amount),
                     tags: entry.value.tags,
                   ),
                 ),
@@ -324,7 +346,7 @@ class HomeSection extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      _formatCurrency(totalStillOwed),
+                      currencyFormat.format(totalStillOwed),
                       style: Theme.of(context).textTheme.displaySmall?.copyWith(
                         fontWeight: FontWeight.w900,
                         letterSpacing: -1,
@@ -332,7 +354,7 @@ class HomeSection extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '${_placeholderBills.length} unpaid placeholder bills',
+                      '${placeholderBills.length} unpaid placeholder bills',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         color: mutedForegroundColor(context, alpha: 0.8),
                         fontWeight: FontWeight.w700,
@@ -541,6 +563,20 @@ class _PlaceholderBillTile extends StatelessWidget {
       ),
     );
   }
+}
+
+class _PlaceholderBillSeed {
+  const _PlaceholderBillSeed({
+    required this.title,
+    required this.dueInDays,
+    required this.amount,
+    required this.tags,
+  });
+
+  final String title;
+  final int dueInDays;
+  final double amount;
+  final List<_PlaceholderTag> tags;
 }
 
 class _PlaceholderBill {

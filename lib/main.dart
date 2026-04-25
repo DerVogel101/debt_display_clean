@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 
 import 'package:debt_display/auth0_service.dart';
@@ -55,6 +56,8 @@ class _AppRoot extends StatelessWidget {
     return MaterialApp(
       title: 'debt_display',
       debugShowCheckedModeBanner: false,
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
+      supportedLocales: const [Locale('en'), Locale('de')],
       themeMode: themeMode,
       theme: lightTheme,
       darkTheme: darkTheme,

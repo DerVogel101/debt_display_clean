@@ -5,22 +5,40 @@ import 'package:debt_display/theme/app_themes.dart';
 import 'package:debt_display/ui/app_sections.dart';
 import 'package:debt_display/ui/app_shell.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+const _supportedLocales = [Locale('en'), Locale('de')];
+final _fixedReferenceDate = DateTime(2026, 4, 25);
+
 void main() {
-  testWidgets('home dashboard shows five placeholder bills and total owed', (
+  testWidgets('home dashboard formats amounts and dates for en_US locale', (
     tester,
   ) async {
     _setTestSurfaceSize(tester, width: 430, height: 1000);
 
     await tester.pumpWidget(
-      _buildHomeSectionTestApp(authState: _TestAuthSessionState()),
+      _buildHomeSectionTestApp(
+        authState: _TestAuthSessionState(),
+        locale: const Locale('en', 'US'),
+        referenceDate: _fixedReferenceDate,
+      ),
+    );
+
+    final materialLocalizations = _homeMaterialLocalizations(tester);
+    final expectedDue = materialLocalizations.formatShortDate(
+      _placeholderDueDate(_fixedReferenceDate, 7),
+    );
+    final expectedAmount = _formatExpectedCurrency(
+      1357.63,
+      const Locale('en', 'US'),
     );
 
     expect(find.text('Recent outstanding bills'), findsOneWidget);
     expect(find.textContaining('Due '), findsNWidgets(5));
-    expect(find.text('Due 02.05.26'), findsOneWidget);
+    expect(find.text('Due $expectedDue'), findsOneWidget);
     expect(find.text('Studio rent top-up'), findsOneWidget);
     expect(find.text('Quarterly electricity bill'), findsOneWidget);
     expect(find.text('Spring grocery split'), findsOneWidget);
@@ -29,7 +47,33 @@ void main() {
     expect(find.text('Home'), findsOneWidget);
     expect(find.text('Open bill list'), findsOneWidget);
     expect(find.text('Total still owed'), findsOneWidget);
-    expect(find.text('1.357,63€'), findsOneWidget);
+    expect(find.text(expectedAmount), findsOneWidget);
+  });
+
+  testWidgets('home dashboard formats amounts and dates for de_DE locale', (
+    tester,
+  ) async {
+    _setTestSurfaceSize(tester, width: 430, height: 1000);
+
+    await tester.pumpWidget(
+      _buildHomeSectionTestApp(
+        authState: _TestAuthSessionState(),
+        locale: const Locale('de', 'DE'),
+        referenceDate: _fixedReferenceDate,
+      ),
+    );
+
+    final materialLocalizations = _homeMaterialLocalizations(tester);
+    final expectedDue = materialLocalizations.formatShortDate(
+      _placeholderDueDate(_fixedReferenceDate, 7),
+    );
+    final expectedAmount = _formatExpectedCurrency(
+      1357.63,
+      const Locale('de', 'DE'),
+    );
+
+    expect(find.text('Due $expectedDue'), findsOneWidget);
+    expect(find.text(expectedAmount), findsOneWidget);
   });
 
   testWidgets('home dashboard bill list button shows a placeholder snackbar', (
@@ -38,7 +82,10 @@ void main() {
     _setTestSurfaceSize(tester, width: 430, height: 1000);
 
     await tester.pumpWidget(
-      _buildHomeSectionTestApp(authState: _TestAuthSessionState()),
+      _buildHomeSectionTestApp(
+        authState: _TestAuthSessionState(),
+        referenceDate: _fixedReferenceDate,
+      ),
     );
 
     await tester.tap(find.byKey(const ValueKey('open-bill-list-button')));
@@ -53,12 +100,39 @@ void main() {
       _setTestSurfaceSize(tester, width: 320, height: 1000);
 
       await tester.pumpWidget(
-        _buildHomeSectionTestApp(authState: _TestAuthSessionState()),
+        _buildHomeSectionTestApp(
+          authState: _TestAuthSessionState(),
+          referenceDate: _fixedReferenceDate,
+        ),
       );
 
       expect(find.text('+5'), findsOneWidget);
     },
   );
+
+  testWidgets('home dashboard generates placeholder due dates from reference date', (
+    tester,
+  ) async {
+    _setTestSurfaceSize(tester, width: 430, height: 1000);
+
+    final referenceDate = DateTime(2030, 1, 10);
+    await tester.pumpWidget(
+      _buildHomeSectionTestApp(
+        authState: _TestAuthSessionState(),
+        locale: const Locale('en', 'US'),
+        referenceDate: referenceDate,
+      ),
+    );
+
+    final materialLocalizations = _homeMaterialLocalizations(tester);
+    const dueOffsets = [7, 5, 4, 2, 1];
+    for (final dueOffset in dueOffsets) {
+      final expectedDue = materialLocalizations.formatShortDate(
+        _placeholderDueDate(referenceDate, dueOffset),
+      );
+      expect(find.text('Due $expectedDue'), findsOneWidget);
+    }
+  });
 
   testWidgets('mobile bottom navigation only shows home and menu', (
     tester,
@@ -160,23 +234,15 @@ void main() {
   });
 }
 
-Widget _buildHomeSectionTestApp({required _TestAuthSessionState authState}) {
-  return MaterialApp(
-    theme: buildLightTheme(),
-    home: ChangeNotifierProvider<AuthSessionState>.value(
-      value: authState,
-      child: const Scaffold(
-        body: SingleChildScrollView(child: HomeSection(isDesktop: false)),
-      ),
-    ),
-  );
-}
-
 Widget _buildResponsiveShellTestApp({
   required _TestAuthSessionState authState,
   required NavigationState navigationState,
+  Locale locale = const Locale('en', 'US'),
 }) {
   return MaterialApp(
+    locale: locale,
+    localizationsDelegates: GlobalMaterialLocalizations.delegates,
+    supportedLocales: _supportedLocales,
     theme: buildLightTheme(),
     home: MultiProvider(
       providers: [
@@ -186,6 +252,51 @@ Widget _buildResponsiveShellTestApp({
       child: const ResponsiveShell(),
     ),
   );
+}
+
+Widget _buildHomeSectionTestApp({
+  required _TestAuthSessionState authState,
+  Locale locale = const Locale('en', 'US'),
+  DateTime? referenceDate,
+}) {
+  return MaterialApp(
+    locale: locale,
+    localizationsDelegates: GlobalMaterialLocalizations.delegates,
+    supportedLocales: _supportedLocales,
+    theme: buildLightTheme(),
+    home: ChangeNotifierProvider<AuthSessionState>.value(
+      value: authState,
+      child: Scaffold(
+        body: SingleChildScrollView(
+          child: HomeSection(
+            isDesktop: false,
+            referenceDate: referenceDate,
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+MaterialLocalizations _homeMaterialLocalizations(WidgetTester tester) {
+  return MaterialLocalizations.of(tester.element(find.byType(HomeSection)));
+}
+
+DateTime _placeholderDueDate(DateTime referenceDate, int dueInDays) {
+  final baseDate = DateTime(
+    referenceDate.year,
+    referenceDate.month,
+    referenceDate.day,
+  );
+  return baseDate.add(Duration(days: dueInDays));
+}
+
+String _formatExpectedCurrency(double amount, Locale locale) {
+  return NumberFormat.currency(
+    locale: locale.toString(),
+    symbol: '€',
+    decimalDigits: 2,
+  ).format(amount);
 }
 
 void _setTestSurfaceSize(
