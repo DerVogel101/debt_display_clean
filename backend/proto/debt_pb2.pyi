@@ -72,8 +72,48 @@ class TagIndex(_message.Message):
     color: str
     def __init__(self, id: _Optional[int] = ..., icon: _Optional[str] = ..., text: _Optional[str] = ..., color: _Optional[str] = ...) -> None: ...
 
+class ReceiptRecipientShareInput(_message.Message):
+    __slots__ = ("user_id", "share_percent")
+    USER_ID_FIELD_NUMBER: _ClassVar[int]
+    SHARE_PERCENT_FIELD_NUMBER: _ClassVar[int]
+    user_id: int
+    share_percent: float
+    def __init__(self, user_id: _Optional[int] = ..., share_percent: _Optional[float] = ...) -> None: ...
+
+class ReceiptSplitInput(_message.Message):
+    __slots__ = ("owner_share_percent", "recipient_shares")
+    OWNER_SHARE_PERCENT_FIELD_NUMBER: _ClassVar[int]
+    RECIPIENT_SHARES_FIELD_NUMBER: _ClassVar[int]
+    owner_share_percent: float
+    recipient_shares: _containers.RepeatedCompositeFieldContainer[ReceiptRecipientShareInput]
+    def __init__(self, owner_share_percent: _Optional[float] = ..., recipient_shares: _Optional[_Iterable[_Union[ReceiptRecipientShareInput, _Mapping]]] = ...) -> None: ...
+
+class ReceiptRecipientShare(_message.Message):
+    __slots__ = ("user_id", "share_percent", "amount", "user_name", "user_email")
+    USER_ID_FIELD_NUMBER: _ClassVar[int]
+    SHARE_PERCENT_FIELD_NUMBER: _ClassVar[int]
+    AMOUNT_FIELD_NUMBER: _ClassVar[int]
+    USER_NAME_FIELD_NUMBER: _ClassVar[int]
+    USER_EMAIL_FIELD_NUMBER: _ClassVar[int]
+    user_id: int
+    share_percent: float
+    amount: float
+    user_name: str
+    user_email: str
+    def __init__(self, user_id: _Optional[int] = ..., share_percent: _Optional[float] = ..., amount: _Optional[float] = ..., user_name: _Optional[str] = ..., user_email: _Optional[str] = ...) -> None: ...
+
+class ReceiptSplit(_message.Message):
+    __slots__ = ("owner_share_percent", "owner_amount", "recipient_shares")
+    OWNER_SHARE_PERCENT_FIELD_NUMBER: _ClassVar[int]
+    OWNER_AMOUNT_FIELD_NUMBER: _ClassVar[int]
+    RECIPIENT_SHARES_FIELD_NUMBER: _ClassVar[int]
+    owner_share_percent: float
+    owner_amount: float
+    recipient_shares: _containers.RepeatedCompositeFieldContainer[ReceiptRecipientShare]
+    def __init__(self, owner_share_percent: _Optional[float] = ..., owner_amount: _Optional[float] = ..., recipient_shares: _Optional[_Iterable[_Union[ReceiptRecipientShare, _Mapping]]] = ...) -> None: ...
+
 class Receipt(_message.Message):
-    __slots__ = ("id", "title", "description", "amount_owed", "amount_paid", "due_date", "is_paid", "currency", "paid_at", "notes", "created_at", "updated_at", "owner_id", "recipient_id", "recipient_name", "recipient", "files", "tags")
+    __slots__ = ("id", "title", "description", "amount_owed", "amount_paid", "due_date", "is_paid", "currency", "paid_at", "notes", "created_at", "updated_at", "owner_id", "recipient_id", "recipient_name", "recipient", "files", "tags", "split")
     ID_FIELD_NUMBER: _ClassVar[int]
     TITLE_FIELD_NUMBER: _ClassVar[int]
     DESCRIPTION_FIELD_NUMBER: _ClassVar[int]
@@ -92,6 +132,7 @@ class Receipt(_message.Message):
     RECIPIENT_FIELD_NUMBER: _ClassVar[int]
     FILES_FIELD_NUMBER: _ClassVar[int]
     TAGS_FIELD_NUMBER: _ClassVar[int]
+    SPLIT_FIELD_NUMBER: _ClassVar[int]
     id: int
     title: str
     description: str
@@ -110,7 +151,8 @@ class Receipt(_message.Message):
     recipient: Recipient
     files: _containers.RepeatedCompositeFieldContainer[ReceiptFile]
     tags: _containers.RepeatedCompositeFieldContainer[TagIndex]
-    def __init__(self, id: _Optional[int] = ..., title: _Optional[str] = ..., description: _Optional[str] = ..., amount_owed: _Optional[float] = ..., amount_paid: _Optional[float] = ..., due_date: _Optional[str] = ..., is_paid: _Optional[bool] = ..., currency: _Optional[str] = ..., paid_at: _Optional[str] = ..., notes: _Optional[str] = ..., created_at: _Optional[str] = ..., updated_at: _Optional[str] = ..., owner_id: _Optional[int] = ..., recipient_id: _Optional[int] = ..., recipient_name: _Optional[str] = ..., recipient: _Optional[_Union[Recipient, _Mapping]] = ..., files: _Optional[_Iterable[_Union[ReceiptFile, _Mapping]]] = ..., tags: _Optional[_Iterable[_Union[TagIndex, _Mapping]]] = ...) -> None: ...
+    split: ReceiptSplit
+    def __init__(self, id: _Optional[int] = ..., title: _Optional[str] = ..., description: _Optional[str] = ..., amount_owed: _Optional[float] = ..., amount_paid: _Optional[float] = ..., due_date: _Optional[str] = ..., is_paid: _Optional[bool] = ..., currency: _Optional[str] = ..., paid_at: _Optional[str] = ..., notes: _Optional[str] = ..., created_at: _Optional[str] = ..., updated_at: _Optional[str] = ..., owner_id: _Optional[int] = ..., recipient_id: _Optional[int] = ..., recipient_name: _Optional[str] = ..., recipient: _Optional[_Union[Recipient, _Mapping]] = ..., files: _Optional[_Iterable[_Union[ReceiptFile, _Mapping]]] = ..., tags: _Optional[_Iterable[_Union[TagIndex, _Mapping]]] = ..., split: _Optional[_Union[ReceiptSplit, _Mapping]] = ...) -> None: ...
 
 class ActionResponse(_message.Message):
     __slots__ = ("success", "message")
@@ -265,7 +307,7 @@ class RecipientMemberRequest(_message.Message):
     def __init__(self, recipient_id: _Optional[int] = ..., user_id: _Optional[int] = ...) -> None: ...
 
 class CreateReceiptRequest(_message.Message):
-    __slots__ = ("title", "amount_owed", "currency", "recipient_id", "description", "due_date", "notes")
+    __slots__ = ("title", "amount_owed", "currency", "recipient_id", "description", "due_date", "notes", "split")
     TITLE_FIELD_NUMBER: _ClassVar[int]
     AMOUNT_OWED_FIELD_NUMBER: _ClassVar[int]
     CURRENCY_FIELD_NUMBER: _ClassVar[int]
@@ -273,6 +315,7 @@ class CreateReceiptRequest(_message.Message):
     DESCRIPTION_FIELD_NUMBER: _ClassVar[int]
     DUE_DATE_FIELD_NUMBER: _ClassVar[int]
     NOTES_FIELD_NUMBER: _ClassVar[int]
+    SPLIT_FIELD_NUMBER: _ClassVar[int]
     title: str
     amount_owed: float
     currency: str
@@ -280,7 +323,8 @@ class CreateReceiptRequest(_message.Message):
     description: str
     due_date: str
     notes: str
-    def __init__(self, title: _Optional[str] = ..., amount_owed: _Optional[float] = ..., currency: _Optional[str] = ..., recipient_id: _Optional[int] = ..., description: _Optional[str] = ..., due_date: _Optional[str] = ..., notes: _Optional[str] = ...) -> None: ...
+    split: ReceiptSplitInput
+    def __init__(self, title: _Optional[str] = ..., amount_owed: _Optional[float] = ..., currency: _Optional[str] = ..., recipient_id: _Optional[int] = ..., description: _Optional[str] = ..., due_date: _Optional[str] = ..., notes: _Optional[str] = ..., split: _Optional[_Union[ReceiptSplitInput, _Mapping]] = ...) -> None: ...
 
 class ReceiptLookupRequest(_message.Message):
     __slots__ = ("receipt_id",)
@@ -301,7 +345,7 @@ class ReceiptListRequest(_message.Message):
     def __init__(self, is_paid: _Optional[bool] = ..., tag_ids: _Optional[_Iterable[int]] = ..., cursor: _Optional[int] = ..., limit: _Optional[int] = ...) -> None: ...
 
 class UpdateReceiptRequest(_message.Message):
-    __slots__ = ("receipt_id", "title", "description", "amount_owed", "amount_paid", "due_date", "notes", "currency")
+    __slots__ = ("receipt_id", "title", "description", "amount_owed", "amount_paid", "due_date", "notes", "currency", "split", "clear_split")
     RECEIPT_ID_FIELD_NUMBER: _ClassVar[int]
     TITLE_FIELD_NUMBER: _ClassVar[int]
     DESCRIPTION_FIELD_NUMBER: _ClassVar[int]
@@ -310,6 +354,8 @@ class UpdateReceiptRequest(_message.Message):
     DUE_DATE_FIELD_NUMBER: _ClassVar[int]
     NOTES_FIELD_NUMBER: _ClassVar[int]
     CURRENCY_FIELD_NUMBER: _ClassVar[int]
+    SPLIT_FIELD_NUMBER: _ClassVar[int]
+    CLEAR_SPLIT_FIELD_NUMBER: _ClassVar[int]
     receipt_id: int
     title: str
     description: str
@@ -318,7 +364,9 @@ class UpdateReceiptRequest(_message.Message):
     due_date: str
     notes: str
     currency: str
-    def __init__(self, receipt_id: _Optional[int] = ..., title: _Optional[str] = ..., description: _Optional[str] = ..., amount_owed: _Optional[float] = ..., amount_paid: _Optional[float] = ..., due_date: _Optional[str] = ..., notes: _Optional[str] = ..., currency: _Optional[str] = ...) -> None: ...
+    split: ReceiptSplitInput
+    clear_split: bool
+    def __init__(self, receipt_id: _Optional[int] = ..., title: _Optional[str] = ..., description: _Optional[str] = ..., amount_owed: _Optional[float] = ..., amount_paid: _Optional[float] = ..., due_date: _Optional[str] = ..., notes: _Optional[str] = ..., currency: _Optional[str] = ..., split: _Optional[_Union[ReceiptSplitInput, _Mapping]] = ..., clear_split: _Optional[bool] = ...) -> None: ...
 
 class MarkReceiptPaidRequest(_message.Message):
     __slots__ = ("receipt_id", "amount_paid")

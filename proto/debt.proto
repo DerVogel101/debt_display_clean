@@ -39,6 +39,30 @@ message TagIndex {
   string color = 4;
 }
 
+message ReceiptRecipientShareInput {
+  int64 user_id = 1;
+  double share_percent = 2;
+}
+
+message ReceiptSplitInput {
+  double owner_share_percent = 1;
+  repeated ReceiptRecipientShareInput recipient_shares = 2;
+}
+
+message ReceiptRecipientShare {
+  int64 user_id = 1;
+  double share_percent = 2;
+  double amount = 3;
+  optional string user_name = 4;
+  optional string user_email = 5;
+}
+
+message ReceiptSplit {
+  double owner_share_percent = 1;
+  double owner_amount = 2;
+  repeated ReceiptRecipientShare recipient_shares = 3;
+}
+
 message Receipt {
   int64 id = 1;
   string title = 2;
@@ -58,6 +82,7 @@ message Receipt {
   optional Recipient recipient = 16;
   repeated ReceiptFile files = 17;
   repeated TagIndex tags = 18;
+  optional ReceiptSplit split = 19;
 }
 
 message ActionResponse {
@@ -160,6 +185,7 @@ message CreateReceiptRequest {
   optional string description = 5;
   optional string due_date = 6;
   optional string notes = 7;
+  optional ReceiptSplitInput split = 8;
 }
 
 message ReceiptLookupRequest {
@@ -182,6 +208,8 @@ message UpdateReceiptRequest {
   optional string due_date = 6;
   optional string notes = 7;
   optional string currency = 8;
+  optional ReceiptSplitInput split = 9;
+  optional bool clear_split = 10;
 }
 
 message MarkReceiptPaidRequest {

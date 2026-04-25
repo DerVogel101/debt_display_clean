@@ -160,6 +160,38 @@ def _tag_to_pb(tag) -> debt_pb2.TagIndex:
     return debt_pb2.TagIndex(id=tag.id, icon=tag.icon, text=tag.text, color=tag.color)
 
 
+def _split_input_from_pb(split) -> tuple[float, list[tuple[int, float]]]:
+    return (
+        float(split.owner_share_percent),
+        [
+            (int(share.user_id), float(share.share_percent))
+            for share in split.recipient_shares
+        ],
+    )
+
+
+def _receipt_split_to_pb(receipt) -> debt_pb2.ReceiptSplit | None:
+    if receipt.owner_share_percent is None:
+        return None
+
+    amount_owed = float(receipt.amount_owed)
+    msg = debt_pb2.ReceiptSplit(
+        owner_share_percent=float(receipt.owner_share_percent),
+        owner_amount=amount_owed * float(receipt.owner_share_percent) / 100.0,
+    )
+    for share in getattr(receipt, "recipient_shares", []) or []:
+        share_msg = msg.recipient_shares.add(
+            user_id=share.user_id,
+            share_percent=float(share.share_percent),
+            amount=amount_owed * float(share.share_percent) / 100.0,
+        )
+        if share.user_name_snapshot is not None:
+            share_msg.user_name = share.user_name_snapshot
+        if share.user_email_snapshot is not None:
+            share_msg.user_email = share.user_email_snapshot
+    return msg
+
+
 def _receipt_to_pb(receipt) -> debt_pb2.Receipt:
     msg = debt_pb2.Receipt(
         id=receipt.id,
@@ -192,6 +224,9 @@ def _receipt_to_pb(receipt) -> debt_pb2.Receipt:
         msg.files.add().CopyFrom(_file_to_pb(file_record))
     for tag in getattr(receipt, "tags", []) or []:
         msg.tags.add().CopyFrom(_tag_to_pb(tag))
+    split = _receipt_split_to_pb(receipt)
+    if split is not None:
+        msg.split.CopyFrom(split)
     return msg
 
 
@@ -533,6 +568,15 @@ async def create_receipt_route(request: Request, session: AsyncSession = Depends
             due_date=_dt_from_proto(proto_req.due_date if _has_field(proto_req, "due_date") else None),
             notes=proto_req.notes if _has_field(proto_req, "notes") else None,
         )
+        if _has_field(proto_req, "split"):
+            owner_share_percent, recipient_shares = _split_input_from_pb(proto_req.split)
+            await services.set_receipt_split_for_owner(
+                session=session,
+                actor_user_id=user.id,
+                receipt_id=receipt.id,
+                owner_share_percent=owner_share_percent,
+                recipient_shares=recipient_shares,
+            )
         await session.commit()
         receipt = await get_receipt_by_id(session, receipt.id)
         return _pb_response(debt_pb2.ReceiptResponse(success=True, receipt=_receipt_to_pb(receipt)))
@@ -608,6 +652,25 @@ async def update_receipt_route(request: Request, session: AsyncSession = Depends
             notes=proto_req.notes if _has_field(proto_req, "notes") else None,
             currency=proto_req.currency if _has_field(proto_req, "currency") else None,
         )
+        has_split = _has_field(proto_req, "split")
+        clear_split = _has_field(proto_req, "clear_split") and proto_req.clear_split
+        if has_split and clear_split:
+            raise ValueError("split and clear_split cannot both be set")
+        if has_split:
+            owner_share_percent, recipient_shares = _split_input_from_pb(proto_req.split)
+            receipt = await services.set_receipt_split_for_owner(
+                session=session,
+                actor_user_id=user.id,
+                receipt_id=receipt.id,
+                owner_share_percent=owner_share_percent,
+                recipient_shares=recipient_shares,
+            )
+        elif clear_split:
+            receipt = await services.clear_receipt_split_for_owner(
+                session=session,
+                actor_user_id=user.id,
+                receipt_id=receipt.id,
+            )
         await session.commit()
         receipt = await get_receipt_by_id(session, receipt.id)
         return _pb_response(debt_pb2.ReceiptResponse(success=True, receipt=_receipt_to_pb(receipt)))

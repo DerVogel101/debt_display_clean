@@ -77,3 +77,7 @@ For Flutter UI state in this repo:
 3. Prefer `context.select`, `Selector`, and `Consumer.child` to listen to specific attributes and minimize unnecessary rebuilds.
 4. Do not watch entire notifiers from broad layout widgets unless a full subtree rebuild is intentional.
 5. Reserve widget-local `setState` for ephemeral local UI concerns only.
+
+## AGENTS.md Maintenance
+
+If you notice repo-specific commands, pitfalls, conventions, or workflows that would likely help future agents, suggest adding them to this `AGENTS.md` file when appropriate.

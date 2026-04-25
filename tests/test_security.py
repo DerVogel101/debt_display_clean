@@ -474,6 +474,423 @@ class ReceiptAndFileAuthorizationTests(AsyncDatabaseTestCase):
                 )
 
 
+class ReceiptSplitTests(AsyncDatabaseTestCase):
+    async def asyncSetUp(self) -> None:
+        await super().asyncSetUp()
+
+        self.owner = await self._create_user("auth0|owner", "owner@example.com", "Owner")
+        self.member_a = await self._create_user(
+            "auth0|member-a", "member-a@example.com", "Member A"
+        )
+        self.member_b = await self._create_user(
+            "auth0|member-b", "member-b@example.com", "Member B"
+        )
+        self.stranger = await self._create_user(
+            "auth0|stranger", "stranger@example.com", "Stranger"
+        )
+
+        async with db.async_session_maker() as session:
+            self.recipient = await db.create_recipient(
+                session=session,
+                owner_id=self.owner.id,
+                name="Split Group",
+                description=None,
+                member_ids=[self.member_a.id, self.member_b.id],
+            )
+            await session.commit()
+
+        self._claims_by_token = {
+            "owner-token": {"sub": self.owner.sub},
+            "member-a-token": {"sub": self.member_a.sub},
+            "member-b-token": {"sub": self.member_b.sub},
+            "stranger-token": {"sub": self.stranger.sub},
+        }
+
+    async def _post_protobuf(self, path: str, message, token: str):
+        async def verify_side_effect(access_token: str):
+            return self._claims_by_token[access_token]
+
+        transport = ASGITransport(app=main.app)
+        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+            with patch("backend.auth.verify_token", new=AsyncMock(side_effect=verify_side_effect)):
+                return await client.post(
+                    path,
+                    content=message.SerializeToString(),
+                    headers={
+                        "Content-Type": "application/x-protobuf",
+                        "Authorization": f"Bearer {token}",
+                    },
+                )
+
+    def _parse_message(self, message_cls, response) -> object:
+        message = message_cls()
+        message.ParseFromString(response.content)
+        return message
+
+    def _create_receipt_request_with_split(self) -> debt_pb2.CreateReceiptRequest:
+        request = debt_pb2.CreateReceiptRequest(
+            title="Dinner",
+            amount_owed=100.0,
+            recipient_id=self.recipient.id,
+        )
+        request.split.owner_share_percent = 30.0
+        request.split.recipient_shares.add(
+            user_id=self.member_a.id,
+            share_percent=30.0,
+        )
+        request.split.recipient_shares.add(
+            user_id=self.member_b.id,
+            share_percent=40.0,
+        )
+        return request
+
+    async def test_create_receipt_with_split_persists_and_returns_computed_amounts(self) -> None:
+        response = await self._post_protobuf(
+            "/api/receipts/create",
+            self._create_receipt_request_with_split(),
+            "owner-token",
+        )
+        parsed = self._parse_message(debt_pb2.ReceiptResponse, response)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(parsed.success)
+        self.assertTrue(parsed.receipt.HasField("split"))
+        self.assertEqual(parsed.receipt.split.owner_share_percent, 30.0)
+        self.assertEqual(parsed.receipt.split.owner_amount, 30.0)
+        self.assertEqual(
+            {
+                (share.user_id, share.share_percent, share.amount, share.user_name)
+                for share in parsed.receipt.split.recipient_shares
+            },
+            {
+                (self.member_a.id, 30.0, 30.0, "Member A"),
+                (self.member_b.id, 40.0, 40.0, "Member B"),
+            },
+        )
+
+        async with db.async_session_maker() as session:
+            receipt = await db.get_receipt_by_id(session, parsed.receipt.id)
+
+        self.assertIsNotNone(receipt)
+        self.assertEqual(receipt.owner_share_percent, 30.0)
+        self.assertEqual(
+            {(share.user_id, share.share_percent) for share in receipt.recipient_shares},
+            {(self.member_a.id, 30.0), (self.member_b.id, 40.0)},
+        )
+
+    async def test_create_receipt_rejects_split_total_not_equal_to_100(self) -> None:
+        request = self._create_receipt_request_with_split()
+        request.split.recipient_shares[1].share_percent = 30.0
+
+        response = await self._post_protobuf(
+            "/api/receipts/create",
+            request,
+            "owner-token",
+        )
+        parsed = self._parse_message(debt_pb2.ReceiptResponse, response)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(parsed.success)
+        self.assertIn("sum to 100", parsed.message)
+
+    async def test_set_receipt_split_rejects_duplicate_and_non_member_users(self) -> None:
+        async with db.async_session_maker() as session:
+            receipt = await db.create_receipt(
+                session=session,
+                owner_id=self.owner.id,
+                title="Dinner",
+                amount_owed=100.0,
+                recipient_id=self.recipient.id,
+            )
+            await session.flush()
+
+            with self.assertRaisesRegex(ValueError, "Duplicate split user"):
+                await db.set_receipt_split(
+                    session=session,
+                    receipt_id=receipt.id,
+                    owner_share_percent=40.0,
+                    recipient_shares=[
+                        (self.member_a.id, 30.0),
+                        (self.member_a.id, 30.0),
+                    ],
+                )
+
+            with self.assertRaisesRegex(ValueError, "current members"):
+                await db.set_receipt_split(
+                    session=session,
+                    receipt_id=receipt.id,
+                    owner_share_percent=50.0,
+                    recipient_shares=[(self.stranger.id, 50.0)],
+                )
+
+    async def test_delete_user_preserves_split_rows_and_snapshots(self) -> None:
+        async with db.async_session_maker() as session:
+            receipt = await db.create_receipt(
+                session=session,
+                owner_id=self.owner.id,
+                title="Dinner",
+                amount_owed=100.0,
+                recipient_id=self.recipient.id,
+            )
+            await db.set_receipt_split(
+                session=session,
+                receipt_id=receipt.id,
+                owner_share_percent=25.0,
+                recipient_shares=[(self.member_a.id, 75.0)],
+            )
+            await session.commit()
+
+        async with db.async_session_maker() as session:
+            deleted_storage_keys = await db.delete_user(session, self.member_a.id)
+            await session.commit()
+
+        self.assertEqual(deleted_storage_keys, [])
+
+        async with db.async_session_maker() as session:
+            stored = await db.get_receipt_by_id(session, receipt.id)
+
+        self.assertIsNotNone(stored)
+        self.assertEqual(stored.owner_share_percent, 25.0)
+        self.assertEqual(
+            [
+                (
+                    share.user_id,
+                    share.share_percent,
+                    share.user_name_snapshot,
+                    share.user_email_snapshot,
+                )
+                for share in stored.recipient_shares
+            ],
+            [(self.member_a.id, 75.0, "Member A", "member-a@example.com")],
+        )
+
+        response = await self._post_protobuf(
+            "/api/receipts/get",
+            debt_pb2.ReceiptLookupRequest(receipt_id=receipt.id),
+            "owner-token",
+        )
+        parsed = self._parse_message(debt_pb2.ReceiptResponse, response)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(parsed.success)
+        self.assertTrue(parsed.receipt.HasField("split"))
+        self.assertEqual(parsed.receipt.split.owner_share_percent, 25.0)
+        self.assertEqual(
+            [
+                (
+                    share.user_id,
+                    share.share_percent,
+                    share.user_name,
+                    share.user_email,
+                )
+                for share in parsed.receipt.split.recipient_shares
+            ],
+            [(self.member_a.id, 75.0, "Member A", "member-a@example.com")],
+        )
+
+    async def test_update_receipt_split_fully_replaces_old_rows(self) -> None:
+        async with db.async_session_maker() as session:
+            receipt = await db.create_receipt(
+                session=session,
+                owner_id=self.owner.id,
+                title="Dinner",
+                amount_owed=100.0,
+                recipient_id=self.recipient.id,
+            )
+            await db.set_receipt_split(
+                session=session,
+                receipt_id=receipt.id,
+                owner_share_percent=30.0,
+                recipient_shares=[(self.member_a.id, 70.0)],
+            )
+            await session.commit()
+
+        request = debt_pb2.UpdateReceiptRequest(
+            receipt_id=receipt.id,
+            amount_owed=200.0,
+        )
+        request.split.owner_share_percent = 50.0
+        request.split.recipient_shares.add(
+            user_id=self.member_b.id,
+            share_percent=50.0,
+        )
+
+        response = await self._post_protobuf(
+            "/api/receipts/update",
+            request,
+            "owner-token",
+        )
+        parsed = self._parse_message(debt_pb2.ReceiptResponse, response)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(parsed.success)
+        self.assertEqual(parsed.receipt.split.owner_amount, 100.0)
+        self.assertEqual(len(parsed.receipt.split.recipient_shares), 1)
+        self.assertEqual(parsed.receipt.split.recipient_shares[0].user_id, self.member_b.id)
+        self.assertEqual(parsed.receipt.split.recipient_shares[0].amount, 100.0)
+
+        async with db.async_session_maker() as session:
+            stored = await db.get_receipt_by_id(session, receipt.id)
+
+        self.assertEqual(stored.owner_share_percent, 50.0)
+        self.assertEqual(
+            [(share.user_id, share.share_percent) for share in stored.recipient_shares],
+            [(self.member_b.id, 50.0)],
+        )
+
+    async def test_update_receipt_with_clear_split_removes_saved_split(self) -> None:
+        async with db.async_session_maker() as session:
+            receipt = await db.create_receipt(
+                session=session,
+                owner_id=self.owner.id,
+                title="Dinner",
+                amount_owed=100.0,
+                recipient_id=self.recipient.id,
+            )
+            await db.set_receipt_split(
+                session=session,
+                receipt_id=receipt.id,
+                owner_share_percent=25.0,
+                recipient_shares=[(self.member_a.id, 75.0)],
+            )
+            await session.commit()
+
+        response = await self._post_protobuf(
+            "/api/receipts/update",
+            debt_pb2.UpdateReceiptRequest(
+                receipt_id=receipt.id,
+                clear_split=True,
+            ),
+            "owner-token",
+        )
+        parsed = self._parse_message(debt_pb2.ReceiptResponse, response)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(parsed.success)
+        self.assertFalse(parsed.receipt.HasField("split"))
+
+        async with db.async_session_maker() as session:
+            stored = await db.get_receipt_by_id(session, receipt.id)
+
+        self.assertIsNone(stored.owner_share_percent)
+        self.assertEqual(stored.recipient_shares, [])
+
+    async def test_update_receipt_clear_split_is_noop_when_split_missing(self) -> None:
+        async with db.async_session_maker() as session:
+            receipt = await db.create_receipt(
+                session=session,
+                owner_id=self.owner.id,
+                title="Dinner",
+                amount_owed=100.0,
+                recipient_id=self.recipient.id,
+            )
+            await session.commit()
+
+        response = await self._post_protobuf(
+            "/api/receipts/update",
+            debt_pb2.UpdateReceiptRequest(
+                receipt_id=receipt.id,
+                clear_split=True,
+            ),
+            "owner-token",
+        )
+        parsed = self._parse_message(debt_pb2.ReceiptResponse, response)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(parsed.success)
+        self.assertFalse(parsed.receipt.HasField("split"))
+
+        async with db.async_session_maker() as session:
+            stored = await db.get_receipt_by_id(session, receipt.id)
+
+        self.assertIsNone(stored.owner_share_percent)
+        self.assertEqual(stored.recipient_shares, [])
+
+    async def test_update_receipt_rejects_split_and_clear_split_together(self) -> None:
+        async with db.async_session_maker() as session:
+            receipt = await db.create_receipt(
+                session=session,
+                owner_id=self.owner.id,
+                title="Dinner",
+                amount_owed=100.0,
+                recipient_id=self.recipient.id,
+            )
+            await db.set_receipt_split(
+                session=session,
+                receipt_id=receipt.id,
+                owner_share_percent=30.0,
+                recipient_shares=[(self.member_a.id, 70.0)],
+            )
+            await session.commit()
+
+        request = debt_pb2.UpdateReceiptRequest(
+            receipt_id=receipt.id,
+            clear_split=True,
+        )
+        request.split.owner_share_percent = 50.0
+        request.split.recipient_shares.add(
+            user_id=self.member_b.id,
+            share_percent=50.0,
+        )
+
+        response = await self._post_protobuf(
+            "/api/receipts/update",
+            request,
+            "owner-token",
+        )
+        parsed = self._parse_message(debt_pb2.ReceiptResponse, response)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(parsed.success)
+        self.assertIn("clear_split", parsed.message)
+
+        async with db.async_session_maker() as session:
+            stored = await db.get_receipt_by_id(session, receipt.id)
+
+        self.assertEqual(stored.owner_share_percent, 30.0)
+        self.assertEqual(
+            [(share.user_id, share.share_percent) for share in stored.recipient_shares],
+            [(self.member_a.id, 70.0)],
+        )
+
+    async def test_no_split_receipt_create_get_and_list_stays_legacy_shape(self) -> None:
+        create_response = await self._post_protobuf(
+            "/api/receipts/create",
+            debt_pb2.CreateReceiptRequest(
+                title="No Split",
+                amount_owed=25.0,
+                recipient_id=self.recipient.id,
+            ),
+            "owner-token",
+        )
+        created = self._parse_message(debt_pb2.ReceiptResponse, create_response)
+
+        self.assertEqual(create_response.status_code, 200)
+        self.assertFalse(created.receipt.HasField("split"))
+
+        get_response = await self._post_protobuf(
+            "/api/receipts/get",
+            debt_pb2.ReceiptLookupRequest(receipt_id=created.receipt.id),
+            "member-a-token",
+        )
+        got = self._parse_message(debt_pb2.ReceiptResponse, get_response)
+
+        self.assertEqual(get_response.status_code, 200)
+        self.assertTrue(got.success)
+        self.assertFalse(got.receipt.HasField("split"))
+
+        list_response = await self._post_protobuf(
+            "/api/receipts/list",
+            debt_pb2.ReceiptListRequest(),
+            "member-a-token",
+        )
+        listed = self._parse_message(debt_pb2.ReceiptsResponse, list_response)
+
+        self.assertEqual(list_response.status_code, 200)
+        self.assertTrue(listed.success)
+        self.assertIn(created.receipt.id, {receipt.id for receipt in listed.receipts})
+
+
 class LiveApiRegressionTests(AsyncDatabaseTestCase):
     async def asyncSetUp(self) -> None:
         await super().asyncSetUp()

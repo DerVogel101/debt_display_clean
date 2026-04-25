@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
+from backend import db
 from backend.api import api_app
 from backend.config import settings
 from backend.frontend import FrontendStaticFiles
@@ -27,6 +28,12 @@ app.mount(
     ),
     name="frontend",
 )
+
+
+@app.on_event("startup")
+async def _migrate_db_schema_on_startup() -> None:
+    await db.migrate_db_schema()
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host=settings.BACKEND_HOST, port=settings.BACKEND_PORT)
