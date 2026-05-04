@@ -20,9 +20,109 @@ enum BillPaymentFilter {
   };
 }
 
+class BillListQuery {
+  BillListQuery({
+    required this.paymentFilter,
+    required Set<int> selectedTagIds,
+    required this.orderBy,
+    required this.orderDirection,
+    required this.actorFilter,
+    required this.pageSize,
+  }) : selectedTagIds = Set<int>.unmodifiable(selectedTagIds);
+
+  factory BillListQuery.defaults() {
+    return BillListQuery(
+      paymentFilter: BillPaymentFilter.all,
+      selectedTagIds: const <int>{},
+      orderBy: ReceiptOrderBy.RECEIPT_ORDER_BY_ID,
+      orderDirection: ReceiptOrderDirection.RECEIPT_ORDER_DIRECTION_DESC,
+      actorFilter:
+          ReceiptActorFilter.RECEIPT_ACTOR_FILTER_OWNER_OR_RECIPIENT_GROUP,
+      pageSize: BillListState.defaultPageSize,
+    );
+  }
+
+  final BillPaymentFilter paymentFilter;
+  final Set<int> selectedTagIds;
+  final ReceiptOrderBy orderBy;
+  final ReceiptOrderDirection orderDirection;
+  final ReceiptActorFilter actorFilter;
+  final int pageSize;
+
+  BillListQuery copyWith({
+    BillPaymentFilter? paymentFilter,
+    Set<int>? selectedTagIds,
+    ReceiptOrderBy? orderBy,
+    ReceiptOrderDirection? orderDirection,
+    ReceiptActorFilter? actorFilter,
+    int? pageSize,
+  }) {
+    return BillListQuery(
+      paymentFilter: paymentFilter ?? this.paymentFilter,
+      selectedTagIds: selectedTagIds ?? this.selectedTagIds,
+      orderBy: orderBy ?? this.orderBy,
+      orderDirection: orderDirection ?? this.orderDirection,
+      actorFilter: actorFilter ?? this.actorFilter,
+      pageSize: pageSize ?? this.pageSize,
+    );
+  }
+
+  bool get isDefault => this == BillListQuery.defaults();
+
+  int get activeFilterCount {
+    var count = 0;
+    if (paymentFilter != BillPaymentFilter.all) {
+      count += 1;
+    }
+    if (selectedTagIds.isNotEmpty) {
+      count += 1;
+    }
+    if (orderBy != ReceiptOrderBy.RECEIPT_ORDER_BY_ID) {
+      count += 1;
+    }
+    if (orderDirection != ReceiptOrderDirection.RECEIPT_ORDER_DIRECTION_DESC) {
+      count += 1;
+    }
+    if (actorFilter !=
+        ReceiptActorFilter.RECEIPT_ACTOR_FILTER_OWNER_OR_RECIPIENT_GROUP) {
+      count += 1;
+    }
+    if (pageSize != BillListState.defaultPageSize) {
+      count += 1;
+    }
+    return count;
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    return other is BillListQuery &&
+        other.paymentFilter == paymentFilter &&
+        setEquals(other.selectedTagIds, selectedTagIds) &&
+        other.orderBy == orderBy &&
+        other.orderDirection == orderDirection &&
+        other.actorFilter == actorFilter &&
+        other.pageSize == pageSize;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    paymentFilter,
+    Object.hashAll(selectedTagIds.toList()..sort()),
+    orderBy,
+    orderDirection,
+    actorFilter,
+    pageSize,
+  );
+}
+
 class BillListState extends ChangeNotifier {
   BillListState({required DebtBackendService debtBackendService})
     : _debtBackendService = debtBackendService;
+
+  static const defaultPageSize = 20;
 
   final DebtBackendService _debtBackendService;
 
@@ -36,14 +136,7 @@ class BillListState extends ChangeNotifier {
   String? _errorMessage;
   List<Receipt> _receipts = const [];
   List<TagIndex> _availableTags = const [];
-  BillPaymentFilter _paymentFilter = BillPaymentFilter.all;
-  Set<int> _selectedTagIds = <int>{};
-  ReceiptOrderBy _orderBy = ReceiptOrderBy.RECEIPT_ORDER_BY_ID;
-  ReceiptOrderDirection _orderDirection =
-      ReceiptOrderDirection.RECEIPT_ORDER_DIRECTION_DESC;
-  ReceiptActorFilter _actorFilter =
-      ReceiptActorFilter.RECEIPT_ACTOR_FILTER_OWNER_OR_RECIPIENT_GROUP;
-  int _pageSize = 20;
+  BillListQuery _appliedQuery = BillListQuery.defaults();
   List<String?> _visitedPageTokens = [null];
   int _currentPageIndex = 0;
   String? _nextPageToken;
@@ -53,23 +146,24 @@ class BillListState extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   List<Receipt> get receipts => _receipts;
   List<TagIndex> get availableTags => _availableTags;
-  BillPaymentFilter get paymentFilter => _paymentFilter;
-  Set<int> get selectedTagIds => Set<int>.unmodifiable(_selectedTagIds);
-  ReceiptOrderBy get orderBy => _orderBy;
-  ReceiptOrderDirection get orderDirection => _orderDirection;
-  ReceiptActorFilter get actorFilter => _actorFilter;
-  int get pageSize => _pageSize;
+  BillListQuery get appliedQuery => _appliedQuery;
+  BillPaymentFilter get paymentFilter => _appliedQuery.paymentFilter;
+  Set<int> get selectedTagIds => _appliedQuery.selectedTagIds;
+  ReceiptOrderBy get orderBy => _appliedQuery.orderBy;
+  ReceiptOrderDirection get orderDirection => _appliedQuery.orderDirection;
+  ReceiptActorFilter get actorFilter => _appliedQuery.actorFilter;
+  int get pageSize => _appliedQuery.pageSize;
   int get currentPage => _currentPageIndex + 1;
   bool get hasPreviousPage => _currentPageIndex > 0;
   bool get hasNextPage => _nextPageToken != null;
 
   void updateAuthSession(AuthSessionState authSessionState) {
+    final previousAuthenticated = _isAuthenticated;
+    final previousUserId = _currentUserId;
     final nextAccessToken = authSessionState.accessToken;
     final nextUserId = authSessionState.userId;
     final nextAuthenticated =
-        authSessionState.isAuthenticated &&
-        nextAccessToken != null &&
-        nextUserId != null;
+        authSessionState.isAuthenticated && nextAccessToken != null;
 
     final authChanged =
         _isAuthenticated != nextAuthenticated ||
@@ -84,21 +178,25 @@ class BillListState extends ChangeNotifier {
     _accessToken = nextAccessToken;
     _currentUserId = nextUserId;
 
+    final becameUnauthenticated = previousAuthenticated && !nextAuthenticated;
+    final switchedPrincipal =
+        previousUserId != null &&
+        nextUserId != null &&
+        previousUserId != nextUserId;
+
     if (!_isAuthenticated) {
-      _hasLoadedTags = false;
-      _hasLoadedPage = false;
-      _errorMessage = null;
-      _receipts = const [];
-      _availableTags = const [];
-      _resetPagination();
+      _clearLoadedData();
+      _resetQueryState();
       return;
     }
 
+    if (becameUnauthenticated || switchedPrincipal) {
+      _resetQueryState();
+    }
+
     if (_hasOpenedBills) {
-      _hasLoadedTags = false;
-      _hasLoadedPage = false;
-      _resetPagination();
-      Future<void>.microtask(() => _runLoad(resetPage: true));
+      _markDataStale();
+      Future<void>.microtask(_loadPage);
     }
   }
 
@@ -114,7 +212,8 @@ class BillListState extends ChangeNotifier {
   }
 
   Future<void> refresh() async {
-    await _runLoad(resetPage: true);
+    _resetQueryStatePagination();
+    await _loadPage();
   }
 
   Future<void> goToNextPage() async {
@@ -143,76 +242,23 @@ class BillListState extends ChangeNotifier {
     await _loadPage();
   }
 
-  Future<void> setPaymentFilter(BillPaymentFilter value) async {
-    if (_paymentFilter == value) {
+  Future<void> applyQuery(BillListQuery query) async {
+    if (_appliedQuery == query) {
       return;
     }
-    _paymentFilter = value;
-    await _runLoad(resetPage: true);
-  }
-
-  Future<void> toggleTag(int tagId) async {
-    if (_selectedTagIds.contains(tagId)) {
-      _selectedTagIds.remove(tagId);
-    } else {
-      _selectedTagIds.add(tagId);
-    }
-    await _runLoad(resetPage: true);
-  }
-
-  Future<void> setOrderBy(ReceiptOrderBy value) async {
-    if (_orderBy == value) {
-      return;
-    }
-    _orderBy = value;
-    await _runLoad(resetPage: true);
-  }
-
-  Future<void> setOrderDirection(ReceiptOrderDirection value) async {
-    if (_orderDirection == value) {
-      return;
-    }
-    _orderDirection = value;
-    await _runLoad(resetPage: true);
-  }
-
-  Future<void> setActorFilter(ReceiptActorFilter value) async {
-    if (_actorFilter == value) {
-      return;
-    }
-    _actorFilter = value;
-    await _runLoad(resetPage: true);
-  }
-
-  Future<void> setPageSize(int value) async {
-    if (_pageSize == value) {
-      return;
-    }
-    _pageSize = value;
-    await _runLoad(resetPage: true);
+    _appliedQuery = query;
+    _resetQueryStatePagination();
+    await _loadPage();
   }
 
   Future<void> resetFilters() async {
     final filtersAlreadyDefault =
-        _paymentFilter == BillPaymentFilter.all &&
-        _selectedTagIds.isEmpty &&
-        _orderBy == ReceiptOrderBy.RECEIPT_ORDER_BY_ID &&
-        _orderDirection == ReceiptOrderDirection.RECEIPT_ORDER_DIRECTION_DESC &&
-        _actorFilter ==
-            ReceiptActorFilter.RECEIPT_ACTOR_FILTER_OWNER_OR_RECIPIENT_GROUP &&
-        _pageSize == 20 &&
-        _currentPageIndex == 0;
+        _appliedQuery.isDefault && _currentPageIndex == 0;
     if (filtersAlreadyDefault) {
       return;
     }
-    _paymentFilter = BillPaymentFilter.all;
-    _selectedTagIds = <int>{};
-    _orderBy = ReceiptOrderBy.RECEIPT_ORDER_BY_ID;
-    _orderDirection = ReceiptOrderDirection.RECEIPT_ORDER_DIRECTION_DESC;
-    _actorFilter =
-        ReceiptActorFilter.RECEIPT_ACTOR_FILTER_OWNER_OR_RECIPIENT_GROUP;
-    _pageSize = 20;
-    await _runLoad(resetPage: true);
+    _resetQueryState();
+    await _loadPage();
   }
 
   String roleLabelFor(Receipt receipt) {
@@ -248,21 +294,31 @@ class BillListState extends ChangeNotifier {
     return 0;
   }
 
-  Future<void> _runLoad({required bool resetPage}) async {
-    if (resetPage) {
-      _resetPagination();
-    }
-    await _loadPage();
+  void _resetQueryState() {
+    _appliedQuery = BillListQuery.defaults();
+    _resetQueryStatePagination();
   }
 
-  void _resetPagination() {
+  void _resetQueryStatePagination() {
     _visitedPageTokens = [null];
     _currentPageIndex = 0;
     _nextPageToken = null;
   }
 
+  void _markDataStale() {
+    _hasLoadedTags = false;
+    _hasLoadedPage = false;
+    _errorMessage = null;
+  }
+
+  void _clearLoadedData() {
+    _markDataStale();
+    _receipts = const [];
+    _availableTags = const [];
+  }
+
   Future<void> _loadPage() async {
-    if (!_isAuthenticated || _accessToken == null || _currentUserId == null) {
+    if (!_isAuthenticated || _accessToken == null) {
       _receipts = const [];
       _errorMessage = null;
       notifyListeners();
@@ -287,18 +343,20 @@ class BillListState extends ChangeNotifier {
       }
 
       final request = ReceiptListRequest(
-        limit: _pageSize,
-        orderBy: _orderBy,
-        orderDirection: _orderDirection,
-        actorFilter: _actorFilter,
+        limit: _appliedQuery.pageSize,
+        orderBy: _appliedQuery.orderBy,
+        orderDirection: _appliedQuery.orderDirection,
+        actorFilter: _appliedQuery.actorFilter,
       );
 
-      final paymentValue = _paymentFilter.apiValue;
+      final paymentValue = _appliedQuery.paymentFilter.apiValue;
       if (paymentValue != null) {
         request.isPaid = paymentValue;
       }
-      if (_selectedTagIds.isNotEmpty) {
-        request.tagIds.addAll(_selectedTagIds.map((tagId) => Int64(tagId)));
+      if (_appliedQuery.selectedTagIds.isNotEmpty) {
+        request.tagIds.addAll(
+          _appliedQuery.selectedTagIds.map((tagId) => Int64(tagId)),
+        );
       }
 
       final currentPageToken = _visitedPageTokens[_currentPageIndex];

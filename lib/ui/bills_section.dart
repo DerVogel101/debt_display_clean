@@ -17,6 +17,10 @@ class BillsSection extends StatefulWidget {
 }
 
 class _BillsSectionState extends State<BillsSection> {
+  bool _filtersExpanded = false;
+  BillListQuery _draftQuery = BillListQuery.defaults();
+  BillListQuery _appliedQuerySnapshot = BillListQuery.defaults();
+
   @override
   void initState() {
     super.initState();
@@ -28,12 +32,41 @@ class _BillsSectionState extends State<BillsSection> {
     });
   }
 
+  void _syncDraftQuery(BillListState billsState) {
+    final appliedQuery = billsState.appliedQuery;
+    if (_appliedQuerySnapshot != appliedQuery) {
+      _appliedQuerySnapshot = appliedQuery;
+      _draftQuery = appliedQuery;
+    }
+  }
+
+  void _toggleFilters(BillListState billsState) {
+    setState(() {
+      if (_filtersExpanded) {
+        _draftQuery = billsState.appliedQuery;
+        _appliedQuerySnapshot = billsState.appliedQuery;
+      }
+      _filtersExpanded = !_filtersExpanded;
+    });
+  }
+
+  void _resetDraftQuery() {
+    setState(() {
+      _draftQuery = BillListQuery.defaults();
+    });
+  }
+
+  Future<void> _applyDraftQuery(BillListState billsState) async {
+    await billsState.applyQuery(_draftQuery);
+  }
+
   @override
   Widget build(BuildContext context) {
     final isAuthenticated = context.select<AuthSessionState, bool>(
       (state) => state.isAuthenticated,
     );
     final billsState = context.watch<BillListState>();
+    _syncDraftQuery(billsState);
 
     if (!isAuthenticated) {
       return _LoggedOutBillsSection(isDesktop: widget.isDesktop);
@@ -44,7 +77,21 @@ class _BillsSectionState extends State<BillsSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _BillsFilterCard(isDesktop: widget.isDesktop, state: billsState),
+        _BillsFilterCard(
+          isDesktop: widget.isDesktop,
+          state: billsState,
+          filtersExpanded: _filtersExpanded,
+          draftQuery: _draftQuery,
+          hasPendingChanges: _draftQuery != billsState.appliedQuery,
+          onToggleFilters: () => _toggleFilters(billsState),
+          onDraftChanged: (query) {
+            setState(() {
+              _draftQuery = query;
+            });
+          },
+          onResetDraft: _resetDraftQuery,
+          onApplyDraft: () => _applyDraftQuery(billsState),
+        ),
         SizedBox(height: spacing),
         if (billsState.errorMessage != null) ...[
           _BillsErrorCard(message: billsState.errorMessage!),
@@ -98,13 +145,32 @@ class _LoggedOutBillsSection extends StatelessWidget {
 }
 
 class _BillsFilterCard extends StatelessWidget {
-  const _BillsFilterCard({required this.isDesktop, required this.state});
+  const _BillsFilterCard({
+    required this.isDesktop,
+    required this.state,
+    required this.filtersExpanded,
+    required this.draftQuery,
+    required this.hasPendingChanges,
+    required this.onToggleFilters,
+    required this.onDraftChanged,
+    required this.onResetDraft,
+    required this.onApplyDraft,
+  });
 
   final bool isDesktop;
   final BillListState state;
+  final bool filtersExpanded;
+  final BillListQuery draftQuery;
+  final bool hasPendingChanges;
+  final VoidCallback onToggleFilters;
+  final ValueChanged<BillListQuery> onDraftChanged;
+  final VoidCallback onResetDraft;
+  final Future<void> Function() onApplyDraft;
 
   @override
   Widget build(BuildContext context) {
+    final activeFilterCount = state.appliedQuery.activeFilterCount;
+
     return PageSection(
       padding: EdgeInsets.all(isDesktop ? 28 : 22),
       child: Column(
@@ -138,11 +204,19 @@ class _BillsFilterCard extends StatelessWidget {
                     icon: const Icon(Icons.refresh_rounded),
                     label: const Text('Refresh'),
                   ),
-                  OutlinedButton.icon(
-                    key: const ValueKey('bills-reset-button'),
-                    onPressed: state.isLoading ? null : state.resetFilters,
-                    icon: const Icon(Icons.restart_alt_rounded),
-                    label: const Text('Reset filters'),
+                  FilledButton.tonalIcon(
+                    key: const ValueKey('bills-filters-toggle-button'),
+                    onPressed: state.isLoading ? null : onToggleFilters,
+                    icon: Icon(
+                      filtersExpanded
+                          ? Icons.expand_less_rounded
+                          : Icons.expand_more_rounded,
+                    ),
+                    label: Text(
+                      activeFilterCount > 0
+                          ? 'Filters ($activeFilterCount)'
+                          : 'Filters',
+                    ),
                   ),
                 ],
               ),
@@ -156,110 +230,196 @@ class _BillsFilterCard extends StatelessWidget {
               height: 1.45,
             ),
           ),
-          const SizedBox(height: 22),
-          _ControlBlock(
-            label: 'Role',
-            child: SegmentedButton<ReceiptActorFilter>(
-              showSelectedIcon: false,
-              segments: const [
-                ButtonSegment(
-                  value: ReceiptActorFilter
-                      .RECEIPT_ACTOR_FILTER_OWNER_OR_RECIPIENT_GROUP,
-                  label: Text('Both'),
-                ),
-                ButtonSegment(
-                  value: ReceiptActorFilter.RECEIPT_ACTOR_FILTER_OWNER,
-                  label: Text('Owner'),
-                ),
-                ButtonSegment(
-                  value:
-                      ReceiptActorFilter.RECEIPT_ACTOR_FILTER_RECIPIENT_GROUP,
-                  label: Text('Participant'),
-                ),
-              ],
-              selected: {state.actorFilter},
-              onSelectionChanged: state.isLoading
-                  ? null
-                  : (selection) {
-                      state.setActorFilter(selection.first);
-                    },
-            ),
-          ),
-          const SizedBox(height: 18),
-          _ControlBlock(
-            label: 'Payment status',
-            child: SegmentedButton<BillPaymentFilter>(
-              showSelectedIcon: false,
-              segments: BillPaymentFilter.values
-                  .map(
-                    (filter) => ButtonSegment<BillPaymentFilter>(
-                      value: filter,
-                      label: Text(filter.label),
-                    ),
-                  )
-                  .toList(),
-              selected: {state.paymentFilter},
-              onSelectionChanged: state.isLoading
-                  ? null
-                  : (selection) {
-                      state.setPaymentFilter(selection.first);
-                    },
-            ),
-          ),
-          const SizedBox(height: 18),
-          _ControlBlock(
-            label: 'Tags',
-            helper: 'Each selected tag must be present on a receipt.',
-            child: state.availableTags.isEmpty
-                ? Text(
-                    'No tags available yet.',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: mutedForegroundColor(context, alpha: 0.84),
-                    ),
-                  )
-                : Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: state.availableTags
-                        .map(
-                          (tag) => FilterChip(
-                            selected: state.selectedTagIds.contains(
-                              tag.id.toInt(),
-                            ),
-                            onSelected: state.isLoading
-                                ? null
-                                : (_) {
-                                    state.toggleTag(tag.id.toInt());
-                                  },
-                            avatar: Text(tag.icon),
-                            label: Text(tag.text),
-                          ),
-                        )
-                        .toList(),
+          if (filtersExpanded) ...[
+            const SizedBox(height: 22),
+            _ControlBlock(
+              label: 'Role',
+              child: SegmentedButton<ReceiptActorFilter>(
+                showSelectedIcon: false,
+                segments: const [
+                  ButtonSegment(
+                    value: ReceiptActorFilter
+                        .RECEIPT_ACTOR_FILTER_OWNER_OR_RECIPIENT_GROUP,
+                    label: Text('Both'),
                   ),
-          ),
-          const SizedBox(height: 18),
-          if (isDesktop)
+                  ButtonSegment(
+                    value: ReceiptActorFilter.RECEIPT_ACTOR_FILTER_OWNER,
+                    label: Text('Owner'),
+                  ),
+                  ButtonSegment(
+                    value:
+                        ReceiptActorFilter.RECEIPT_ACTOR_FILTER_RECIPIENT_GROUP,
+                    label: Text('Participant'),
+                  ),
+                ],
+                selected: {draftQuery.actorFilter},
+                onSelectionChanged: state.isLoading
+                    ? null
+                    : (selection) {
+                        onDraftChanged(
+                          draftQuery.copyWith(actorFilter: selection.first),
+                        );
+                      },
+              ),
+            ),
+            const SizedBox(height: 18),
+            _ControlBlock(
+              label: 'Payment status',
+              child: SegmentedButton<BillPaymentFilter>(
+                showSelectedIcon: false,
+                segments: BillPaymentFilter.values
+                    .map(
+                      (filter) => ButtonSegment<BillPaymentFilter>(
+                        value: filter,
+                        label: Text(filter.label),
+                      ),
+                    )
+                    .toList(),
+                selected: {draftQuery.paymentFilter},
+                onSelectionChanged: state.isLoading
+                    ? null
+                    : (selection) {
+                        onDraftChanged(
+                          draftQuery.copyWith(paymentFilter: selection.first),
+                        );
+                      },
+              ),
+            ),
+            const SizedBox(height: 18),
+            _ControlBlock(
+              label: 'Tags',
+              helper: 'Each selected tag must be present on a receipt.',
+              child: state.availableTags.isEmpty
+                  ? Text(
+                      'No tags available yet.',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: mutedForegroundColor(context, alpha: 0.84),
+                      ),
+                    )
+                  : Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: state.availableTags
+                          .map(
+                            (tag) => FilterChip(
+                              selected: draftQuery.selectedTagIds.contains(
+                                tag.id.toInt(),
+                              ),
+                              onSelected: state.isLoading
+                                  ? null
+                                  : (_) {
+                                      final nextTagIds = Set<int>.from(
+                                        draftQuery.selectedTagIds,
+                                      );
+                                      if (!nextTagIds.add(tag.id.toInt())) {
+                                        nextTagIds.remove(tag.id.toInt());
+                                      }
+                                      onDraftChanged(
+                                        draftQuery.copyWith(
+                                          selectedTagIds: nextTagIds,
+                                        ),
+                                      );
+                                    },
+                              avatar: Text(tag.icon),
+                              label: Text(tag.text),
+                            ),
+                          )
+                          .toList(),
+                    ),
+            ),
+            const SizedBox(height: 18),
+            if (isDesktop)
+              Wrap(
+                spacing: 18,
+                runSpacing: 18,
+                children: [
+                  SizedBox(
+                    width: 240,
+                    child: _SortByControl(
+                      query: draftQuery,
+                      isLoading: state.isLoading,
+                      onChanged: (value) {
+                        onDraftChanged(draftQuery.copyWith(orderBy: value));
+                      },
+                    ),
+                  ),
+                  SizedBox(
+                    width: 240,
+                    child: _DirectionControl(
+                      query: draftQuery,
+                      isLoading: state.isLoading,
+                      onChanged: (value) {
+                        onDraftChanged(
+                          draftQuery.copyWith(orderDirection: value),
+                        );
+                      },
+                    ),
+                  ),
+                  SizedBox(
+                    width: 180,
+                    child: _PageSizeControl(
+                      query: draftQuery,
+                      isLoading: state.isLoading,
+                      onChanged: (value) {
+                        onDraftChanged(draftQuery.copyWith(pageSize: value));
+                      },
+                    ),
+                  ),
+                ],
+              )
+            else
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _SortByControl(
+                    query: draftQuery,
+                    isLoading: state.isLoading,
+                    onChanged: (value) {
+                      onDraftChanged(draftQuery.copyWith(orderBy: value));
+                    },
+                  ),
+                  const SizedBox(height: 18),
+                  _DirectionControl(
+                    query: draftQuery,
+                    isLoading: state.isLoading,
+                    onChanged: (value) {
+                      onDraftChanged(draftQuery.copyWith(orderDirection: value));
+                    },
+                  ),
+                  const SizedBox(height: 18),
+                  _PageSizeControl(
+                    query: draftQuery,
+                    isLoading: state.isLoading,
+                    onChanged: (value) {
+                      onDraftChanged(draftQuery.copyWith(pageSize: value));
+                    },
+                  ),
+                ],
+              ),
+            const SizedBox(height: 18),
             Wrap(
-              spacing: 18,
-              runSpacing: 18,
+              spacing: 10,
+              runSpacing: 10,
               children: [
-                SizedBox(width: 240, child: _SortByControl(state: state)),
-                SizedBox(width: 240, child: _DirectionControl(state: state)),
-                SizedBox(width: 180, child: _PageSizeControl(state: state)),
-              ],
-            )
-          else
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _SortByControl(state: state),
-                const SizedBox(height: 18),
-                _DirectionControl(state: state),
-                const SizedBox(height: 18),
-                _PageSizeControl(state: state),
+                OutlinedButton.icon(
+                  key: const ValueKey('bills-draft-reset-button'),
+                  onPressed: state.isLoading ? null : onResetDraft,
+                  icon: const Icon(Icons.restart_alt_rounded),
+                  label: const Text('Reset'),
+                ),
+                FilledButton.icon(
+                  key: const ValueKey('bills-apply-filters-button'),
+                  onPressed: state.isLoading || !hasPendingChanges
+                      ? null
+                      : () {
+                          onApplyDraft();
+                        },
+                  icon: const Icon(Icons.check_rounded),
+                  label: const Text('Apply'),
+                ),
               ],
             ),
+          ],
         ],
       ),
     );
@@ -267,51 +427,66 @@ class _BillsFilterCard extends StatelessWidget {
 }
 
 class _SortByControl extends StatelessWidget {
-  const _SortByControl({required this.state});
+  const _SortByControl({
+    required this.query,
+    required this.isLoading,
+    required this.onChanged,
+  });
 
-  final BillListState state;
+  final BillListQuery query;
+  final bool isLoading;
+  final ValueChanged<ReceiptOrderBy> onChanged;
 
   @override
   Widget build(BuildContext context) {
     return _ControlBlock(
       label: 'Sort by',
-      child: DropdownButtonFormField<ReceiptOrderBy>(
+      child: SizedBox(
         key: const ValueKey('bills-sort-dropdown'),
-        initialValue: state.orderBy,
-        items: const [
-          DropdownMenuItem(
-            value: ReceiptOrderBy.RECEIPT_ORDER_BY_ID,
-            child: Text('ID'),
-          ),
-          DropdownMenuItem(
-            value: ReceiptOrderBy.RECEIPT_ORDER_BY_COST_TOTAL,
-            child: Text('Total'),
-          ),
-          DropdownMenuItem(
-            value: ReceiptOrderBy.RECEIPT_ORDER_BY_COST_FOR_USER,
-            child: Text('My share'),
-          ),
-          DropdownMenuItem(
-            value: ReceiptOrderBy.RECEIPT_ORDER_BY_DUE_DATE,
-            child: Text('Due date'),
-          ),
-        ],
-        onChanged: state.isLoading
-            ? null
-            : (value) {
-                if (value != null) {
-                  state.setOrderBy(value);
-                }
-              },
+        child: DropdownButtonFormField<ReceiptOrderBy>(
+          key: ValueKey(query.orderBy),
+          initialValue: query.orderBy,
+          items: const [
+            DropdownMenuItem(
+              value: ReceiptOrderBy.RECEIPT_ORDER_BY_ID,
+              child: Text('ID'),
+            ),
+            DropdownMenuItem(
+              value: ReceiptOrderBy.RECEIPT_ORDER_BY_COST_TOTAL,
+              child: Text('Total'),
+            ),
+            DropdownMenuItem(
+              value: ReceiptOrderBy.RECEIPT_ORDER_BY_COST_FOR_USER,
+              child: Text('My share'),
+            ),
+            DropdownMenuItem(
+              value: ReceiptOrderBy.RECEIPT_ORDER_BY_DUE_DATE,
+              child: Text('Due date'),
+            ),
+          ],
+          onChanged: isLoading
+              ? null
+              : (value) {
+                  if (value != null) {
+                    onChanged(value);
+                  }
+                },
+        ),
       ),
     );
   }
 }
 
 class _DirectionControl extends StatelessWidget {
-  const _DirectionControl({required this.state});
+  const _DirectionControl({
+    required this.query,
+    required this.isLoading,
+    required this.onChanged,
+  });
 
-  final BillListState state;
+  final BillListQuery query;
+  final bool isLoading;
+  final ValueChanged<ReceiptOrderDirection> onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -329,11 +504,11 @@ class _DirectionControl extends StatelessWidget {
             label: Text('Descending'),
           ),
         ],
-        selected: {state.orderDirection},
-        onSelectionChanged: state.isLoading
+        selected: {query.orderDirection},
+        onSelectionChanged: isLoading
             ? null
             : (selection) {
-                state.setOrderDirection(selection.first);
+                onChanged(selection.first);
               },
       ),
     );
@@ -341,29 +516,38 @@ class _DirectionControl extends StatelessWidget {
 }
 
 class _PageSizeControl extends StatelessWidget {
-  const _PageSizeControl({required this.state});
+  const _PageSizeControl({
+    required this.query,
+    required this.isLoading,
+    required this.onChanged,
+  });
 
-  final BillListState state;
+  final BillListQuery query;
+  final bool isLoading;
+  final ValueChanged<int> onChanged;
 
   @override
   Widget build(BuildContext context) {
     return _ControlBlock(
       label: 'Page size',
-      child: DropdownButtonFormField<int>(
+      child: SizedBox(
         key: const ValueKey('bills-page-size-dropdown'),
-        initialValue: state.pageSize,
-        items: const [
-          DropdownMenuItem(value: 10, child: Text('10')),
-          DropdownMenuItem(value: 20, child: Text('20')),
-          DropdownMenuItem(value: 50, child: Text('50')),
-        ],
-        onChanged: state.isLoading
-            ? null
-            : (value) {
-                if (value != null) {
-                  state.setPageSize(value);
-                }
-              },
+        child: DropdownButtonFormField<int>(
+          key: ValueKey(query.pageSize),
+          initialValue: query.pageSize,
+          items: const [
+            DropdownMenuItem(value: 10, child: Text('10')),
+            DropdownMenuItem(value: 20, child: Text('20')),
+            DropdownMenuItem(value: 50, child: Text('50')),
+          ],
+          onChanged: isLoading
+              ? null
+              : (value) {
+                  if (value != null) {
+                    onChanged(value);
+                  }
+                },
+        ),
       ),
     );
   }

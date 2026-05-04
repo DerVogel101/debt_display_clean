@@ -225,7 +225,74 @@ void main() {
     expect(find.byKey(const ValueKey('bills-login-button')), findsOneWidget);
   });
 
-  testWidgets('bills filter changes reload and reset pagination to page 1', (
+  testWidgets('bills view loads with an access token before user id resolves', (
+    tester,
+  ) async {
+    _setTestSurfaceSize(tester, width: 430, height: 1000);
+
+    final fakeService = _FakeDebtBackendService(
+      availableTags: const [],
+      onListReceipts: (_) {
+        final response = ReceiptsResponse(success: true);
+        response.receipts.add(
+          _testReceipt(id: 41, title: 'Token only receipt', amountOwed: 31),
+        );
+        return response;
+      },
+    );
+
+    await tester.pumpWidget(
+      _buildBillsSectionTestApp(
+        authState: _TestAuthSessionState(
+          isAuthenticatedValue: true,
+          accessTokenValue: 'token-1',
+          userIdValue: null,
+        ),
+        billListState: BillListState(debtBackendService: fakeService),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Token only receipt'), findsOneWidget);
+    expect(fakeService.requests, hasLength(1));
+  });
+
+  testWidgets('bills filters are collapsed by default and toggle open/closed', (
+    tester,
+  ) async {
+    _setTestSurfaceSize(tester, width: 430, height: 1000);
+
+    await tester.pumpWidget(
+      _buildBillsSectionTestApp(
+        authState: _TestAuthSessionState(
+          isAuthenticatedValue: true,
+          accessTokenValue: 'token-1',
+          userIdValue: 10,
+        ),
+        billListState: BillListState(
+          debtBackendService: _FakeDebtBackendService(
+            availableTags: const [],
+            onListReceipts: (_) => ReceiptsResponse(success: true),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('bills-filters-toggle-button')), findsOneWidget);
+    expect(find.text('Role'), findsNothing);
+    expect(find.byKey(const ValueKey('bills-apply-filters-button')), findsNothing);
+
+    await _toggleBillsFilters(tester);
+    expect(find.text('Role'), findsOneWidget);
+    expect(find.byKey(const ValueKey('bills-apply-filters-button')), findsOneWidget);
+
+    await _toggleBillsFilters(tester);
+    expect(find.text('Role'), findsNothing);
+    expect(find.byKey(const ValueKey('bills-apply-filters-button')), findsNothing);
+  });
+
+  testWidgets('bills draft changes wait for apply and reset pagination to page 1', (
     tester,
   ) async {
     _setTestSurfaceSize(tester, width: 430, height: 1000);
@@ -281,8 +348,16 @@ void main() {
 
     expect(find.text('Page 2 receipt'), findsOneWidget);
     expect(find.text('Page 2'), findsOneWidget);
+    expect(fakeService.requests, hasLength(2));
 
+    await _toggleBillsFilters(tester);
     await tester.tap(find.text('Paid'));
+    await tester.pumpAndSettle();
+
+    expect(fakeService.requests, hasLength(2));
+    expect(find.text('Page 2'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('bills-apply-filters-button')));
     await tester.pumpAndSettle();
 
     expect(find.text('Paid only'), findsOneWidget);
@@ -290,6 +365,212 @@ void main() {
     expect(fakeService.requests.last.hasPageToken(), isFalse);
     expect(fakeService.requests.last.hasIsPaid(), isTrue);
     expect(fakeService.requests.last.isPaid, isTrue);
+  });
+
+  testWidgets('bills auth refresh keeps active filters when user id arrives', (
+    tester,
+  ) async {
+    _setTestSurfaceSize(tester, width: 430, height: 1000);
+
+    final fakeService = _FakeDebtBackendService(
+      availableTags: [
+        TagIndex(
+          id: Int64(5),
+          icon: 'u',
+          text: 'Utilities',
+          color: '#123456',
+        ),
+      ],
+      onListReceipts: (request) {
+        final response = ReceiptsResponse(success: true);
+        response.receipts.add(
+          _testReceipt(
+            id: 51,
+            title: 'Filtered receipt',
+            amountOwed: 19,
+          ),
+        );
+        return response;
+      },
+    );
+    final authState = _TestAuthSessionState(
+      isAuthenticatedValue: true,
+      accessTokenValue: 'token-1',
+      userIdValue: null,
+    );
+
+    await tester.pumpWidget(
+      _buildBillsSectionTestApp(
+        authState: authState,
+        billListState: BillListState(debtBackendService: fakeService),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _toggleBillsFilters(tester);
+    await _selectDropdownItem(
+      tester,
+      const ValueKey('bills-sort-dropdown'),
+      'Total',
+    );
+    await tester.tap(find.text('Utilities'));
+    await tester.pumpAndSettle();
+    expect(fakeService.requests, hasLength(1));
+
+    await tester.tap(find.byKey(const ValueKey('bills-apply-filters-button')));
+    await tester.pumpAndSettle();
+
+    authState.updateSession(
+      isAuthenticated: true,
+      accessToken: 'token-1',
+      userId: 10,
+    );
+    await tester.pumpAndSettle();
+
+    expect(fakeService.requests.length, greaterThanOrEqualTo(3));
+    expect(
+      fakeService.requests.last.orderBy,
+      ReceiptOrderBy.RECEIPT_ORDER_BY_COST_TOTAL,
+    );
+    expect(fakeService.requests.last.tagIds.map((tag) => tag.toInt()), [5]);
+  });
+
+  testWidgets('bills resets filters when a different user logs in', (
+    tester,
+  ) async {
+    _setTestSurfaceSize(tester, width: 430, height: 1000);
+
+    final fakeService = _FakeDebtBackendService(
+      availableTags: [
+        TagIndex(
+          id: Int64(5),
+          icon: 'u',
+          text: 'Utilities',
+          color: '#123456',
+        ),
+      ],
+      onListReceipts: (request) {
+        final response = ReceiptsResponse(success: true);
+        response.receipts.add(
+          _testReceipt(id: 61, title: 'Account receipt', amountOwed: 22),
+        );
+        if (!request.hasPageToken()) {
+          response.nextPageToken = 'page-2';
+        }
+        return response;
+      },
+    );
+    final authState = _TestAuthSessionState(
+      isAuthenticatedValue: true,
+      accessTokenValue: 'token-a',
+      userIdValue: 10,
+    );
+
+    await tester.pumpWidget(
+      _buildBillsSectionTestApp(
+        authState: authState,
+        billListState: BillListState(debtBackendService: fakeService),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _toggleBillsFilters(tester);
+    await _selectDropdownItem(
+      tester,
+      const ValueKey('bills-sort-dropdown'),
+      'Total',
+    );
+    await _selectDropdownItem(
+      tester,
+      const ValueKey('bills-page-size-dropdown'),
+      '50',
+    );
+    await tester.tap(find.text('Utilities'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('bills-apply-filters-button')));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.byKey(const ValueKey('bills-page-next-button')));
+    await tester.tap(find.byKey(const ValueKey('bills-page-next-button')));
+    await tester.pumpAndSettle();
+
+    authState.updateSession(
+      isAuthenticated: false,
+      accessToken: null,
+      userId: null,
+    );
+    await tester.pump();
+
+    authState.updateSession(
+      isAuthenticated: true,
+      accessToken: 'token-b',
+      userId: 20,
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      fakeService.requests.last.orderBy,
+      ReceiptOrderBy.RECEIPT_ORDER_BY_ID,
+    );
+    expect(fakeService.requests.last.limit, 20);
+    expect(fakeService.requests.last.tagIds, isEmpty);
+    expect(fakeService.requests.last.hasPageToken(), isFalse);
+  });
+
+  testWidgets('bills collapse discards unapplied draft edits', (tester) async {
+    _setTestSurfaceSize(tester, width: 430, height: 1000);
+
+    final fakeService = _FakeDebtBackendService(
+      availableTags: const [],
+      onListReceipts: (_) {
+        final response = ReceiptsResponse(success: true);
+        response.receipts.add(
+          _testReceipt(id: 72, title: 'Applied default receipt', amountOwed: 27),
+        );
+        return response;
+      },
+    );
+
+    await tester.pumpWidget(
+      _buildBillsSectionTestApp(
+        authState: _TestAuthSessionState(
+          isAuthenticatedValue: true,
+          accessTokenValue: 'token-1',
+          userIdValue: 10,
+        ),
+        billListState: BillListState(debtBackendService: fakeService),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _toggleBillsFilters(tester);
+    await _selectDropdownItem(
+      tester,
+      const ValueKey('bills-sort-dropdown'),
+      'Total',
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('bills-sort-dropdown')),
+        matching: find.text('Total'),
+      ),
+      findsOneWidget,
+    );
+    expect(fakeService.requests, hasLength(1));
+
+    await _toggleBillsFilters(tester);
+    await _toggleBillsFilters(tester);
+
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('bills-sort-dropdown')),
+        matching: find.text('ID'),
+      ),
+      findsOneWidget,
+    );
+    expect(fakeService.requests, hasLength(1));
   });
 
   testWidgets('bills pagination works across id, total, and due-date sorts', (
@@ -374,27 +655,107 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('ID page 2'), findsOneWidget);
 
+    await _toggleBillsFilters(tester);
     await _selectDropdownItem(
       tester,
       const ValueKey('bills-sort-dropdown'),
       'Total',
     );
+    await tester.tap(find.byKey(const ValueKey('bills-apply-filters-button')));
     await tester.pumpAndSettle();
     expect(find.text('Total page 1'), findsOneWidget);
+    await _toggleBillsFilters(tester);
     await tester.tap(find.byKey(const ValueKey('bills-page-next-button')));
     await tester.pumpAndSettle();
     expect(find.text('Total page 2'), findsOneWidget);
 
+    await _toggleBillsFilters(tester);
     await _selectDropdownItem(
       tester,
       const ValueKey('bills-sort-dropdown'),
       'Due date',
     );
+    await tester.tap(find.byKey(const ValueKey('bills-apply-filters-button')));
     await tester.pumpAndSettle();
     expect(find.text('Due page 1'), findsOneWidget);
+    await _toggleBillsFilters(tester);
     await tester.tap(find.byKey(const ValueKey('bills-page-next-button')));
     await tester.pumpAndSettle();
     expect(find.text('Due page 2'), findsOneWidget);
+  });
+
+  testWidgets('bills draft reset restores controls without triggering a request', (tester) async {
+    _setTestSurfaceSize(tester, width: 430, height: 1000);
+
+    final fakeService = _FakeDebtBackendService(
+      availableTags: const [],
+      onListReceipts: (request) {
+        final response = ReceiptsResponse(success: true);
+        response.receipts.add(
+          _testReceipt(id: 71, title: 'Reset candidate', amountOwed: 27),
+        );
+        return response;
+      },
+    );
+
+    await tester.pumpWidget(
+      _buildBillsSectionTestApp(
+        authState: _TestAuthSessionState(
+          isAuthenticatedValue: true,
+          accessTokenValue: 'token-1',
+          userIdValue: 10,
+        ),
+        billListState: BillListState(debtBackendService: fakeService),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _toggleBillsFilters(tester);
+    await _selectDropdownItem(
+      tester,
+      const ValueKey('bills-sort-dropdown'),
+      'Total',
+    );
+    await _selectDropdownItem(
+      tester,
+      const ValueKey('bills-page-size-dropdown'),
+      '50',
+    );
+    expect(fakeService.requests, hasLength(1));
+
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('bills-sort-dropdown')),
+        matching: find.text('Total'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('bills-page-size-dropdown')),
+        matching: find.text('50'),
+      ),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('bills-draft-reset-button')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('bills-sort-dropdown')),
+        matching: find.text('ID'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('bills-page-size-dropdown')),
+        matching: find.text('20'),
+      ),
+      findsOneWidget,
+    );
+    expect(fakeService.requests, hasLength(1));
   });
 
   testWidgets('mobile profile state maps to the menu bottom-nav selection', (
@@ -466,6 +827,11 @@ void main() {
   });
 }
 
+Future<void> _toggleBillsFilters(WidgetTester tester) async {
+  await tester.tap(find.byKey(const ValueKey('bills-filters-toggle-button')));
+  await tester.pumpAndSettle();
+}
+
 Widget _buildResponsiveShellTestApp({
   required _TestAuthSessionState authState,
   required NavigationState navigationState,
@@ -479,7 +845,6 @@ Widget _buildResponsiveShellTestApp({
           onListReceipts: (_) => ReceiptsResponse(success: true),
         ),
       );
-  resolvedBillListState.updateAuthSession(authState);
 
   return MaterialApp(
     locale: locale,
@@ -491,8 +856,11 @@ Widget _buildResponsiveShellTestApp({
         ChangeNotifierProvider<AuthSessionState>.value(value: authState),
         ChangeNotifierProvider<NavigationState>.value(value: navigationState),
         ChangeNotifierProvider<ThemeState>(create: (_) => ThemeState()),
-        ChangeNotifierProvider<BillListState>.value(
-          value: resolvedBillListState,
+        ChangeNotifierProxyProvider<AuthSessionState, BillListState>(
+          create: (_) => resolvedBillListState,
+          update: (_, authSessionState, billListState) =>
+              (billListState ?? resolvedBillListState)
+                ..updateAuthSession(authSessionState),
         ),
       ],
       child: const ResponsiveShell(),
@@ -532,8 +900,6 @@ Widget _buildBillsSectionTestApp({
   required BillListState billListState,
   Locale locale = const Locale('en', 'US'),
 }) {
-  billListState.updateAuthSession(authState);
-
   return MaterialApp(
     locale: locale,
     localizationsDelegates: GlobalMaterialLocalizations.delegates,
@@ -542,7 +908,11 @@ Widget _buildBillsSectionTestApp({
     home: MultiProvider(
       providers: [
         ChangeNotifierProvider<AuthSessionState>.value(value: authState),
-        ChangeNotifierProvider<BillListState>.value(value: billListState),
+        ChangeNotifierProxyProvider<AuthSessionState, BillListState>(
+          create: (_) => billListState,
+          update: (_, authSessionState, state) =>
+              (state ?? billListState)..updateAuthSession(authSessionState),
+        ),
       ],
       child: const Scaffold(
         body: SingleChildScrollView(child: BillsSection(isDesktop: false)),
@@ -646,18 +1016,22 @@ class _FakeDebtBackendService extends DebtBackendService {
 
 class _TestAuthSessionState extends ChangeNotifier implements AuthSessionState {
   _TestAuthSessionState({
-    this.isAuthenticatedValue = false,
-    this.displayNameValue,
-    this.userEmailValue,
-    this.accessTokenValue,
-    this.userIdValue,
-  });
+    bool isAuthenticatedValue = false,
+    String? displayNameValue,
+    String? userEmailValue,
+    String? accessTokenValue,
+    int? userIdValue,
+  }) : _isAuthenticatedValue = isAuthenticatedValue,
+       _displayNameValue = displayNameValue,
+       _userEmailValue = userEmailValue,
+       _accessTokenValue = accessTokenValue,
+       _userIdValue = userIdValue;
 
-  final bool isAuthenticatedValue;
-  final String? displayNameValue;
-  final String? userEmailValue;
-  final String? accessTokenValue;
-  final int? userIdValue;
+  bool _isAuthenticatedValue;
+  String? _displayNameValue;
+  String? _userEmailValue;
+  String? _accessTokenValue;
+  int? _userIdValue;
 
   int loginCalls = 0;
   int logoutCalls = 0;
@@ -669,14 +1043,14 @@ class _TestAuthSessionState extends ChangeNotifier implements AuthSessionState {
   String? get backendError => null;
 
   @override
-  String? get accessToken => accessTokenValue;
+  String? get accessToken => _accessTokenValue;
 
   @override
-  String? get displayName => displayNameValue;
+  String? get displayName => _displayNameValue;
 
   @override
   String get greeting {
-    final name = displayNameValue;
+    final name = _displayNameValue;
     if (name == null || name.isEmpty) {
       return 'Hi there';
     }
@@ -684,16 +1058,31 @@ class _TestAuthSessionState extends ChangeNotifier implements AuthSessionState {
   }
 
   @override
-  bool get isAuthenticated => isAuthenticatedValue;
+  bool get isAuthenticated => _isAuthenticatedValue;
 
   @override
   bool get isLoading => false;
 
   @override
-  int? get userId => userIdValue;
+  int? get userId => _userIdValue;
 
   @override
-  String? get userEmail => userEmailValue;
+  String? get userEmail => _userEmailValue;
+
+  void updateSession({
+    required bool isAuthenticated,
+    required String? accessToken,
+    required int? userId,
+    String? displayName,
+    String? userEmail,
+  }) {
+    _isAuthenticatedValue = isAuthenticated;
+    _accessTokenValue = accessToken;
+    _userIdValue = userId;
+    _displayNameValue = displayName;
+    _userEmailValue = userEmail;
+    notifyListeners();
+  }
 
   @override
   Future<void> initialize() async {}
