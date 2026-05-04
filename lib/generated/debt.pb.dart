@@ -1518,11 +1518,13 @@ class ReceiptsResponse extends $pb.GeneratedMessage {
     $core.bool? success,
     $core.String? message,
     $core.Iterable<Receipt>? receipts,
+    $core.String? nextPageToken,
   }) {
     final result = create();
     if (success != null) result.success = success;
     if (message != null) result.message = message;
     if (receipts != null) result.receipts.addAll(receipts);
+    if (nextPageToken != null) result.nextPageToken = nextPageToken;
     return result;
   }
 
@@ -1543,6 +1545,7 @@ class ReceiptsResponse extends $pb.GeneratedMessage {
     ..aOS(2, _omitFieldNames ? '' : 'message')
     ..pPM<Receipt>(3, _omitFieldNames ? '' : 'receipts',
         subBuilder: Receipt.create)
+    ..aOS(4, _omitFieldNames ? '' : 'nextPageToken')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1584,6 +1587,15 @@ class ReceiptsResponse extends $pb.GeneratedMessage {
 
   @$pb.TagNumber(3)
   $pb.PbList<Receipt> get receipts => $_getList(2);
+
+  @$pb.TagNumber(4)
+  $core.String get nextPageToken => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set nextPageToken($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasNextPageToken() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearNextPageToken() => $_clearField(4);
 }
 
 class FileResponse extends $pb.GeneratedMessage {
@@ -2451,6 +2463,7 @@ class ReceiptListRequest extends $pb.GeneratedMessage {
     ReceiptOrderBy? orderBy,
     ReceiptOrderDirection? orderDirection,
     ReceiptActorFilter? actorFilter,
+    $core.String? pageToken,
   }) {
     final result = create();
     if (isPaid != null) result.isPaid = isPaid;
@@ -2460,6 +2473,7 @@ class ReceiptListRequest extends $pb.GeneratedMessage {
     if (orderBy != null) result.orderBy = orderBy;
     if (orderDirection != null) result.orderDirection = orderDirection;
     if (actorFilter != null) result.actorFilter = actorFilter;
+    if (pageToken != null) result.pageToken = pageToken;
     return result;
   }
 
@@ -2486,6 +2500,7 @@ class ReceiptListRequest extends $pb.GeneratedMessage {
         enumValues: ReceiptOrderDirection.values)
     ..aE<ReceiptActorFilter>(7, _omitFieldNames ? '' : 'actorFilter',
         enumValues: ReceiptActorFilter.values)
+    ..aOS(8, _omitFieldNames ? '' : 'pageToken')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2563,6 +2578,15 @@ class ReceiptListRequest extends $pb.GeneratedMessage {
   $core.bool hasActorFilter() => $_has(6);
   @$pb.TagNumber(7)
   void clearActorFilter() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.String get pageToken => $_getSZ(7);
+  @$pb.TagNumber(8)
+  set pageToken($core.String value) => $_setString(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasPageToken() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearPageToken() => $_clearField(8);
 }
 
 class UpdateReceiptRequest extends $pb.GeneratedMessage {

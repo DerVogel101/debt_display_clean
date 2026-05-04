@@ -596,6 +596,18 @@ const ReceiptsResponse$json = {
       '6': '.debt.Receipt',
       '10': 'receipts'
     },
+    {
+      '1': 'next_page_token',
+      '3': 4,
+      '4': 1,
+      '5': 9,
+      '9': 0,
+      '10': 'nextPageToken',
+      '17': true
+    },
+  ],
+  '8': [
+    {'1': '_next_page_token'},
   ],
 };
 
@@ -603,7 +615,8 @@ const ReceiptsResponse$json = {
 final $typed_data.Uint8List receiptsResponseDescriptor = $convert.base64Decode(
     'ChBSZWNlaXB0c1Jlc3BvbnNlEhgKB3N1Y2Nlc3MYASABKAhSB3N1Y2Nlc3MSGAoHbWVzc2FnZR'
     'gCIAEoCVIHbWVzc2FnZRIpCghyZWNlaXB0cxgDIAMoCzINLmRlYnQuUmVjZWlwdFIIcmVjZWlw'
-    'dHM=');
+    'dHMSKwoPbmV4dF9wYWdlX3Rva2VuGAQgASgJSABSDW5leHRQYWdlVG9rZW6IAQFCEgoQX25leH'
+    'RfcGFnZV90b2tlbg==');
 
 @$core.Deprecated('Use fileResponseDescriptor instead')
 const FileResponse$json = {
@@ -918,11 +931,21 @@ const ReceiptListRequest$json = {
       '6': '.debt.ReceiptActorFilter',
       '10': 'actorFilter'
     },
+    {
+      '1': 'page_token',
+      '3': 8,
+      '4': 1,
+      '5': 9,
+      '9': 3,
+      '10': 'pageToken',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_is_paid'},
     {'1': '_cursor'},
     {'1': '_limit'},
+    {'1': '_page_token'},
   ],
 };
 
@@ -933,8 +956,9 @@ final $typed_data.Uint8List receiptListRequestDescriptor = $convert.base64Decode
     'aXQYBCABKAVIAlIFbGltaXSIAQESLwoIb3JkZXJfYnkYBSABKA4yFC5kZWJ0LlJlY2VpcHRPcm'
     'RlckJ5UgdvcmRlckJ5EkQKD29yZGVyX2RpcmVjdGlvbhgGIAEoDjIbLmRlYnQuUmVjZWlwdE9y'
     'ZGVyRGlyZWN0aW9uUg5vcmRlckRpcmVjdGlvbhI7CgxhY3Rvcl9maWx0ZXIYByABKA4yGC5kZW'
-    'J0LlJlY2VpcHRBY3RvckZpbHRlclILYWN0b3JGaWx0ZXJCCgoIX2lzX3BhaWRCCQoHX2N1cnNv'
-    'ckIICgZfbGltaXQ=');
+    'J0LlJlY2VpcHRBY3RvckZpbHRlclILYWN0b3JGaWx0ZXISIgoKcGFnZV90b2tlbhgIIAEoCUgD'
+    'UglwYWdlVG9rZW6IAQFCCgoIX2lzX3BhaWRCCQoHX2N1cnNvckIICgZfbGltaXRCDQoLX3BhZ2'
+    'VfdG9rZW4=');
 
 @$core.Deprecated('Use updateReceiptRequestDescriptor instead')
 const UpdateReceiptRequest$json = {

@@ -124,6 +124,7 @@ message ReceiptsResponse {
   bool success = 1;
   string message = 2;
   repeated Receipt receipts = 3;
+  optional string next_page_token = 4;
 }
 
 message FileResponse {
@@ -221,6 +222,7 @@ message ReceiptListRequest {
   ReceiptOrderBy order_by = 5;
   ReceiptOrderDirection order_direction = 6;
   ReceiptActorFilter actor_filter = 7;
+  optional string page_token = 8;
 }
 
 message UpdateReceiptRequest {

@@ -645,12 +645,13 @@ async def list_receipts_route(request: Request, session: AsyncSession = Depends(
     proto_req.ParseFromString(body)
     try:
         user = await _current_user(request, session)
-        receipts = await services.list_visible_receipts(
+        receipt_page = await services.list_visible_receipts(
             session,
             actor_user_id=user.id,
             is_paid=proto_req.is_paid if _has_field(proto_req, "is_paid") else None,
             tag_ids=list(proto_req.tag_ids) or None,
             cursor=proto_req.cursor if _has_field(proto_req, "cursor") else None,
+            page_token=proto_req.page_token if _has_field(proto_req, "page_token") else None,
             limit=proto_req.limit if _has_field(proto_req, "limit") else 20,
             order_by=_receipt_list_order_by(proto_req.order_by),
             order_direction=_receipt_list_order_direction(proto_req.order_direction),
@@ -658,8 +659,10 @@ async def list_receipts_route(request: Request, session: AsyncSession = Depends(
         )
         await session.commit()
         resp = debt_pb2.ReceiptsResponse(success=True)
-        for receipt in receipts:
+        for receipt in receipt_page.receipts:
             resp.receipts.add().CopyFrom(_receipt_to_pb(receipt))
+        if receipt_page.next_page_token is not None:
+            resp.next_page_token = receipt_page.next_page_token
         return _pb_response(resp)
     except Exception as exc:
         await session.rollback()

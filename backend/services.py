@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-from sqlalchemy import case, func, or_, select
+import base64
+import json
+from dataclasses import asdict, dataclass
+from datetime import datetime
+
+from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -22,6 +27,39 @@ class ResourceNotFoundError(LookupError):
 
 class AuthorizationError(PermissionError):
     pass
+
+
+@dataclass(frozen=True)
+class ReceiptPage:
+    receipts: list[Receipt]
+    next_page_token: str | None = None
+
+
+@dataclass(frozen=True)
+class _ReceiptSortSpec:
+    order_by: str
+    order_direction: str
+    primary_expr: object
+    null_rank_expr: object | None = None
+
+
+@dataclass(frozen=True)
+class _ReceiptPageToken:
+    version: int
+    actor_user_id: int
+    order_by: str
+    order_direction: str
+    actor_filter: str
+    is_paid: bool | None
+    tag_ids: list[int]
+    receipt_id: int
+    primary: float | str | None = None
+    null_rank: int | None = None
+
+
+_TOKEN_VERSION = 1
+_PAGE_PRIMARY_LABEL = "_page_primary"
+_PAGE_NULL_RANK_LABEL = "_page_null_rank"
 
 
 def _require_owned_resource(
@@ -83,29 +121,225 @@ def _receipt_cost_for_user_expr(actor_user_id: int):
     )
 
 
-def _receipt_order_by_clauses(
+def _receipt_sort_spec(
     actor_user_id: int,
     order_by: str,
     order_direction: str,
 ):
-    is_desc = order_direction == "desc"
-
     if order_by == "cost_total":
-        primary = Receipt.amount_owed.desc() if is_desc else Receipt.amount_owed.asc()
-        return [primary, Receipt.id.asc()]
+        return _ReceiptSortSpec(
+            order_by=order_by,
+            order_direction=order_direction,
+            primary_expr=Receipt.amount_owed,
+        )
 
     if order_by == "cost_for_user":
-        cost_for_user = _receipt_cost_for_user_expr(actor_user_id)
-        primary = cost_for_user.desc() if is_desc else cost_for_user.asc()
-        return [primary, Receipt.id.asc()]
+        return _ReceiptSortSpec(
+            order_by=order_by,
+            order_direction=order_direction,
+            primary_expr=_receipt_cost_for_user_expr(actor_user_id),
+        )
 
     if order_by == "due_date":
-        nulls_last_rank = case((Receipt.due_date.is_(None), 1), else_=0).asc()
-        primary = Receipt.due_date.desc() if is_desc else Receipt.due_date.asc()
-        return [nulls_last_rank, primary, Receipt.id.asc()]
+        return _ReceiptSortSpec(
+            order_by=order_by,
+            order_direction=order_direction,
+            primary_expr=Receipt.due_date,
+            null_rank_expr=case((Receipt.due_date.is_(None), 1), else_=0),
+        )
 
-    primary = Receipt.id.desc() if is_desc else Receipt.id.asc()
-    return [primary, Receipt.id.asc()]
+    return _ReceiptSortSpec(
+        order_by="id",
+        order_direction=order_direction,
+        primary_expr=Receipt.id,
+    )
+
+
+def _receipt_order_by_clauses(spec: _ReceiptSortSpec):
+    is_desc = spec.order_direction == "desc"
+    primary = spec.primary_expr.desc() if is_desc else spec.primary_expr.asc()
+
+    if spec.order_by == "id":
+        return [primary]
+
+    clauses = []
+    if spec.null_rank_expr is not None:
+        clauses.append(spec.null_rank_expr.asc())
+    clauses.extend([primary, Receipt.id.asc()])
+    return clauses
+
+
+def _normalize_tag_ids(tag_ids: list[int] | None) -> list[int]:
+    return sorted(set(tag_ids or []))
+
+
+def _encode_page_token(token: _ReceiptPageToken) -> str:
+    raw = json.dumps(asdict(token), separators=(",", ":"), sort_keys=True).encode()
+    return base64.urlsafe_b64encode(raw).decode().rstrip("=")
+
+
+def _decode_page_token(raw_token: str) -> dict[str, object]:
+    try:
+        padded = raw_token + "=" * (-len(raw_token) % 4)
+        decoded = base64.urlsafe_b64decode(padded.encode()).decode()
+        payload = json.loads(decoded)
+    except Exception as exc:  # pragma: no cover - defensive parsing branch
+        raise ValueError("Invalid page token") from exc
+
+    if not isinstance(payload, dict):
+        raise ValueError("Invalid page token")
+    return payload
+
+
+def _parse_page_token(
+    raw_token: str,
+    *,
+    actor_user_id: int,
+    order_by: str,
+    order_direction: str,
+    actor_filter: str,
+    is_paid: bool | None,
+    tag_ids: list[int] | None,
+) -> _ReceiptPageToken:
+    payload = _decode_page_token(raw_token)
+
+    try:
+        token = _ReceiptPageToken(
+            version=int(payload["version"]),
+            actor_user_id=int(payload["actor_user_id"]),
+            order_by=str(payload["order_by"]),
+            order_direction=str(payload["order_direction"]),
+            actor_filter=str(payload["actor_filter"]),
+            is_paid=payload.get("is_paid"),
+            tag_ids=[int(tag_id) for tag_id in payload.get("tag_ids", [])],
+            receipt_id=int(payload["receipt_id"]),
+            primary=payload.get("primary"),
+            null_rank=(
+                None
+                if payload.get("null_rank") is None
+                else int(payload["null_rank"])
+            ),
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError("Invalid page token") from exc
+
+    if token.version != _TOKEN_VERSION:
+        raise ValueError("Invalid page token")
+
+    if (
+        token.actor_user_id != actor_user_id
+        or token.order_by != order_by
+        or token.order_direction != order_direction
+        or token.actor_filter != actor_filter
+        or token.is_paid != is_paid
+        or token.tag_ids != _normalize_tag_ids(tag_ids)
+    ):
+        raise ValueError("Page token does not match current receipt list configuration")
+
+    return token
+
+
+def _receipt_page_value_columns(spec: _ReceiptSortSpec) -> list[object]:
+    columns: list[object] = []
+    if spec.null_rank_expr is not None:
+        columns.append(spec.null_rank_expr.label(_PAGE_NULL_RANK_LABEL))
+    if spec.order_by != "id":
+        columns.append(spec.primary_expr.label(_PAGE_PRIMARY_LABEL))
+    return columns
+
+
+def _receipt_page_token_filter(
+    token: _ReceiptPageToken,
+    spec: _ReceiptSortSpec,
+):
+    receipt_id = token.receipt_id
+    is_desc = spec.order_direction == "desc"
+
+    if spec.order_by == "id":
+        if is_desc:
+            return Receipt.id < receipt_id
+        return Receipt.id > receipt_id
+
+    if spec.order_by == "due_date":
+        if token.null_rank not in (0, 1):
+            raise ValueError("Invalid page token")
+
+        if token.null_rank == 1:
+            return and_(spec.null_rank_expr == 1, Receipt.id > receipt_id)
+
+        if not isinstance(token.primary, str):
+            raise ValueError("Invalid page token")
+
+        primary_value = datetime.fromisoformat(token.primary)
+        compare_primary = (
+            spec.primary_expr < primary_value
+            if is_desc
+            else spec.primary_expr > primary_value
+        )
+        return or_(
+            spec.null_rank_expr > token.null_rank,
+            and_(
+                spec.null_rank_expr == token.null_rank,
+                or_(
+                    compare_primary,
+                    and_(spec.primary_expr == primary_value, Receipt.id > receipt_id),
+                ),
+            ),
+        )
+
+    if not isinstance(token.primary, (int, float)):
+        raise ValueError("Invalid page token")
+
+    primary_value = float(token.primary)
+    compare_primary = (
+        spec.primary_expr < primary_value
+        if is_desc
+        else spec.primary_expr > primary_value
+    )
+    return or_(
+        compare_primary,
+        and_(spec.primary_expr == primary_value, Receipt.id > receipt_id),
+    )
+
+
+def _build_receipt_page_token(
+    row,
+    *,
+    spec: _ReceiptSortSpec,
+    actor_user_id: int,
+    actor_filter: str,
+    is_paid: bool | None,
+    tag_ids: list[int] | None,
+) -> str:
+    receipt = row[0]
+    primary_value = None
+    if spec.order_by != "id":
+        primary_value = row._mapping[_PAGE_PRIMARY_LABEL]
+        if spec.order_by == "due_date":
+            primary_value = (
+                None if primary_value is None else primary_value.isoformat()
+            )
+        else:
+            primary_value = float(primary_value)
+
+    null_rank = None
+    if spec.null_rank_expr is not None:
+        null_rank = int(row._mapping[_PAGE_NULL_RANK_LABEL])
+
+    return _encode_page_token(
+        _ReceiptPageToken(
+            version=_TOKEN_VERSION,
+            actor_user_id=actor_user_id,
+            order_by=spec.order_by,
+            order_direction=spec.order_direction,
+            actor_filter=actor_filter,
+            is_paid=is_paid,
+            tag_ids=_normalize_tag_ids(tag_ids),
+            receipt_id=receipt.id,
+            primary=primary_value,
+            null_rank=null_rank,
+        )
+    )
 
 
 def _receipt_cursor_filter(
@@ -222,11 +456,13 @@ async def list_visible_receipts(
     is_paid: bool | None = None,
     tag_ids: list[int] | None = None,
     cursor: int | None = None,
+    page_token: str | None = None,
     limit: int = 20,
     order_by: str = "id",
     order_direction: str = "asc",
     actor_filter: str = "owner_or_recipient_group",
-) -> list[Receipt]:
+) -> ReceiptPage:
+    spec = _receipt_sort_spec(actor_user_id, order_by, order_direction)
     stmt = select(Receipt).where(
         _receipt_actor_visibility_filter(actor_user_id, actor_filter)
     )
@@ -242,20 +478,51 @@ async def list_visible_receipts(
                 )
             )
 
+    if cursor is not None and page_token is not None:
+        raise ValueError("cursor and page_token cannot be used together")
+
     if cursor is not None:
         stmt = stmt.where(_receipt_cursor_filter(cursor, order_by, order_direction))
+    elif page_token is not None:
+        parsed_page_token = _parse_page_token(
+            page_token,
+            actor_user_id=actor_user_id,
+            order_by=spec.order_by,
+            order_direction=spec.order_direction,
+            actor_filter=actor_filter,
+            is_paid=is_paid,
+            tag_ids=tag_ids,
+        )
+        stmt = stmt.where(_receipt_page_token_filter(parsed_page_token, spec))
 
     stmt = stmt.order_by(
-        *_receipt_order_by_clauses(actor_user_id, order_by, order_direction)
-    ).limit(limit).options(
+        *_receipt_order_by_clauses(spec)
+    ).limit(limit + 1).options(
         selectinload(Receipt.recipient),
         selectinload(Receipt.recipient_shares),
         selectinload(Receipt.files),
         selectinload(Receipt.tags),
     )
+    stmt = stmt.add_columns(*_receipt_page_value_columns(spec))
 
     result = await session.execute(stmt)
-    return list(result.scalars().all())
+    rows = list(result.all())
+    has_next_page = len(rows) > limit
+    page_rows = rows[:limit]
+    receipts = [row[0] for row in page_rows]
+
+    next_page_token = None
+    if has_next_page and page_rows:
+        next_page_token = _build_receipt_page_token(
+            page_rows[-1],
+            spec=spec,
+            actor_user_id=actor_user_id,
+            actor_filter=actor_filter,
+            is_paid=is_paid,
+            tag_ids=tag_ids,
+        )
+
+    return ReceiptPage(receipts=receipts, next_page_token=next_page_token)
 
 
 async def update_receipt_for_owner(

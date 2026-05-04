@@ -247,14 +247,16 @@ class ReceiptResponse(_message.Message):
     def __init__(self, success: _Optional[bool] = ..., message: _Optional[str] = ..., receipt: _Optional[_Union[Receipt, _Mapping]] = ...) -> None: ...
 
 class ReceiptsResponse(_message.Message):
-    __slots__ = ("success", "message", "receipts")
+    __slots__ = ("success", "message", "receipts", "next_page_token")
     SUCCESS_FIELD_NUMBER: _ClassVar[int]
     MESSAGE_FIELD_NUMBER: _ClassVar[int]
     RECEIPTS_FIELD_NUMBER: _ClassVar[int]
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     success: bool
     message: str
     receipts: _containers.RepeatedCompositeFieldContainer[Receipt]
-    def __init__(self, success: _Optional[bool] = ..., message: _Optional[str] = ..., receipts: _Optional[_Iterable[_Union[Receipt, _Mapping]]] = ...) -> None: ...
+    next_page_token: str
+    def __init__(self, success: _Optional[bool] = ..., message: _Optional[str] = ..., receipts: _Optional[_Iterable[_Union[Receipt, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
 
 class FileResponse(_message.Message):
     __slots__ = ("success", "message", "file")
@@ -367,7 +369,7 @@ class ReceiptLookupRequest(_message.Message):
     def __init__(self, receipt_id: _Optional[int] = ...) -> None: ...
 
 class ReceiptListRequest(_message.Message):
-    __slots__ = ("is_paid", "tag_ids", "cursor", "limit", "order_by", "order_direction", "actor_filter")
+    __slots__ = ("is_paid", "tag_ids", "cursor", "limit", "order_by", "order_direction", "actor_filter", "page_token")
     IS_PAID_FIELD_NUMBER: _ClassVar[int]
     TAG_IDS_FIELD_NUMBER: _ClassVar[int]
     CURSOR_FIELD_NUMBER: _ClassVar[int]
@@ -375,6 +377,7 @@ class ReceiptListRequest(_message.Message):
     ORDER_BY_FIELD_NUMBER: _ClassVar[int]
     ORDER_DIRECTION_FIELD_NUMBER: _ClassVar[int]
     ACTOR_FILTER_FIELD_NUMBER: _ClassVar[int]
+    PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
     is_paid: bool
     tag_ids: _containers.RepeatedScalarFieldContainer[int]
     cursor: int
@@ -382,7 +385,8 @@ class ReceiptListRequest(_message.Message):
     order_by: ReceiptOrderBy
     order_direction: ReceiptOrderDirection
     actor_filter: ReceiptActorFilter
-    def __init__(self, is_paid: _Optional[bool] = ..., tag_ids: _Optional[_Iterable[int]] = ..., cursor: _Optional[int] = ..., limit: _Optional[int] = ..., order_by: _Optional[_Union[ReceiptOrderBy, str]] = ..., order_direction: _Optional[_Union[ReceiptOrderDirection, str]] = ..., actor_filter: _Optional[_Union[ReceiptActorFilter, str]] = ...) -> None: ...
+    page_token: str
+    def __init__(self, is_paid: _Optional[bool] = ..., tag_ids: _Optional[_Iterable[int]] = ..., cursor: _Optional[int] = ..., limit: _Optional[int] = ..., order_by: _Optional[_Union[ReceiptOrderBy, str]] = ..., order_direction: _Optional[_Union[ReceiptOrderDirection, str]] = ..., actor_filter: _Optional[_Union[ReceiptActorFilter, str]] = ..., page_token: _Optional[str] = ...) -> None: ...
 
 class UpdateReceiptRequest(_message.Message):
     __slots__ = ("receipt_id", "title", "description", "amount_owed", "amount_paid", "due_date", "notes", "currency", "split", "clear_split")
