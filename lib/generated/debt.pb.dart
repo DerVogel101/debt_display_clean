@@ -15,7 +15,11 @@ import 'dart:core' as $core;
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
+import 'debt.pbenum.dart';
+
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
+
+export 'debt.pbenum.dart';
 
 class EmptyRequest extends $pb.GeneratedMessage {
   factory EmptyRequest() => create();
@@ -2444,12 +2448,18 @@ class ReceiptListRequest extends $pb.GeneratedMessage {
     $core.Iterable<$fixnum.Int64>? tagIds,
     $fixnum.Int64? cursor,
     $core.int? limit,
+    ReceiptOrderBy? orderBy,
+    ReceiptOrderDirection? orderDirection,
+    ReceiptActorFilter? actorFilter,
   }) {
     final result = create();
     if (isPaid != null) result.isPaid = isPaid;
     if (tagIds != null) result.tagIds.addAll(tagIds);
     if (cursor != null) result.cursor = cursor;
     if (limit != null) result.limit = limit;
+    if (orderBy != null) result.orderBy = orderBy;
+    if (orderDirection != null) result.orderDirection = orderDirection;
+    if (actorFilter != null) result.actorFilter = actorFilter;
     return result;
   }
 
@@ -2470,6 +2480,12 @@ class ReceiptListRequest extends $pb.GeneratedMessage {
     ..p<$fixnum.Int64>(2, _omitFieldNames ? '' : 'tagIds', $pb.PbFieldType.K6)
     ..aInt64(3, _omitFieldNames ? '' : 'cursor')
     ..aI(4, _omitFieldNames ? '' : 'limit')
+    ..aE<ReceiptOrderBy>(5, _omitFieldNames ? '' : 'orderBy',
+        enumValues: ReceiptOrderBy.values)
+    ..aE<ReceiptOrderDirection>(6, _omitFieldNames ? '' : 'orderDirection',
+        enumValues: ReceiptOrderDirection.values)
+    ..aE<ReceiptActorFilter>(7, _omitFieldNames ? '' : 'actorFilter',
+        enumValues: ReceiptActorFilter.values)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2520,6 +2536,33 @@ class ReceiptListRequest extends $pb.GeneratedMessage {
   $core.bool hasLimit() => $_has(3);
   @$pb.TagNumber(4)
   void clearLimit() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  ReceiptOrderBy get orderBy => $_getN(4);
+  @$pb.TagNumber(5)
+  set orderBy(ReceiptOrderBy value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasOrderBy() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearOrderBy() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  ReceiptOrderDirection get orderDirection => $_getN(5);
+  @$pb.TagNumber(6)
+  set orderDirection(ReceiptOrderDirection value) => $_setField(6, value);
+  @$pb.TagNumber(6)
+  $core.bool hasOrderDirection() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearOrderDirection() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  ReceiptActorFilter get actorFilter => $_getN(6);
+  @$pb.TagNumber(7)
+  set actorFilter(ReceiptActorFilter value) => $_setField(7, value);
+  @$pb.TagNumber(7)
+  $core.bool hasActorFilter() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearActorFilter() => $_clearField(7);
 }
 
 class UpdateReceiptRequest extends $pb.GeneratedMessage {

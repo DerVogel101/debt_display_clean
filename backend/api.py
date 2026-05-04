@@ -93,6 +93,36 @@ def _has_field(message, field: str) -> bool:
         return False
 
 
+def _receipt_list_order_by(value: int) -> str:
+    if value == 0 or value == 1:
+        return "id"
+    if value == 2:
+        return "cost_total"
+    if value == 3:
+        return "cost_for_user"
+    if value == 4:
+        return "due_date"
+    raise ValueError("Unsupported receipt list order_by")
+
+
+def _receipt_list_order_direction(value: int) -> str:
+    if value == 0 or value == 1:
+        return "asc"
+    if value == 2:
+        return "desc"
+    raise ValueError("Unsupported receipt list order_direction")
+
+
+def _receipt_list_actor_filter(value: int) -> str:
+    if value == 0 or value == 1:
+        return "owner_or_recipient_group"
+    if value == 2:
+        return "owner"
+    if value == 3:
+        return "recipient_group"
+    raise ValueError("Unsupported receipt list actor_filter")
+
+
 def _status_for_exc(exc: Exception) -> int:
     if isinstance(exc, HTTPException):
         return exc.status_code
@@ -622,6 +652,9 @@ async def list_receipts_route(request: Request, session: AsyncSession = Depends(
             tag_ids=list(proto_req.tag_ids) or None,
             cursor=proto_req.cursor if _has_field(proto_req, "cursor") else None,
             limit=proto_req.limit if _has_field(proto_req, "limit") else 20,
+            order_by=_receipt_list_order_by(proto_req.order_by),
+            order_direction=_receipt_list_order_direction(proto_req.order_direction),
+            actor_filter=_receipt_list_actor_filter(proto_req.actor_filter),
         )
         await session.commit()
         resp = debt_pb2.ReceiptsResponse(success=True)

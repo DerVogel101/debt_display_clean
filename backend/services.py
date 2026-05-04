@@ -1,11 +1,18 @@
 from __future__ import annotations
 
-from sqlalchemy import or_, select
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from backend import db
-from backend.db import Receipt, ReceiptFile, Recipient, TaggedReceipt, recipient_members
+from backend.db import (
+    Receipt,
+    ReceiptFile,
+    ReceiptRecipientShare,
+    Recipient,
+    TaggedReceipt,
+    recipient_members,
+)
 from backend.storage import generate_storage_key, sanitize_download_filename
 
 
@@ -37,6 +44,80 @@ def _member_recipient_ids(actor_user_id: int):
     return select(recipient_members.c.recipient_id).where(
         recipient_members.c.user_id == actor_user_id
     )
+
+
+def _receipt_actor_visibility_filter(actor_user_id: int, actor_filter: str):
+    in_recipient_group = Receipt.recipient_id.in_(_member_recipient_ids(actor_user_id))
+
+    if actor_filter == "owner":
+        return Receipt.owner_id == actor_user_id
+    if actor_filter == "recipient_group":
+        return in_recipient_group
+    return or_(
+        Receipt.owner_id == actor_user_id,
+        in_recipient_group,
+    )
+
+
+def _receipt_cost_for_user_expr(actor_user_id: int):
+    actor_share_percent = (
+        select(ReceiptRecipientShare.share_percent)
+        .where(
+            ReceiptRecipientShare.receipt_id == Receipt.id,
+            ReceiptRecipientShare.user_id == actor_user_id,
+        )
+        .correlate(Receipt)
+        .scalar_subquery()
+    )
+    owner_cost = case(
+        (
+            Receipt.owner_share_percent.is_not(None),
+            Receipt.amount_owed * Receipt.owner_share_percent / 100.0,
+        ),
+        else_=Receipt.amount_owed,
+    )
+    member_cost = Receipt.amount_owed * func.coalesce(actor_share_percent, 0.0) / 100.0
+    return case(
+        (Receipt.owner_id == actor_user_id, owner_cost),
+        else_=member_cost,
+    )
+
+
+def _receipt_order_by_clauses(
+    actor_user_id: int,
+    order_by: str,
+    order_direction: str,
+):
+    is_desc = order_direction == "desc"
+
+    if order_by == "cost_total":
+        primary = Receipt.amount_owed.desc() if is_desc else Receipt.amount_owed.asc()
+        return [primary, Receipt.id.asc()]
+
+    if order_by == "cost_for_user":
+        cost_for_user = _receipt_cost_for_user_expr(actor_user_id)
+        primary = cost_for_user.desc() if is_desc else cost_for_user.asc()
+        return [primary, Receipt.id.asc()]
+
+    if order_by == "due_date":
+        nulls_last_rank = case((Receipt.due_date.is_(None), 1), else_=0).asc()
+        primary = Receipt.due_date.desc() if is_desc else Receipt.due_date.asc()
+        return [nulls_last_rank, primary, Receipt.id.asc()]
+
+    primary = Receipt.id.desc() if is_desc else Receipt.id.asc()
+    return [primary, Receipt.id.asc()]
+
+
+def _receipt_cursor_filter(
+    cursor: int,
+    order_by: str,
+    order_direction: str,
+):
+    if order_by != "id":
+        raise ValueError("cursor pagination is only supported when ordering by id")
+    if order_direction == "desc":
+        return Receipt.id < cursor
+    return Receipt.id > cursor
 
 
 async def get_visible_receipt(
@@ -142,12 +223,12 @@ async def list_visible_receipts(
     tag_ids: list[int] | None = None,
     cursor: int | None = None,
     limit: int = 20,
+    order_by: str = "id",
+    order_direction: str = "asc",
+    actor_filter: str = "owner_or_recipient_group",
 ) -> list[Receipt]:
     stmt = select(Receipt).where(
-        or_(
-            Receipt.owner_id == actor_user_id,
-            Receipt.recipient_id.in_(_member_recipient_ids(actor_user_id)),
-        )
+        _receipt_actor_visibility_filter(actor_user_id, actor_filter)
     )
 
     if is_paid is not None:
@@ -162,9 +243,11 @@ async def list_visible_receipts(
             )
 
     if cursor is not None:
-        stmt = stmt.where(Receipt.id > cursor)
+        stmt = stmt.where(_receipt_cursor_filter(cursor, order_by, order_direction))
 
-    stmt = stmt.order_by(Receipt.id).limit(limit).options(
+    stmt = stmt.order_by(
+        *_receipt_order_by_clauses(actor_user_id, order_by, order_direction)
+    ).limit(limit).options(
         selectinload(Receipt.recipient),
         selectinload(Receipt.recipient_shares),
         selectinload(Receipt.files),

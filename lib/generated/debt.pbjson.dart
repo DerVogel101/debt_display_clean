@@ -15,6 +15,59 @@ import 'dart:convert' as $convert;
 import 'dart:core' as $core;
 import 'dart:typed_data' as $typed_data;
 
+@$core.Deprecated('Use receiptOrderByDescriptor instead')
+const ReceiptOrderBy$json = {
+  '1': 'ReceiptOrderBy',
+  '2': [
+    {'1': 'RECEIPT_ORDER_BY_UNSPECIFIED', '2': 0},
+    {'1': 'RECEIPT_ORDER_BY_ID', '2': 1},
+    {'1': 'RECEIPT_ORDER_BY_COST_TOTAL', '2': 2},
+    {'1': 'RECEIPT_ORDER_BY_COST_FOR_USER', '2': 3},
+    {'1': 'RECEIPT_ORDER_BY_DUE_DATE', '2': 4},
+  ],
+};
+
+/// Descriptor for `ReceiptOrderBy`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List receiptOrderByDescriptor = $convert.base64Decode(
+    'Cg5SZWNlaXB0T3JkZXJCeRIgChxSRUNFSVBUX09SREVSX0JZX1VOU1BFQ0lGSUVEEAASFwoTUk'
+    'VDRUlQVF9PUkRFUl9CWV9JRBABEh8KG1JFQ0VJUFRfT1JERVJfQllfQ09TVF9UT1RBTBACEiIK'
+    'HlJFQ0VJUFRfT1JERVJfQllfQ09TVF9GT1JfVVNFUhADEh0KGVJFQ0VJUFRfT1JERVJfQllfRF'
+    'VFX0RBVEUQBA==');
+
+@$core.Deprecated('Use receiptOrderDirectionDescriptor instead')
+const ReceiptOrderDirection$json = {
+  '1': 'ReceiptOrderDirection',
+  '2': [
+    {'1': 'RECEIPT_ORDER_DIRECTION_UNSPECIFIED', '2': 0},
+    {'1': 'RECEIPT_ORDER_DIRECTION_ASC', '2': 1},
+    {'1': 'RECEIPT_ORDER_DIRECTION_DESC', '2': 2},
+  ],
+};
+
+/// Descriptor for `ReceiptOrderDirection`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List receiptOrderDirectionDescriptor = $convert.base64Decode(
+    'ChVSZWNlaXB0T3JkZXJEaXJlY3Rpb24SJwojUkVDRUlQVF9PUkRFUl9ESVJFQ1RJT05fVU5TUE'
+    'VDSUZJRUQQABIfChtSRUNFSVBUX09SREVSX0RJUkVDVElPTl9BU0MQARIgChxSRUNFSVBUX09S'
+    'REVSX0RJUkVDVElPTl9ERVNDEAI=');
+
+@$core.Deprecated('Use receiptActorFilterDescriptor instead')
+const ReceiptActorFilter$json = {
+  '1': 'ReceiptActorFilter',
+  '2': [
+    {'1': 'RECEIPT_ACTOR_FILTER_UNSPECIFIED', '2': 0},
+    {'1': 'RECEIPT_ACTOR_FILTER_OWNER_OR_RECIPIENT_GROUP', '2': 1},
+    {'1': 'RECEIPT_ACTOR_FILTER_OWNER', '2': 2},
+    {'1': 'RECEIPT_ACTOR_FILTER_RECIPIENT_GROUP', '2': 3},
+  ],
+};
+
+/// Descriptor for `ReceiptActorFilter`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List receiptActorFilterDescriptor = $convert.base64Decode(
+    'ChJSZWNlaXB0QWN0b3JGaWx0ZXISJAogUkVDRUlQVF9BQ1RPUl9GSUxURVJfVU5TUEVDSUZJRU'
+    'QQABIxCi1SRUNFSVBUX0FDVE9SX0ZJTFRFUl9PV05FUl9PUl9SRUNJUElFTlRfR1JPVVAQARIe'
+    'ChpSRUNFSVBUX0FDVE9SX0ZJTFRFUl9PV05FUhACEigKJFJFQ0VJUFRfQUNUT1JfRklMVEVSX1'
+    'JFQ0lQSUVOVF9HUk9VUBAD');
+
 @$core.Deprecated('Use emptyRequestDescriptor instead')
 const EmptyRequest$json = {
   '1': 'EmptyRequest',
@@ -841,6 +894,30 @@ const ReceiptListRequest$json = {
     {'1': 'tag_ids', '3': 2, '4': 3, '5': 3, '10': 'tagIds'},
     {'1': 'cursor', '3': 3, '4': 1, '5': 3, '9': 1, '10': 'cursor', '17': true},
     {'1': 'limit', '3': 4, '4': 1, '5': 5, '9': 2, '10': 'limit', '17': true},
+    {
+      '1': 'order_by',
+      '3': 5,
+      '4': 1,
+      '5': 14,
+      '6': '.debt.ReceiptOrderBy',
+      '10': 'orderBy'
+    },
+    {
+      '1': 'order_direction',
+      '3': 6,
+      '4': 1,
+      '5': 14,
+      '6': '.debt.ReceiptOrderDirection',
+      '10': 'orderDirection'
+    },
+    {
+      '1': 'actor_filter',
+      '3': 7,
+      '4': 1,
+      '5': 14,
+      '6': '.debt.ReceiptActorFilter',
+      '10': 'actorFilter'
+    },
   ],
   '8': [
     {'1': '_is_paid'},
@@ -853,7 +930,11 @@ const ReceiptListRequest$json = {
 final $typed_data.Uint8List receiptListRequestDescriptor = $convert.base64Decode(
     'ChJSZWNlaXB0TGlzdFJlcXVlc3QSHAoHaXNfcGFpZBgBIAEoCEgAUgZpc1BhaWSIAQESFwoHdG'
     'FnX2lkcxgCIAMoA1IGdGFnSWRzEhsKBmN1cnNvchgDIAEoA0gBUgZjdXJzb3KIAQESGQoFbGlt'
-    'aXQYBCABKAVIAlIFbGltaXSIAQFCCgoIX2lzX3BhaWRCCQoHX2N1cnNvckIICgZfbGltaXQ=');
+    'aXQYBCABKAVIAlIFbGltaXSIAQESLwoIb3JkZXJfYnkYBSABKA4yFC5kZWJ0LlJlY2VpcHRPcm'
+    'RlckJ5UgdvcmRlckJ5EkQKD29yZGVyX2RpcmVjdGlvbhgGIAEoDjIbLmRlYnQuUmVjZWlwdE9y'
+    'ZGVyRGlyZWN0aW9uUg5vcmRlckRpcmVjdGlvbhI7CgxhY3Rvcl9maWx0ZXIYByABKA4yGC5kZW'
+    'J0LlJlY2VpcHRBY3RvckZpbHRlclILYWN0b3JGaWx0ZXJCCgoIX2lzX3BhaWRCCQoHX2N1cnNv'
+    'ckIICgZfbGltaXQ=');
 
 @$core.Deprecated('Use updateReceiptRequestDescriptor instead')
 const UpdateReceiptRequest$json = {

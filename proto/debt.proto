@@ -192,11 +192,35 @@ message ReceiptLookupRequest {
   int64 receipt_id = 1;
 }
 
+enum ReceiptOrderBy {
+  RECEIPT_ORDER_BY_UNSPECIFIED = 0;
+  RECEIPT_ORDER_BY_ID = 1;
+  RECEIPT_ORDER_BY_COST_TOTAL = 2;
+  RECEIPT_ORDER_BY_COST_FOR_USER = 3;
+  RECEIPT_ORDER_BY_DUE_DATE = 4;
+}
+
+enum ReceiptOrderDirection {
+  RECEIPT_ORDER_DIRECTION_UNSPECIFIED = 0;
+  RECEIPT_ORDER_DIRECTION_ASC = 1;
+  RECEIPT_ORDER_DIRECTION_DESC = 2;
+}
+
+enum ReceiptActorFilter {
+  RECEIPT_ACTOR_FILTER_UNSPECIFIED = 0;
+  RECEIPT_ACTOR_FILTER_OWNER_OR_RECIPIENT_GROUP = 1;
+  RECEIPT_ACTOR_FILTER_OWNER = 2;
+  RECEIPT_ACTOR_FILTER_RECIPIENT_GROUP = 3;
+}
+
 message ReceiptListRequest {
   optional bool is_paid = 1;
   repeated int64 tag_ids = 2;
   optional int64 cursor = 3;
   optional int32 limit = 4;
+  ReceiptOrderBy order_by = 5;
+  ReceiptOrderDirection order_direction = 6;
+  ReceiptActorFilter actor_filter = 7;
 }
 
 message UpdateReceiptRequest {

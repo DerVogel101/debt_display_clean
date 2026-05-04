@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
@@ -1044,6 +1045,404 @@ class LiveApiRegressionTests(AsyncDatabaseTestCase):
 
         self.assertIsNotNone(stored)
         self.assertEqual(stored.original_filename, "Quarterly Report_.pdf")
+
+
+class ReceiptListOrderingAndFilterTests(AsyncDatabaseTestCase):
+    async def asyncSetUp(self) -> None:
+        await super().asyncSetUp()
+
+        self.owner = await self._create_user("auth0|owner", "owner@example.com", "Owner")
+        self.member_a = await self._create_user(
+            "auth0|member-a", "member-a@example.com", "Member A"
+        )
+        self.member_b = await self._create_user(
+            "auth0|member-b", "member-b@example.com", "Member B"
+        )
+        self.stranger = await self._create_user(
+            "auth0|stranger", "stranger@example.com", "Stranger"
+        )
+
+        async with db.async_session_maker() as session:
+            self.recipient = await db.create_recipient(
+                session=session,
+                owner_id=self.owner.id,
+                name="Sorting Group",
+                description=None,
+                member_ids=[self.member_a.id, self.member_b.id],
+            )
+
+            due_base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+            self.owner_unpaid = await db.create_receipt(
+                session=session,
+                owner_id=self.owner.id,
+                title="Owner Unpaid",
+                amount_owed=50.0,
+                due_date=due_base + timedelta(days=2),
+            )
+            self.shared_with_split = await db.create_receipt(
+                session=session,
+                owner_id=self.owner.id,
+                title="Shared Split",
+                amount_owed=90.0,
+                recipient_id=self.recipient.id,
+                due_date=due_base + timedelta(days=1),
+            )
+            self.shared_without_member_share = await db.create_receipt(
+                session=session,
+                owner_id=self.owner.id,
+                title="Shared No Member Share",
+                amount_owed=120.0,
+                recipient_id=self.recipient.id,
+                due_date=None,
+            )
+            self.member_owned_paid = await db.create_receipt(
+                session=session,
+                owner_id=self.member_a.id,
+                title="Member Paid",
+                amount_owed=30.0,
+                due_date=due_base + timedelta(days=3),
+            )
+            self.member_owned_large = await db.create_receipt(
+                session=session,
+                owner_id=self.member_a.id,
+                title="Member Large",
+                amount_owed=120.0,
+                due_date=due_base + timedelta(days=4),
+            )
+            self.tie_low_id = await db.create_receipt(
+                session=session,
+                owner_id=self.member_a.id,
+                title="Tie Low Id",
+                amount_owed=77.0,
+                due_date=due_base + timedelta(days=5),
+            )
+            self.tie_high_id = await db.create_receipt(
+                session=session,
+                owner_id=self.member_a.id,
+                title="Tie High Id",
+                amount_owed=77.0,
+                due_date=due_base + timedelta(days=6),
+            )
+            self.stranger_receipt = await db.create_receipt(
+                session=session,
+                owner_id=self.stranger.id,
+                title="Stranger Receipt",
+                amount_owed=999.0,
+                due_date=due_base + timedelta(days=7),
+            )
+
+            await db.set_receipt_split(
+                session=session,
+                receipt_id=self.shared_with_split.id,
+                owner_share_percent=50.0,
+                recipient_shares=[
+                    (self.member_a.id, 20.0),
+                    (self.member_b.id, 30.0),
+                ],
+            )
+            await db.set_receipt_split(
+                session=session,
+                receipt_id=self.shared_without_member_share.id,
+                owner_share_percent=100.0,
+                recipient_shares=[],
+            )
+            await db.mark_receipt_paid(
+                session=session,
+                receipt_id=self.member_owned_paid.id,
+                amount_paid=30.0,
+            )
+
+            tag_shared = await db.get_or_create_tag(
+                session=session,
+                text="shared",
+                icon="s",
+                color="#111111",
+            )
+            tag_urgent = await db.get_or_create_tag(
+                session=session,
+                text="urgent",
+                icon="u",
+                color="#222222",
+            )
+            tag_personal = await db.get_or_create_tag(
+                session=session,
+                text="personal",
+                icon="p",
+                color="#333333",
+            )
+            self.shared_tag_id = tag_shared.id
+            self.urgent_tag_id = tag_urgent.id
+            self.personal_tag_id = tag_personal.id
+
+            await db.set_receipt_tags(
+                session,
+                self.shared_with_split.id,
+                [self.shared_tag_id, self.urgent_tag_id],
+            )
+            await db.set_receipt_tags(
+                session,
+                self.shared_without_member_share.id,
+                [self.shared_tag_id],
+            )
+            await db.set_receipt_tags(
+                session,
+                self.member_owned_paid.id,
+                [self.personal_tag_id],
+            )
+
+            await session.commit()
+
+        self._claims_by_token = {
+            "owner-token": {"sub": self.owner.sub},
+            "member-a-token": {"sub": self.member_a.sub},
+            "member-b-token": {"sub": self.member_b.sub},
+            "stranger-token": {"sub": self.stranger.sub},
+        }
+
+    async def _post_protobuf(self, path: str, message, token: str):
+        async def verify_side_effect(access_token: str):
+            return self._claims_by_token[access_token]
+
+        transport = ASGITransport(app=main.app)
+        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+            with patch("backend.auth.verify_token", new=AsyncMock(side_effect=verify_side_effect)):
+                return await client.post(
+                    path,
+                    content=message.SerializeToString(),
+                    headers={
+                        "Content-Type": "application/x-protobuf",
+                        "Authorization": f"Bearer {token}",
+                    },
+                )
+
+    def _parse_message(self, message_cls, response) -> object:
+        message = message_cls()
+        message.ParseFromString(response.content)
+        return message
+
+    async def _list_receipts(self, token: str, **kwargs) -> list[int]:
+        response = await self._post_protobuf(
+            "/api/receipts/list",
+            debt_pb2.ReceiptListRequest(**kwargs),
+            token,
+        )
+        parsed = self._parse_message(debt_pb2.ReceiptsResponse, response)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(parsed.success)
+        return [receipt.id for receipt in parsed.receipts]
+
+    async def test_receipts_list_filters_paid_true(self) -> None:
+        ids = await self._list_receipts("member-a-token", is_paid=True)
+        self.assertEqual(ids, [self.member_owned_paid.id])
+
+    async def test_receipts_list_filters_paid_false(self) -> None:
+        ids = await self._list_receipts("member-a-token", is_paid=False)
+        self.assertNotIn(self.member_owned_paid.id, ids)
+        self.assertEqual(
+            set(ids),
+            {
+                self.shared_with_split.id,
+                self.shared_without_member_share.id,
+                self.member_owned_large.id,
+                self.tie_low_id.id,
+                self.tie_high_id.id,
+            },
+        )
+
+    async def test_receipts_list_filters_by_all_tag_ids(self) -> None:
+        ids = await self._list_receipts(
+            "member-a-token",
+            tag_ids=[self.shared_tag_id, self.urgent_tag_id],
+        )
+        self.assertEqual(ids, [self.shared_with_split.id])
+
+    async def test_receipts_list_cursor_paginates_id_ascending(self) -> None:
+        ids = await self._list_receipts(
+            "member-a-token",
+            cursor=self.member_owned_paid.id,
+            order_by=debt_pb2.RECEIPT_ORDER_BY_ID,
+            order_direction=debt_pb2.RECEIPT_ORDER_DIRECTION_ASC,
+        )
+        self.assertTrue(all(receipt_id > self.member_owned_paid.id for receipt_id in ids))
+
+    async def test_receipts_list_cursor_paginates_id_descending(self) -> None:
+        ids = await self._list_receipts(
+            "member-a-token",
+            cursor=self.tie_high_id.id,
+            order_by=debt_pb2.RECEIPT_ORDER_BY_ID,
+            order_direction=debt_pb2.RECEIPT_ORDER_DIRECTION_DESC,
+        )
+        self.assertTrue(all(receipt_id < self.tie_high_id.id for receipt_id in ids))
+
+    async def test_receipts_list_rejects_cursor_for_non_id_sort(self) -> None:
+        response = await self._post_protobuf(
+            "/api/receipts/list",
+            debt_pb2.ReceiptListRequest(
+                cursor=self.shared_with_split.id,
+                order_by=debt_pb2.RECEIPT_ORDER_BY_COST_TOTAL,
+                order_direction=debt_pb2.RECEIPT_ORDER_DIRECTION_DESC,
+            ),
+            "member-a-token",
+        )
+        parsed = self._parse_message(debt_pb2.ReceiptsResponse, response)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(parsed.success)
+        self.assertIn("cursor pagination is only supported", parsed.message)
+
+    async def test_receipts_list_orders_by_id_ascending_and_descending(self) -> None:
+        asc_ids = await self._list_receipts(
+            "member-a-token",
+            order_by=debt_pb2.RECEIPT_ORDER_BY_ID,
+            order_direction=debt_pb2.RECEIPT_ORDER_DIRECTION_ASC,
+        )
+        desc_ids = await self._list_receipts(
+            "member-a-token",
+            order_by=debt_pb2.RECEIPT_ORDER_BY_ID,
+            order_direction=debt_pb2.RECEIPT_ORDER_DIRECTION_DESC,
+        )
+        self.assertEqual(asc_ids, sorted(asc_ids))
+        self.assertEqual(desc_ids, sorted(desc_ids, reverse=True))
+
+    async def test_receipts_list_orders_by_cost_total(self) -> None:
+        ids = await self._list_receipts(
+            "member-a-token",
+            order_by=debt_pb2.RECEIPT_ORDER_BY_COST_TOTAL,
+            order_direction=debt_pb2.RECEIPT_ORDER_DIRECTION_ASC,
+        )
+        self.assertEqual(
+            ids,
+            [
+                self.member_owned_paid.id,
+                self.tie_low_id.id,
+                self.tie_high_id.id,
+                self.shared_with_split.id,
+                self.shared_without_member_share.id,
+                self.member_owned_large.id,
+            ],
+        )
+
+    async def test_receipts_list_orders_by_due_date_with_nulls_last(self) -> None:
+        ids = await self._list_receipts(
+            "member-a-token",
+            order_by=debt_pb2.RECEIPT_ORDER_BY_DUE_DATE,
+            order_direction=debt_pb2.RECEIPT_ORDER_DIRECTION_ASC,
+        )
+        self.assertEqual(
+            ids,
+            [
+                self.shared_with_split.id,
+                self.member_owned_paid.id,
+                self.member_owned_large.id,
+                self.tie_low_id.id,
+                self.tie_high_id.id,
+                self.shared_without_member_share.id,
+            ],
+        )
+
+    async def test_receipts_list_orders_by_cost_for_user_for_owner(self) -> None:
+        ids = await self._list_receipts(
+            "owner-token",
+            order_by=debt_pb2.RECEIPT_ORDER_BY_COST_FOR_USER,
+            order_direction=debt_pb2.RECEIPT_ORDER_DIRECTION_ASC,
+        )
+        self.assertEqual(
+            ids,
+            [
+                self.shared_with_split.id,
+                self.owner_unpaid.id,
+                self.shared_without_member_share.id,
+            ],
+        )
+
+    async def test_receipts_list_orders_by_cost_for_user_for_member_with_explicit_share(self) -> None:
+        ids = await self._list_receipts(
+            "member-a-token",
+            order_by=debt_pb2.RECEIPT_ORDER_BY_COST_FOR_USER,
+            order_direction=debt_pb2.RECEIPT_ORDER_DIRECTION_ASC,
+        )
+        self.assertEqual(
+            ids,
+            [
+                self.shared_without_member_share.id,
+                self.shared_with_split.id,
+                self.member_owned_paid.id,
+                self.tie_low_id.id,
+                self.tie_high_id.id,
+                self.member_owned_large.id,
+            ],
+        )
+
+    async def test_receipts_list_orders_by_cost_for_user_uses_zero_for_missing_member_share(self) -> None:
+        ids = await self._list_receipts(
+            "member-b-token",
+            order_by=debt_pb2.RECEIPT_ORDER_BY_COST_FOR_USER,
+            order_direction=debt_pb2.RECEIPT_ORDER_DIRECTION_ASC,
+        )
+        self.assertEqual(ids[0], self.shared_without_member_share.id)
+
+    async def test_receipts_list_uses_id_tiebreaker_for_equal_primary_sort(self) -> None:
+        ids = await self._list_receipts(
+            "member-a-token",
+            order_by=debt_pb2.RECEIPT_ORDER_BY_COST_TOTAL,
+            order_direction=debt_pb2.RECEIPT_ORDER_DIRECTION_ASC,
+        )
+        self.assertLess(ids.index(self.tie_low_id.id), ids.index(self.tie_high_id.id))
+
+    async def test_receipts_list_visibility_is_unchanged_under_sorting(self) -> None:
+        ids = await self._list_receipts(
+            "member-a-token",
+            order_by=debt_pb2.RECEIPT_ORDER_BY_COST_FOR_USER,
+            order_direction=debt_pb2.RECEIPT_ORDER_DIRECTION_DESC,
+        )
+        self.assertNotIn(self.owner_unpaid.id, ids)
+        self.assertNotIn(self.stranger_receipt.id, ids)
+
+    async def test_receipts_list_actor_filter_owner_only(self) -> None:
+        ids = await self._list_receipts(
+            "member-a-token",
+            actor_filter=debt_pb2.RECEIPT_ACTOR_FILTER_OWNER,
+            order_by=debt_pb2.RECEIPT_ORDER_BY_ID,
+            order_direction=debt_pb2.RECEIPT_ORDER_DIRECTION_ASC,
+        )
+        self.assertEqual(
+            ids,
+            [
+                self.member_owned_paid.id,
+                self.member_owned_large.id,
+                self.tie_low_id.id,
+                self.tie_high_id.id,
+            ],
+        )
+
+    async def test_receipts_list_actor_filter_recipient_group_only(self) -> None:
+        ids = await self._list_receipts(
+            "member-a-token",
+            actor_filter=debt_pb2.RECEIPT_ACTOR_FILTER_RECIPIENT_GROUP,
+            order_by=debt_pb2.RECEIPT_ORDER_BY_ID,
+            order_direction=debt_pb2.RECEIPT_ORDER_DIRECTION_ASC,
+        )
+        self.assertEqual(
+            ids,
+            [
+                self.shared_with_split.id,
+                self.shared_without_member_share.id,
+            ],
+        )
+
+    async def test_receipts_list_actor_filter_default_matches_owner_or_recipient_group(self) -> None:
+        default_ids = await self._list_receipts(
+            "member-a-token",
+            order_by=debt_pb2.RECEIPT_ORDER_BY_ID,
+            order_direction=debt_pb2.RECEIPT_ORDER_DIRECTION_ASC,
+        )
+        explicit_ids = await self._list_receipts(
+            "member-a-token",
+            actor_filter=debt_pb2.RECEIPT_ACTOR_FILTER_OWNER_OR_RECIPIENT_GROUP,
+            order_by=debt_pb2.RECEIPT_ORDER_BY_ID,
+            order_direction=debt_pb2.RECEIPT_ORDER_DIRECTION_ASC,
+        )
+        self.assertEqual(default_ids, explicit_ids)
 
 
 class AuthorizationDependencyTests(AsyncDatabaseTestCase):
