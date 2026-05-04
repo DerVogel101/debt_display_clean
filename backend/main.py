@@ -32,7 +32,7 @@ app.mount(
 
 @app.on_event("startup")
 async def _migrate_db_schema_on_startup() -> None:
-    await db.migrate_db_schema()
+    pass
 
 
 if __name__ == "__main__":
