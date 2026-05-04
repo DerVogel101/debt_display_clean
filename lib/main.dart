@@ -5,7 +5,9 @@ import 'package:provider/provider.dart';
 import 'package:debt_display/auth0_service.dart';
 import 'package:debt_display/config/app_config.dart';
 import 'package:debt_display/services/auth_backend_service.dart';
+import 'package:debt_display/services/debt_backend_service.dart';
 import 'package:debt_display/state/auth_session_state.dart';
+import 'package:debt_display/state/bill_list_state.dart';
 import 'package:debt_display/state/navigation_state.dart';
 import 'package:debt_display/state/theme_state.dart';
 import 'package:debt_display/ui/app_shell.dart';
@@ -31,6 +33,12 @@ class MyApp extends StatelessWidget {
             auth0Service: Auth0Service(),
             authBackendService: AuthBackendService(),
           )..initialize(),
+        ),
+        ChangeNotifierProxyProvider<AuthSessionState, BillListState>(
+          create: (_) =>
+              BillListState(debtBackendService: DebtBackendService()),
+          update: (_, authSessionState, billListState) =>
+              billListState!..updateAuthSession(authSessionState),
         ),
       ],
       child: const _AppRoot(),

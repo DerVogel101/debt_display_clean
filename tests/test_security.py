@@ -1220,7 +1220,7 @@ class ReceiptListOrderingAndFilterTests(AsyncDatabaseTestCase):
         message.ParseFromString(response.content)
         return message
 
-    async def _list_receipts(self, token: str, **kwargs) -> list[int]:
+    async def _list_receipts_response(self, token: str, **kwargs):
         response = await self._post_protobuf(
             "/api/receipts/list",
             debt_pb2.ReceiptListRequest(**kwargs),
@@ -1229,7 +1229,29 @@ class ReceiptListOrderingAndFilterTests(AsyncDatabaseTestCase):
         parsed = self._parse_message(debt_pb2.ReceiptsResponse, response)
         self.assertEqual(response.status_code, 200)
         self.assertTrue(parsed.success)
+        return parsed
+
+    async def _list_receipts(self, token: str, **kwargs) -> list[int]:
+        parsed = await self._list_receipts_response(token, **kwargs)
         return [receipt.id for receipt in parsed.receipts]
+
+    async def _collect_page_token_ids(self, token: str, **kwargs) -> list[int]:
+        ids: list[int] = []
+        next_page_token: str | None = None
+
+        while True:
+            request_kwargs = dict(kwargs)
+            if next_page_token is not None:
+                request_kwargs["page_token"] = next_page_token
+
+            parsed = await self._list_receipts_response(token, **request_kwargs)
+            ids.extend(receipt.id for receipt in parsed.receipts)
+
+            if not parsed.HasField("next_page_token"):
+                break
+            next_page_token = parsed.next_page_token
+
+        return ids
 
     async def test_receipts_list_filters_paid_true(self) -> None:
         ids = await self._list_receipts("member-a-token", is_paid=True)
@@ -1289,6 +1311,112 @@ class ReceiptListOrderingAndFilterTests(AsyncDatabaseTestCase):
         self.assertEqual(response.status_code, 400)
         self.assertFalse(parsed.success)
         self.assertIn("cursor pagination is only supported", parsed.message)
+
+    async def test_receipts_list_page_token_paginates_id_sort(self) -> None:
+        ids = await self._collect_page_token_ids(
+            "member-a-token",
+            limit=2,
+            order_by=debt_pb2.RECEIPT_ORDER_BY_ID,
+            order_direction=debt_pb2.RECEIPT_ORDER_DIRECTION_DESC,
+        )
+        self.assertEqual(ids, sorted(ids, reverse=True))
+
+    async def test_receipts_list_page_token_paginates_cost_total_sort(self) -> None:
+        ids = await self._collect_page_token_ids(
+            "member-a-token",
+            limit=2,
+            order_by=debt_pb2.RECEIPT_ORDER_BY_COST_TOTAL,
+            order_direction=debt_pb2.RECEIPT_ORDER_DIRECTION_ASC,
+        )
+        self.assertEqual(
+            ids,
+            [
+                self.member_owned_paid.id,
+                self.tie_low_id.id,
+                self.tie_high_id.id,
+                self.shared_with_split.id,
+                self.shared_without_member_share.id,
+                self.member_owned_large.id,
+            ],
+        )
+
+    async def test_receipts_list_page_token_paginates_due_date_sort(self) -> None:
+        ids = await self._collect_page_token_ids(
+            "member-a-token",
+            limit=2,
+            order_by=debt_pb2.RECEIPT_ORDER_BY_DUE_DATE,
+            order_direction=debt_pb2.RECEIPT_ORDER_DIRECTION_ASC,
+        )
+        self.assertEqual(
+            ids,
+            [
+                self.shared_with_split.id,
+                self.member_owned_paid.id,
+                self.member_owned_large.id,
+                self.tie_low_id.id,
+                self.tie_high_id.id,
+                self.shared_without_member_share.id,
+            ],
+        )
+
+    async def test_receipts_list_page_token_paginates_cost_for_user_sort(self) -> None:
+        ids = await self._collect_page_token_ids(
+            "member-a-token",
+            limit=2,
+            order_by=debt_pb2.RECEIPT_ORDER_BY_COST_FOR_USER,
+            order_direction=debt_pb2.RECEIPT_ORDER_DIRECTION_ASC,
+        )
+        self.assertEqual(
+            ids,
+            [
+                self.shared_without_member_share.id,
+                self.shared_with_split.id,
+                self.member_owned_paid.id,
+                self.tie_low_id.id,
+                self.tie_high_id.id,
+                self.member_owned_large.id,
+            ],
+        )
+
+    async def test_receipts_list_rejects_malformed_page_token(self) -> None:
+        response = await self._post_protobuf(
+            "/api/receipts/list",
+            debt_pb2.ReceiptListRequest(
+                page_token="not-valid-base64",
+                order_by=debt_pb2.RECEIPT_ORDER_BY_ID,
+                order_direction=debt_pb2.RECEIPT_ORDER_DIRECTION_DESC,
+            ),
+            "member-a-token",
+        )
+        parsed = self._parse_message(debt_pb2.ReceiptsResponse, response)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(parsed.success)
+        self.assertIn("Invalid page token", parsed.message)
+
+    async def test_receipts_list_rejects_mismatched_page_token(self) -> None:
+        first_page = await self._list_receipts_response(
+            "member-a-token",
+            limit=2,
+            order_by=debt_pb2.RECEIPT_ORDER_BY_COST_TOTAL,
+            order_direction=debt_pb2.RECEIPT_ORDER_DIRECTION_ASC,
+        )
+
+        response = await self._post_protobuf(
+            "/api/receipts/list",
+            debt_pb2.ReceiptListRequest(
+                limit=2,
+                page_token=first_page.next_page_token,
+                order_by=debt_pb2.RECEIPT_ORDER_BY_DUE_DATE,
+                order_direction=debt_pb2.RECEIPT_ORDER_DIRECTION_ASC,
+            ),
+            "member-a-token",
+        )
+        parsed = self._parse_message(debt_pb2.ReceiptsResponse, response)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(parsed.success)
+        self.assertIn("Page token does not match", parsed.message)
 
     async def test_receipts_list_orders_by_id_ascending_and_descending(self) -> None:
         asc_ids = await self._list_receipts(

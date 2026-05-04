@@ -3,6 +3,7 @@ import 'package:debt_display/state/auth_session_state.dart';
 import 'package:debt_display/state/navigation_state.dart';
 import 'package:debt_display/state/theme_state.dart';
 import 'package:debt_display/theme/app_themes.dart';
+import 'package:debt_display/ui/bills_section.dart';
 import 'package:debt_display/ui/app_shared.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -144,6 +145,11 @@ class _AppSectionsState extends State<AppSections> {
           key: const ValueKey('home'),
           isDesktop: widget.isDesktop,
         );
+      case AppDestination.bills:
+        return BillsSection(
+          key: const ValueKey('bills'),
+          isDesktop: widget.isDesktop,
+        );
       case AppDestination.profile:
         return const ProfileSection(key: ValueKey('profile'));
       case AppDestination.menu:
@@ -153,11 +159,7 @@ class _AppSectionsState extends State<AppSections> {
 }
 
 class HomeSection extends StatelessWidget {
-  const HomeSection({
-    super.key,
-    required this.isDesktop,
-    this.referenceDate,
-  });
+  const HomeSection({super.key, required this.isDesktop, this.referenceDate});
 
   final bool isDesktop;
   final DateTime? referenceDate;
@@ -239,7 +241,9 @@ class HomeSection extends StatelessWidget {
     );
     final locale = Localizations.localeOf(context);
     final materialLocalizations = MaterialLocalizations.of(context);
-    final placeholderBills = _buildPlaceholderBills(referenceDate ?? DateTime.now());
+    final placeholderBills = _buildPlaceholderBills(
+      referenceDate ?? DateTime.now(),
+    );
     final currencyFormat = NumberFormat.currency(
       locale: locale.toString(),
       symbol: '€',
@@ -273,13 +277,9 @@ class HomeSection extends StatelessWidget {
                   OutlinedButton.icon(
                     key: const ValueKey('open-bill-list-button'),
                     onPressed: () {
-                      ScaffoldMessenger.of(context)
-                        ..hideCurrentSnackBar()
-                        ..showSnackBar(
-                          const SnackBar(
-                            content: Text('Bill list placeholder coming soon.'),
-                          ),
-                        );
+                      context.read<NavigationState>().selectDestination(
+                        AppDestination.bills,
+                      );
                     },
                     icon: const Icon(Icons.receipt_long_rounded),
                     label: const Text('Open bill list'),
@@ -434,6 +434,13 @@ class MenuSection extends StatelessWidget {
             'Return to the placeholder dashboard and outstanding bill overview.',
         icon: Icons.home_rounded,
         destination: AppDestination.home,
+      ),
+      (
+        title: 'Bills',
+        body:
+            'Open the full bills view with filters, sorting, and pagination controls.',
+        icon: Icons.receipt_long_rounded,
+        destination: AppDestination.bills,
       ),
       (
         title: 'Profile',

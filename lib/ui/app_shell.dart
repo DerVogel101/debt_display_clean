@@ -518,7 +518,11 @@ class _MobileBottomNavigation extends StatelessWidget {
   const _MobileBottomNavigation();
 
   static const _blurSigma = 6.0;
-  static const _mobileDestinations = [AppDestination.home, AppDestination.menu];
+  static const _mobileDestinations = [
+    AppDestination.home,
+    AppDestination.bills,
+    AppDestination.menu,
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -528,6 +532,7 @@ class _MobileBottomNavigation extends StatelessWidget {
     final selectedDestination = switch (currentDestination) {
       AppDestination.profile => AppDestination.menu,
       AppDestination.home => AppDestination.home,
+      AppDestination.bills => AppDestination.bills,
       AppDestination.menu => AppDestination.menu,
     };
     final scheme = Theme.of(context).colorScheme;

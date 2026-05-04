@@ -18,6 +18,7 @@ class AuthSessionState extends ChangeNotifier {
   bool _isLoading = true;
   String? _backendError;
   String? _backendDisplayName;
+  int? _backendUserId;
   bool _hasStarted = false;
 
   Credentials? get credentials => _credentials;
@@ -25,6 +26,8 @@ class AuthSessionState extends ChangeNotifier {
   String? get backendError => _backendError;
   bool get isAuthenticated => _credentials != null;
   String? get userEmail => _credentials?.user.email;
+  String? get accessToken => _credentials?.accessToken;
+  int? get userId => _backendUserId;
 
   static String? resolvePersistedNameForUser(
     UserProfile? user, {
@@ -36,7 +39,9 @@ class AuthSessionState extends ChangeNotifier {
       return resolvedBackendName;
     }
 
-    final customFullName = _trimmedNonEmptyString(user?.customClaims?[claimKey]);
+    final customFullName = _trimmedNonEmptyString(
+      user?.customClaims?[claimKey],
+    );
     if (customFullName != null) {
       return customFullName;
     }
@@ -125,6 +130,7 @@ class AuthSessionState extends ChangeNotifier {
         await _refreshBackendDisplayName(credentials.accessToken);
       } else {
         _backendDisplayName = null;
+        _backendUserId = null;
       }
 
       _credentials = credentials;
@@ -182,6 +188,7 @@ class AuthSessionState extends ChangeNotifier {
     } catch (_) {
       _credentials = null;
       _backendDisplayName = null;
+      _backendUserId = null;
       _backendError = 'Your session expired. Please log in again.';
       _isLoading = false;
       notifyListeners();
@@ -196,12 +203,16 @@ class AuthSessionState extends ChangeNotifier {
         return;
       }
       _backendDisplayName = null;
+      _backendUserId = null;
       return;
     }
 
-    if (response.hasUser() && response.user.hasName()) {
-      _backendDisplayName = _trimmedNonEmptyString(response.user.name);
-      return;
+    if (response.hasUser()) {
+      _backendUserId = response.user.id.toInt();
+      if (response.user.hasName()) {
+        _backendDisplayName = _trimmedNonEmptyString(response.user.name);
+        return;
+      }
     }
 
     _backendDisplayName = null;
