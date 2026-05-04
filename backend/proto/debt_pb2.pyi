@@ -1,10 +1,44 @@
 from google.protobuf.internal import containers as _containers
+from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
 from collections.abc import Iterable as _Iterable, Mapping as _Mapping
 from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
 
 DESCRIPTOR: _descriptor.FileDescriptor
+
+class ReceiptOrderBy(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    RECEIPT_ORDER_BY_UNSPECIFIED: _ClassVar[ReceiptOrderBy]
+    RECEIPT_ORDER_BY_ID: _ClassVar[ReceiptOrderBy]
+    RECEIPT_ORDER_BY_COST_TOTAL: _ClassVar[ReceiptOrderBy]
+    RECEIPT_ORDER_BY_COST_FOR_USER: _ClassVar[ReceiptOrderBy]
+    RECEIPT_ORDER_BY_DUE_DATE: _ClassVar[ReceiptOrderBy]
+
+class ReceiptOrderDirection(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    RECEIPT_ORDER_DIRECTION_UNSPECIFIED: _ClassVar[ReceiptOrderDirection]
+    RECEIPT_ORDER_DIRECTION_ASC: _ClassVar[ReceiptOrderDirection]
+    RECEIPT_ORDER_DIRECTION_DESC: _ClassVar[ReceiptOrderDirection]
+
+class ReceiptActorFilter(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    RECEIPT_ACTOR_FILTER_UNSPECIFIED: _ClassVar[ReceiptActorFilter]
+    RECEIPT_ACTOR_FILTER_OWNER_OR_RECIPIENT_GROUP: _ClassVar[ReceiptActorFilter]
+    RECEIPT_ACTOR_FILTER_OWNER: _ClassVar[ReceiptActorFilter]
+    RECEIPT_ACTOR_FILTER_RECIPIENT_GROUP: _ClassVar[ReceiptActorFilter]
+RECEIPT_ORDER_BY_UNSPECIFIED: ReceiptOrderBy
+RECEIPT_ORDER_BY_ID: ReceiptOrderBy
+RECEIPT_ORDER_BY_COST_TOTAL: ReceiptOrderBy
+RECEIPT_ORDER_BY_COST_FOR_USER: ReceiptOrderBy
+RECEIPT_ORDER_BY_DUE_DATE: ReceiptOrderBy
+RECEIPT_ORDER_DIRECTION_UNSPECIFIED: ReceiptOrderDirection
+RECEIPT_ORDER_DIRECTION_ASC: ReceiptOrderDirection
+RECEIPT_ORDER_DIRECTION_DESC: ReceiptOrderDirection
+RECEIPT_ACTOR_FILTER_UNSPECIFIED: ReceiptActorFilter
+RECEIPT_ACTOR_FILTER_OWNER_OR_RECIPIENT_GROUP: ReceiptActorFilter
+RECEIPT_ACTOR_FILTER_OWNER: ReceiptActorFilter
+RECEIPT_ACTOR_FILTER_RECIPIENT_GROUP: ReceiptActorFilter
 
 class EmptyRequest(_message.Message):
     __slots__ = ()
@@ -333,16 +367,22 @@ class ReceiptLookupRequest(_message.Message):
     def __init__(self, receipt_id: _Optional[int] = ...) -> None: ...
 
 class ReceiptListRequest(_message.Message):
-    __slots__ = ("is_paid", "tag_ids", "cursor", "limit")
+    __slots__ = ("is_paid", "tag_ids", "cursor", "limit", "order_by", "order_direction", "actor_filter")
     IS_PAID_FIELD_NUMBER: _ClassVar[int]
     TAG_IDS_FIELD_NUMBER: _ClassVar[int]
     CURSOR_FIELD_NUMBER: _ClassVar[int]
     LIMIT_FIELD_NUMBER: _ClassVar[int]
+    ORDER_BY_FIELD_NUMBER: _ClassVar[int]
+    ORDER_DIRECTION_FIELD_NUMBER: _ClassVar[int]
+    ACTOR_FILTER_FIELD_NUMBER: _ClassVar[int]
     is_paid: bool
     tag_ids: _containers.RepeatedScalarFieldContainer[int]
     cursor: int
     limit: int
-    def __init__(self, is_paid: _Optional[bool] = ..., tag_ids: _Optional[_Iterable[int]] = ..., cursor: _Optional[int] = ..., limit: _Optional[int] = ...) -> None: ...
+    order_by: ReceiptOrderBy
+    order_direction: ReceiptOrderDirection
+    actor_filter: ReceiptActorFilter
+    def __init__(self, is_paid: _Optional[bool] = ..., tag_ids: _Optional[_Iterable[int]] = ..., cursor: _Optional[int] = ..., limit: _Optional[int] = ..., order_by: _Optional[_Union[ReceiptOrderBy, str]] = ..., order_direction: _Optional[_Union[ReceiptOrderDirection, str]] = ..., actor_filter: _Optional[_Union[ReceiptActorFilter, str]] = ...) -> None: ...
 
 class UpdateReceiptRequest(_message.Message):
     __slots__ = ("receipt_id", "title", "description", "amount_owed", "amount_paid", "due_date", "notes", "currency", "split", "clear_split")
