@@ -928,10 +928,16 @@ class _TagPill extends StatelessWidget {
 Color _parseTagColor(String value) {
   final normalized = value.trim().replaceFirst('#', '');
   if (normalized.length == 6) {
-    return Color(int.parse('FF$normalized', radix: 16));
+    final parsed = int.tryParse('FF$normalized', radix: 16);
+    if (parsed != null) {
+      return Color(parsed);
+    }
   }
   if (normalized.length == 8) {
-    return Color(int.parse(normalized, radix: 16));
+    final parsed = int.tryParse(normalized, radix: 16);
+    if (parsed != null) {
+      return Color(parsed);
+    }
   }
   return brandPrimary;
 }

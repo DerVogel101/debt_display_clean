@@ -758,6 +758,48 @@ void main() {
     expect(fakeService.requests, hasLength(1));
   });
 
+  testWidgets('bills view tolerates malformed backend tag colors', (tester) async {
+    _setTestSurfaceSize(tester, width: 430, height: 1000);
+
+    final fakeService = _FakeDebtBackendService(
+      availableTags: const [],
+      onListReceipts: (_) {
+        final response = ReceiptsResponse(success: true);
+        response.receipts.add(
+          _testReceipt(
+            id: 81,
+            title: 'Malformed tag color receipt',
+            amountOwed: 14,
+            tags: [
+              TagIndex(
+                id: Int64(8),
+                icon: '!',
+                text: 'Broken color',
+                color: 'blue',
+              ),
+            ],
+          ),
+        );
+        return response;
+      },
+    );
+
+    await tester.pumpWidget(
+      _buildBillsSectionTestApp(
+        authState: _TestAuthSessionState(
+          isAuthenticatedValue: true,
+          accessTokenValue: 'token-1',
+          userIdValue: 10,
+        ),
+        billListState: BillListState(debtBackendService: fakeService),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Malformed tag color receipt'), findsOneWidget);
+    expect(find.text('Broken color'), findsOneWidget);
+  });
+
   testWidgets('mobile profile state maps to the menu bottom-nav selection', (
     tester,
   ) async {
@@ -973,6 +1015,7 @@ Receipt _testReceipt({
   bool isPaid = false,
   int ownerId = 10,
   String? dueDate,
+  List<TagIndex> tags = const [],
 }) {
   return Receipt(
     id: Int64(id),
@@ -983,6 +1026,7 @@ Receipt _testReceipt({
     ownerId: Int64(ownerId),
     recipientName: 'Shared group',
     dueDate: dueDate,
+    tags: tags,
   );
 }
 
