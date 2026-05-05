@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:auth0_flutter/auth0_flutter.dart';
 import 'package:debt_display/generated/debt.pb.dart';
 import 'package:debt_display/state/auth_session_state.dart';
@@ -377,6 +379,106 @@ void main() {
     expect(
       find.byKey(const ValueKey('recipient-selected-member-20')),
       findsOneWidget,
+    );
+  });
+
+  test('recipient group state ignores stale user search responses', () async {
+    final searchCompleters = <String, Completer<UsersResponse>>{};
+    final fakeService = _FakeDebtBackendService(
+      onListReceipts: (_) => ReceiptsResponse(success: true),
+      onSearchUsers: (request) {
+        final completer = Completer<UsersResponse>();
+        searchCompleters[request.query] = completer;
+        return completer.future;
+      },
+    );
+    final state = RecipientGroupState(debtBackendService: fakeService)
+      ..updateAuthSession(
+        _TestAuthSessionState(
+          isAuthenticatedValue: true,
+          accessTokenValue: 'token',
+          userIdValue: 10,
+        ),
+      );
+
+    final aliSearch = state.searchUsers('Ali');
+    final bobSearch = state.searchUsers('Bob');
+
+    searchCompleters['Bob']!.complete(
+      UsersResponse(success: true)
+        ..users.add(_testUser(id: 21, name: 'Bob', email: 'bob@test.dev')),
+    );
+    await bobSearch;
+
+    expect(state.searchResults.map((user) => user.name), ['Bob']);
+
+    searchCompleters['Ali']!.complete(
+      UsersResponse(success: true)
+        ..users.add(_testUser(id: 20, name: 'Alice', email: 'alice@test.dev')),
+    );
+    await aliSearch;
+
+    expect(state.searchResults.map((user) => user.name), ['Bob']);
+  });
+
+  testWidgets('recipient group editor clears search results when reopened', (
+    tester,
+  ) async {
+    final fakeService = _FakeDebtBackendService(
+      onListReceipts: (_) => ReceiptsResponse(success: true),
+      onSearchUsers: (_) {
+        final response = UsersResponse(success: true);
+        response.users.add(
+          _testUser(id: 20, name: 'Alice', email: 'alice@test.dev'),
+        );
+        return response;
+      },
+    );
+    final navigationState = NavigationState()
+      ..selectDestination(AppDestination.recipientGroups);
+    _setTestSurfaceSize(tester, width: 430, height: 900);
+
+    await tester.pumpWidget(
+      _buildResponsiveShellTestApp(
+        authState: _TestAuthSessionState(
+          isAuthenticatedValue: true,
+          accessTokenValue: 'token',
+          userIdValue: 10,
+        ),
+        navigationState: navigationState,
+        recipientGroupState: RecipientGroupState(
+          debtBackendService: fakeService,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _tapVisible(
+      tester,
+      find.byKey(const ValueKey('recipient-groups-create-button')),
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('recipient-user-search-field')),
+      'Ali',
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('recipient-user-search-result-20')),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
+    await tester.pumpAndSettle();
+    await _tapVisible(
+      tester,
+      find.byKey(const ValueKey('recipient-groups-create-button')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('recipient-user-search-result-20')),
+      findsNothing,
     );
   });
 
@@ -1674,7 +1776,8 @@ class _FakeDebtBackendService extends DebtBackendService {
 
   final List<TagIndex> availableTags;
   final ReceiptsResponse Function(ReceiptListRequest request) onListReceipts;
-  final UsersResponse Function(UserSearchRequest request)? onSearchUsers;
+  final FutureOr<UsersResponse> Function(UserSearchRequest request)?
+  onSearchUsers;
   final ReceiptResponse Function(SetReceiptPaymentsRequest request)?
   onSetReceiptPayments;
   final bool createRecipientSucceeds;
@@ -1721,7 +1824,7 @@ class _FakeDebtBackendService extends DebtBackendService {
     final clonedRequest = request.deepCopy();
     searchRequests.add(clonedRequest);
     if (onSearchUsers != null) {
-      return onSearchUsers!(clonedRequest);
+      return await onSearchUsers!(clonedRequest);
     }
     return UsersResponse(success: true);
   }

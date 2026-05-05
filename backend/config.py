@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     FRONTEND_HTML_CACHE_SECONDS: int = 0
     FRONTEND_SHELL_CACHE_SECONDS: int = 0
 
-    # Local/demo seed data. Disable in production with GENERATE_TEST_DATA_ON_STARTUP=false.
+    # Local/demo seed data. Enable explicitly with GENERATE_TEST_DATA_ON_STARTUP=true.
     GENERATE_TEST_DATA_ON_STARTUP: bool = True
 
     # ── Server ports ──────────────────────────────────────────────────────────

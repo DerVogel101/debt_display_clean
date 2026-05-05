@@ -14,10 +14,17 @@ from sqlalchemy.orm import selectinload
 from starlette.requests import Request
 
 from backend import authorization, db, main, seed_test_data, services
-from backend.config import settings
+from backend.config import Settings, settings
 from backend.proto import debt_pb2
 from backend.proto import auth_pb2
 from backend.storage import resolve_storage_path
+
+
+class SettingsDefaultTests(unittest.TestCase):
+    def test_demo_seed_data_is_opt_in_by_default(self) -> None:
+        self.assertFalse(
+            Settings.model_fields["GENERATE_TEST_DATA_ON_STARTUP"].default
+        )
 
 
 class AsyncDatabaseTestCase(unittest.IsolatedAsyncioTestCase):

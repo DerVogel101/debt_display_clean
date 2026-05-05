@@ -25,6 +25,7 @@ class RecipientGroupState extends ChangeNotifier {
   String? _searchErrorMessage;
   List<Recipient> _groups = const [];
   List<User> _searchResults = const [];
+  int _searchGeneration = 0;
 
   bool get isAuthenticated => _isAuthenticated;
   bool get isLoadingGroups => _isLoadingGroups;
@@ -121,6 +122,7 @@ class RecipientGroupState extends ChangeNotifier {
   }
 
   Future<void> searchUsers(String query) async {
+    final searchGeneration = ++_searchGeneration;
     final trimmedQuery = query.trim();
     if (trimmedQuery.length < minSearchQueryLength) {
       _searchResults = const [];
@@ -130,6 +132,10 @@ class RecipientGroupState extends ChangeNotifier {
       return;
     }
     if (!_isAuthenticated || _accessToken == null) {
+      _searchResults = const [];
+      _searchErrorMessage = null;
+      _isSearchingUsers = false;
+      notifyListeners();
       return;
     }
 
@@ -142,6 +148,9 @@ class RecipientGroupState extends ChangeNotifier {
         _accessToken!,
         UserSearchRequest(query: trimmedQuery, limit: defaultSearchLimit),
       );
+      if (searchGeneration != _searchGeneration) {
+        return;
+      }
       if (!response.success) {
         throw StateError(response.message);
       }
@@ -152,20 +161,29 @@ class RecipientGroupState extends ChangeNotifier {
             .map((user) => user.deepCopy()),
       );
     } catch (error) {
+      if (searchGeneration != _searchGeneration) {
+        return;
+      }
       _searchResults = const [];
       _searchErrorMessage = _formatError(error);
     } finally {
-      _isSearchingUsers = false;
-      notifyListeners();
+      if (searchGeneration == _searchGeneration) {
+        _isSearchingUsers = false;
+        notifyListeners();
+      }
     }
   }
 
   void clearSearchResults() {
-    if (_searchResults.isEmpty && _searchErrorMessage == null) {
+    _searchGeneration += 1;
+    if (_searchResults.isEmpty &&
+        _searchErrorMessage == null &&
+        !_isSearchingUsers) {
       return;
     }
     _searchResults = const [];
     _searchErrorMessage = null;
+    _isSearchingUsers = false;
     notifyListeners();
   }
 
@@ -316,10 +334,12 @@ class RecipientGroupState extends ChangeNotifier {
   }
 
   void _clearLoadedData() {
+    _searchGeneration += 1;
     _markGroupsStale();
     _groups = const [];
     _searchResults = const [];
     _searchErrorMessage = null;
+    _isSearchingUsers = false;
   }
 
   String _formatError(Object error) {

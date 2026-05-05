@@ -1169,6 +1169,7 @@ Future<void> _showRecipientGroupDialog(
   Recipient? group,
 }) {
   final recipientGroupState = context.read<RecipientGroupState>();
+  recipientGroupState.clearSearchResults();
   return showDialog<void>(
     context: context,
     builder: (dialogContext) =>
