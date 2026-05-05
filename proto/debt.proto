@@ -55,12 +55,14 @@ message ReceiptRecipientShare {
   double amount = 3;
   optional string user_name = 4;
   optional string user_email = 5;
+  double amount_paid = 6;
 }
 
 message ReceiptSplit {
   double owner_share_percent = 1;
   double owner_amount = 2;
   repeated ReceiptRecipientShare recipient_shares = 3;
+  double owner_amount_paid = 4;
 }
 
 message Receipt {
@@ -157,6 +159,11 @@ message UpdateUserRequest {
   optional string avatar_url = 3;
 }
 
+message UserSearchRequest {
+  string query = 1;
+  optional int32 limit = 2;
+}
+
 message CreateRecipientRequest {
   string name = 1;
   optional string description = 2;
@@ -241,6 +248,16 @@ message UpdateReceiptRequest {
 message MarkReceiptPaidRequest {
   int64 receipt_id = 1;
   optional double amount_paid = 2;
+}
+
+message ReceiptPaymentInput {
+  optional int64 user_id = 1;
+  double amount_paid = 2;
+}
+
+message SetReceiptPaymentsRequest {
+  int64 receipt_id = 1;
+  repeated ReceiptPaymentInput payments = 2;
 }
 
 message ReceiptFileRequest {

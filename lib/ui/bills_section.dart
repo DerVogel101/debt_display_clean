@@ -266,6 +266,7 @@ class _BillsFilterCard extends StatelessWidget {
             _ControlBlock(
               label: 'Payment status',
               child: SegmentedButton<BillPaymentFilter>(
+                key: const ValueKey('bills-payment-filter-control'),
                 showSelectedIcon: false,
                 segments: BillPaymentFilter.values
                     .map(
@@ -383,7 +384,9 @@ class _BillsFilterCard extends StatelessWidget {
                     query: draftQuery,
                     isLoading: state.isLoading,
                     onChanged: (value) {
-                      onDraftChanged(draftQuery.copyWith(orderDirection: value));
+                      onDraftChanged(
+                        draftQuery.copyWith(orderDirection: value),
+                      );
                     },
                   ),
                   const SizedBox(height: 18),
@@ -677,6 +680,8 @@ class _BillReceiptTile extends StatelessWidget {
         : (receipt.hasRecipient() ? receipt.recipient.name : 'Personal bill');
     final myShare = state.myShareFor(receipt);
     final roleLabel = state.roleLabelFor(receipt);
+    final isOwner = receipt.ownerId.toInt() == state.currentUserId;
+    final amountPaid = receipt.hasAmountPaid() ? receipt.amountPaid : 0.0;
 
     return GlassPanel.secondary(
       width: double.infinity,
@@ -698,6 +703,19 @@ class _BillReceiptTile extends StatelessWidget {
                         fontWeight: FontWeight.w800,
                       ),
                     ),
+                    if (receipt.hasDescription() &&
+                        receipt.description.trim().isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        receipt.description,
+                        maxLines: 1,
+                        softWrap: false,
+                        overflow: TextOverflow.fade,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: mutedForegroundColor(context, alpha: 0.82),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 6),
                     Wrap(
                       spacing: 8,
@@ -743,9 +761,33 @@ class _BillReceiptTile extends StatelessWidget {
                 label: 'My share',
                 value: amountFormat.format(myShare),
               ),
+              _MetricText(
+                label: 'Paid',
+                value: amountFormat.format(amountPaid),
+              ),
               _MetricText(label: 'Due', value: dueLabel),
             ],
           ),
+          if (isOwner) ...[
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              key: ValueKey('receipt-payments-${receipt.id}'),
+              onPressed: state.isMutating
+                  ? null
+                  : () => _showReceiptPaymentsDialog(
+                      context,
+                      state,
+                      receipt,
+                      amountFormat,
+                    ),
+              icon: const Icon(Icons.payments_rounded),
+              label: const Text('Payments'),
+            ),
+          ],
+          if (receipt.hasSplit()) ...[
+            const SizedBox(height: 14),
+            _ReceiptSplitShareRow(receipt: receipt, amountFormat: amountFormat),
+          ],
           if (receipt.tags.isNotEmpty) ...[
             const SizedBox(height: 14),
             Wrap(
@@ -758,6 +800,298 @@ class _BillReceiptTile extends StatelessWidget {
       ),
     );
   }
+}
+
+Future<void> _showReceiptPaymentsDialog(
+  BuildContext context,
+  BillListState state,
+  Receipt receipt,
+  NumberFormat amountFormat,
+) {
+  return showDialog<void>(
+    context: context,
+    builder: (dialogContext) => _ReceiptPaymentsDialog(
+      state: state,
+      receipt: receipt,
+      amountFormat: amountFormat,
+    ),
+  );
+}
+
+class _ReceiptPaymentsDialog extends StatefulWidget {
+  const _ReceiptPaymentsDialog({
+    required this.state,
+    required this.receipt,
+    required this.amountFormat,
+  });
+
+  final BillListState state;
+  final Receipt receipt;
+  final NumberFormat amountFormat;
+
+  @override
+  State<_ReceiptPaymentsDialog> createState() => _ReceiptPaymentsDialogState();
+}
+
+class _ReceiptPaymentsDialogState extends State<_ReceiptPaymentsDialog> {
+  late final TextEditingController _ownerController;
+  late final Map<int, TextEditingController> _recipientControllers;
+  String? _errorText;
+
+  @override
+  void initState() {
+    super.initState();
+    _ownerController = TextEditingController(
+      text: _initialOwnerPaidAmount().toStringAsFixed(2),
+    );
+    _recipientControllers = {
+      for (final share
+          in widget.receipt.hasSplit()
+              ? widget.receipt.split.recipientShares
+              : <ReceiptRecipientShare>[])
+        share.userId.toInt(): TextEditingController(
+          text: share.amountPaid.toStringAsFixed(2),
+        ),
+    };
+  }
+
+  @override
+  void dispose() {
+    _ownerController.dispose();
+    for (final controller in _recipientControllers.values) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  double _initialOwnerPaidAmount() {
+    if (widget.receipt.hasSplit()) {
+      return widget.receipt.split.ownerAmountPaid;
+    }
+    return widget.receipt.hasAmountPaid() ? widget.receipt.amountPaid : 0.0;
+  }
+
+  double _ownerShareAmount() {
+    if (widget.receipt.hasSplit()) {
+      return widget.receipt.split.ownerAmount;
+    }
+    return widget.receipt.amountOwed;
+  }
+
+  Future<void> _save() async {
+    final ownerAmountPaid = _parseAmount(_ownerController.text);
+    if (ownerAmountPaid == null) {
+      setState(() {
+        _errorText = 'Enter a valid owner paid amount.';
+      });
+      return;
+    }
+
+    final recipientAmountsPaid = <int, double>{};
+    for (final entry in _recipientControllers.entries) {
+      final amount = _parseAmount(entry.value.text);
+      if (amount == null) {
+        setState(() {
+          _errorText = 'Enter valid recipient paid amounts.';
+        });
+        return;
+      }
+      recipientAmountsPaid[entry.key] = amount;
+    }
+
+    final saved = await widget.state.setReceiptPayments(
+      receipt: widget.receipt,
+      ownerAmountPaid: ownerAmountPaid,
+      recipientAmountsPaid: recipientAmountsPaid,
+    );
+    if (!mounted) {
+      return;
+    }
+    if (saved) {
+      Navigator.of(context).pop();
+      return;
+    }
+    setState(() {
+      _errorText = widget.state.errorMessage ?? 'Could not save payments.';
+    });
+  }
+
+  double? _parseAmount(String raw) {
+    final normalized = raw.trim().replaceAll(',', '.');
+    if (normalized.isEmpty) {
+      return null;
+    }
+    return double.tryParse(normalized);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final split = widget.receipt.hasSplit() ? widget.receipt.split : null;
+
+    return AlertDialog(
+      title: const Text('Payments'),
+      content: SingleChildScrollView(
+        child: SizedBox(
+          width: 420,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextField(
+                key: const ValueKey('receipt-payment-owner-field'),
+                controller: _ownerController,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: InputDecoration(
+                  labelText: 'Owner paid',
+                  helperText:
+                      'Share ${widget.amountFormat.format(_ownerShareAmount())}',
+                ),
+              ),
+              if (split != null)
+                for (final share in split.recipientShares) ...[
+                  const SizedBox(height: 14),
+                  TextField(
+                    key: ValueKey(
+                      'receipt-payment-user-${share.userId.toInt()}-field',
+                    ),
+                    controller: _recipientControllers[share.userId.toInt()]!,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: InputDecoration(
+                      labelText: '${_shareUserLabel(share)} paid',
+                      helperText:
+                          'Share ${widget.amountFormat.format(share.amount)}',
+                    ),
+                  ),
+                ],
+              if (_errorText != null) ...[
+                const SizedBox(height: 14),
+                Text(
+                  _errorText!,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.error,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: widget.state.isMutating
+              ? null
+              : () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton.icon(
+          key: const ValueKey('receipt-payment-save-button'),
+          onPressed: widget.state.isMutating ? null : _save,
+          icon: const Icon(Icons.check_rounded),
+          label: const Text('Save'),
+        ),
+      ],
+    );
+  }
+}
+
+class _ReceiptSplitShareRow extends StatelessWidget {
+  const _ReceiptSplitShareRow({
+    required this.receipt,
+    required this.amountFormat,
+  });
+
+  final Receipt receipt;
+  final NumberFormat amountFormat;
+
+  @override
+  Widget build(BuildContext context) {
+    final split = receipt.split;
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        _SplitSharePill(
+          label: 'Owner',
+          amountLabel: amountFormat.format(split.ownerAmount),
+          paidLabel: amountFormat.format(split.ownerAmountPaid),
+          percentLabel: '${split.ownerSharePercent.toStringAsFixed(0)}%',
+          icon: Icons.badge_rounded,
+        ),
+        ...split.recipientShares.map(
+          (share) => _SplitSharePill(
+            label: _shareUserLabel(share),
+            amountLabel: amountFormat.format(share.amount),
+            paidLabel: amountFormat.format(share.amountPaid),
+            percentLabel: '${share.sharePercent.toStringAsFixed(0)}%',
+            icon: Icons.person_rounded,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SplitSharePill extends StatelessWidget {
+  const _SplitSharePill({
+    required this.label,
+    required this.amountLabel,
+    required this.paidLabel,
+    required this.percentLabel,
+    required this.icon,
+  });
+
+  final String label;
+  final String amountLabel;
+  final String paidLabel;
+  final String percentLabel;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: glassSurfaceDecoration(
+        context,
+        variant: AppGlassVariant.secondary,
+        tone: brandPrimary,
+        borderRadius: const BorderRadius.all(Radius.circular(999)),
+        includeShadows: false,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: brandPrimary),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              '$label · $amountLabel · paid $paidLabel · $percentLabel',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              softWrap: false,
+              style: Theme.of(
+                context,
+              ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _shareUserLabel(ReceiptRecipientShare share) {
+  if (share.hasUserName() && share.userName.trim().isNotEmpty) {
+    return share.userName;
+  }
+  if (share.hasUserEmail() && share.userEmail.trim().isNotEmpty) {
+    return share.userEmail;
+  }
+  return 'User ${share.userId}';
 }
 
 class _ControlBlock extends StatelessWidget {

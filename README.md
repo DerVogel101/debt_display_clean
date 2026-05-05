@@ -2,16 +2,14 @@
 
 A Flutter Project used to gather recipets
 
+## Backend demo data
+
+The backend currently seeds local/demo users, recipient groups, and bills on
+startup by default because the app is not production-ready yet. Set
+`GENERATE_TEST_DATA_ON_STARTUP=false` in `backend/.env` or the process
+environment before using a database with real data.
+
 ## Getting Started
 
 This project is a starting point for a Flutter application.
 
-A few resources to get you started if this is your first Flutter project:
-
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.

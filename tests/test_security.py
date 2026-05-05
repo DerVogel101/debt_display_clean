@@ -8,15 +8,23 @@ from unittest.mock import AsyncMock, patch
 
 from fastapi import HTTPException
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.orm import selectinload
 from starlette.requests import Request
 
-from backend import authorization, db, main, services
-from backend.config import settings
+from backend import authorization, db, main, seed_test_data, services
+from backend.config import Settings, settings
 from backend.proto import debt_pb2
 from backend.proto import auth_pb2
 from backend.storage import resolve_storage_path
+
+
+class SettingsDefaultTests(unittest.TestCase):
+    def test_demo_seed_data_is_enabled_by_default_until_prod_ready(self) -> None:
+        self.assertTrue(
+            Settings.model_fields["GENERATE_TEST_DATA_ON_STARTUP"].default
+        )
 
 
 class AsyncDatabaseTestCase(unittest.IsolatedAsyncioTestCase):
@@ -360,6 +368,137 @@ class LoginHardeningTests(AsyncDatabaseTestCase):
         self.assertEqual(user.avatar_url, claims["picture"])
 
 
+class TestDataSeedTests(AsyncDatabaseTestCase):
+    async def test_seed_test_data_uses_first_user_and_is_idempotent(self) -> None:
+        first_user = await self._create_user(
+            "auth0|first",
+            "first@example.com",
+            "First User",
+        )
+
+        await seed_test_data.seed_test_data()
+        await seed_test_data.seed_test_data()
+
+        async with db.async_session_maker() as session:
+            users = await db.search_users_by_prefix(
+                session,
+                "ali",
+                exclude_user_id=0,
+            )
+            recipients = await session.execute(
+                select(db.Recipient).where(db.Recipient.name == "Demo household")
+            )
+            receipts = await session.execute(
+                select(db.Receipt)
+                .where(db.Receipt.title == "Demo rent top-up")
+                .options(selectinload(db.Receipt.recipient_shares), selectinload(db.Receipt.tags))
+            )
+            owner_zero_receipts = await session.execute(
+                select(db.Receipt)
+                .where(db.Receipt.title == "Demo team lunch reimbursement")
+                .options(selectinload(db.Receipt.recipient_shares))
+            )
+
+        self.assertEqual([user.email for user in users], ["alice.demo@example.com"])
+        recipient = recipients.scalar_one_or_none()
+        receipt = receipts.scalar_one_or_none()
+        self.assertIsNotNone(recipient)
+        self.assertIsNotNone(receipt)
+        self.assertEqual(recipient.owner_id, first_user.id)
+        self.assertEqual(receipt.owner_id, first_user.id)
+        self.assertEqual(receipt.owner_share_percent, 40.0)
+        self.assertAlmostEqual(receipt.owner_amount_paid, 170.8)
+        self.assertGreater(receipt.amount_paid, receipt.owner_amount_paid)
+        self.assertEqual(len(receipt.recipient_shares), 2)
+        self.assertEqual([(tag.icon, tag.text) for tag in receipt.tags], [("🏠", "Rent")])
+        owner_zero_receipt = owner_zero_receipts.scalar_one_or_none()
+        self.assertIsNotNone(owner_zero_receipt)
+        self.assertEqual(owner_zero_receipt.owner_id, first_user.id)
+        self.assertEqual(owner_zero_receipt.owner_share_percent, 0.0)
+        self.assertEqual(owner_zero_receipt.owner_amount_paid, 0.0)
+        self.assertEqual(len(owner_zero_receipt.recipient_shares), 2)
+
+
+class SchemaCompatibilityTests(AsyncDatabaseTestCase):
+    async def test_schema_migration_backfills_participant_payments(self) -> None:
+        async with db.engine.begin() as conn:  # type: ignore[arg-type]
+            await conn.run_sync(db.Base.metadata.drop_all)
+            await conn.execute(
+                text(
+                    "CREATE TABLE receipts ("
+                    "id INTEGER PRIMARY KEY, "
+                    "amount_owed FLOAT NOT NULL, "
+                    "amount_paid FLOAT, "
+                    "owner_share_percent FLOAT, "
+                    "is_paid BOOLEAN NOT NULL DEFAULT 0"
+                    ")"
+                )
+            )
+            await conn.execute(
+                text(
+                    "CREATE TABLE receipt_recipient_shares ("
+                    "receipt_id INTEGER NOT NULL, "
+                    "user_id INTEGER NOT NULL, "
+                    "share_percent FLOAT NOT NULL, "
+                    "PRIMARY KEY (receipt_id, user_id)"
+                    ")"
+                )
+            )
+            await conn.execute(
+                text(
+                    "INSERT INTO receipts "
+                    "(id, amount_owed, amount_paid, owner_share_percent, is_paid) "
+                    "VALUES "
+                    "(1, 100.0, 0.0, 25.0, 1), "
+                    "(2, 100.0, 50.0, 40.0, 0), "
+                    "(3, 100.0, 30.0, NULL, 0)"
+                )
+            )
+            await conn.execute(
+                text(
+                    "INSERT INTO receipt_recipient_shares "
+                    "(receipt_id, user_id, share_percent) "
+                    "VALUES (1, 20, 75.0), (2, 21, 60.0)"
+                )
+            )
+
+        await db.ensure_schema_compatible()
+
+        async with db.engine.begin() as conn:  # type: ignore[arg-type]
+            receipts = {
+                row.id: row
+                for row in (
+                    await conn.execute(
+                        text(
+                            "SELECT id, amount_paid, owner_amount_paid "
+                            "FROM receipts ORDER BY id"
+                        )
+                    )
+                ).all()
+            }
+            shares = {
+                (row.receipt_id, row.user_id): row.amount_paid
+                for row in (
+                    await conn.execute(
+                        text(
+                            "SELECT receipt_id, user_id, amount_paid "
+                            "FROM receipt_recipient_shares "
+                            "ORDER BY receipt_id, user_id"
+                        )
+                    )
+                ).all()
+            }
+
+        self.assertAlmostEqual(receipts[1].amount_paid, 100.0)
+        self.assertAlmostEqual(receipts[1].owner_amount_paid, 25.0)
+        self.assertAlmostEqual(shares[(1, 20)], 75.0)
+        self.assertAlmostEqual(receipts[2].amount_paid, 50.0)
+        self.assertAlmostEqual(receipts[2].owner_amount_paid, 20.0)
+        self.assertAlmostEqual(shares[(2, 21)], 30.0)
+        self.assertAlmostEqual(receipts[3].amount_paid, 30.0)
+        self.assertAlmostEqual(receipts[3].owner_amount_paid, 30.0)
+
+
 class ReceiptAndFileAuthorizationTests(AsyncDatabaseTestCase):
     async def asyncSetUp(self) -> None:
         await super().asyncSetUp()
@@ -577,6 +716,145 @@ class ReceiptSplitTests(AsyncDatabaseTestCase):
         self.assertEqual(
             {(share.user_id, share.share_percent) for share in receipt.recipient_shares},
             {(self.member_a.id, 30.0), (self.member_b.id, 40.0)},
+        )
+
+    async def test_set_receipt_payments_accumulates_individual_paid_amounts(self) -> None:
+        create_response = await self._post_protobuf(
+            "/api/receipts/create",
+            self._create_receipt_request_with_split(),
+            "owner-token",
+        )
+        created = self._parse_message(debt_pb2.ReceiptResponse, create_response)
+        request = debt_pb2.SetReceiptPaymentsRequest(receipt_id=created.receipt.id)
+        request.payments.add(amount_paid=15.0)
+        request.payments.add(user_id=self.member_a.id, amount_paid=20.0)
+
+        response = await self._post_protobuf(
+            "/api/receipts/set-payments",
+            request,
+            "owner-token",
+        )
+        parsed = self._parse_message(debt_pb2.ReceiptResponse, response)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(parsed.success)
+        self.assertAlmostEqual(parsed.receipt.amount_paid, 35.0)
+        self.assertAlmostEqual(parsed.receipt.split.owner_amount_paid, 15.0)
+        self.assertFalse(parsed.receipt.is_paid)
+        self.assertEqual(
+            {
+                (share.user_id, share.amount_paid)
+                for share in parsed.receipt.split.recipient_shares
+            },
+            {
+                (self.member_a.id, 20.0),
+                (self.member_b.id, 0.0),
+            },
+        )
+
+        async with db.async_session_maker() as session:
+            stored = await db.get_receipt_by_id(session, created.receipt.id)
+
+        self.assertAlmostEqual(stored.amount_paid, 35.0)
+        self.assertAlmostEqual(stored.owner_amount_paid, 15.0)
+        self.assertEqual(
+            {
+                (share.user_id, share.amount_paid)
+                for share in stored.recipient_shares
+            },
+            {
+                (self.member_a.id, 20.0),
+                (self.member_b.id, 0.0),
+            },
+        )
+
+    async def test_set_receipt_payments_rejects_non_owner_and_overpayment(self) -> None:
+        create_response = await self._post_protobuf(
+            "/api/receipts/create",
+            self._create_receipt_request_with_split(),
+            "owner-token",
+        )
+        created = self._parse_message(debt_pb2.ReceiptResponse, create_response)
+
+        member_request = debt_pb2.SetReceiptPaymentsRequest(
+            receipt_id=created.receipt.id
+        )
+        member_request.payments.add(user_id=self.member_a.id, amount_paid=1.0)
+        member_response = await self._post_protobuf(
+            "/api/receipts/set-payments",
+            member_request,
+            "member-a-token",
+        )
+        member_parsed = self._parse_message(debt_pb2.ReceiptResponse, member_response)
+
+        self.assertEqual(member_response.status_code, 403)
+        self.assertFalse(member_parsed.success)
+
+        overpay_request = debt_pb2.SetReceiptPaymentsRequest(
+            receipt_id=created.receipt.id
+        )
+        overpay_request.payments.add(user_id=self.member_a.id, amount_paid=31.0)
+        overpay_response = await self._post_protobuf(
+            "/api/receipts/set-payments",
+            overpay_request,
+            "owner-token",
+        )
+        overpay_parsed = self._parse_message(debt_pb2.ReceiptResponse, overpay_response)
+
+        self.assertEqual(overpay_response.status_code, 400)
+        self.assertFalse(overpay_parsed.success)
+        self.assertIn("cannot exceed", overpay_parsed.message)
+
+    async def test_mark_paid_and_unpaid_fill_and_clear_individual_amounts(self) -> None:
+        create_response = await self._post_protobuf(
+            "/api/receipts/create",
+            self._create_receipt_request_with_split(),
+            "owner-token",
+        )
+        created = self._parse_message(debt_pb2.ReceiptResponse, create_response)
+
+        paid_response = await self._post_protobuf(
+            "/api/receipts/mark-paid",
+            debt_pb2.MarkReceiptPaidRequest(receipt_id=created.receipt.id),
+            "owner-token",
+        )
+        paid = self._parse_message(debt_pb2.ReceiptResponse, paid_response)
+
+        self.assertEqual(paid_response.status_code, 200)
+        self.assertTrue(paid.receipt.is_paid)
+        self.assertAlmostEqual(paid.receipt.amount_paid, 100.0)
+        self.assertAlmostEqual(paid.receipt.split.owner_amount_paid, 30.0)
+        self.assertEqual(
+            {
+                (share.user_id, share.amount_paid)
+                for share in paid.receipt.split.recipient_shares
+            },
+            {
+                (self.member_a.id, 30.0),
+                (self.member_b.id, 40.0),
+            },
+        )
+
+        unpaid_response = await self._post_protobuf(
+            "/api/receipts/mark-unpaid",
+            debt_pb2.ReceiptLookupRequest(receipt_id=created.receipt.id),
+            "owner-token",
+        )
+        unpaid = self._parse_message(debt_pb2.ReceiptResponse, unpaid_response)
+
+        self.assertEqual(unpaid_response.status_code, 200)
+        self.assertFalse(unpaid.receipt.is_paid)
+        self.assertAlmostEqual(unpaid.receipt.amount_paid, 0.0)
+        self.assertAlmostEqual(unpaid.receipt.split.owner_amount_paid, 0.0)
+        self.assertEqual(
+            {
+                (share.user_id, share.amount_paid)
+                for share in unpaid.receipt.split.recipient_shares
+            },
+            {
+                (self.member_a.id, 0.0),
+                (self.member_b.id, 0.0),
+            },
         )
 
     async def test_create_receipt_rejects_split_total_not_equal_to_100(self) -> None:
@@ -974,6 +1252,87 @@ class LiveApiRegressionTests(AsyncDatabaseTestCase):
             )
             self.assertIsNone(result.scalar_one_or_none())
 
+    async def test_users_search_requires_auth(self) -> None:
+        transport = ASGITransport(app=main.app)
+        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+            response = await client.post(
+                "/api/users/search",
+                content=debt_pb2.UserSearchRequest(query="mem").SerializeToString(),
+                headers={"Content-Type": "application/x-protobuf"},
+            )
+        parsed = self._parse_message(debt_pb2.UsersResponse, response)
+
+        self.assertEqual(response.status_code, 401)
+        self.assertFalse(parsed.success)
+
+    async def test_users_search_rejects_short_query(self) -> None:
+        response = await self._post_protobuf(
+            "/api/users/search",
+            debt_pb2.UserSearchRequest(query="me"),
+            "owner-token",
+        )
+        parsed = self._parse_message(debt_pb2.UsersResponse, response)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(parsed.success)
+        self.assertIn("at least 3 characters", parsed.message)
+
+    async def test_users_search_matches_prefix_and_excludes_current_user(self) -> None:
+        async with db.async_session_maker() as session:
+            await db.get_or_create_user(
+                session=session,
+                sub="auth0|member-two",
+                email="member.two@example.com",
+                name="Member Two",
+                avatar_url=None,
+            )
+            await db.get_or_create_user(
+                session=session,
+                sub="auth0|other",
+                email="other@example.com",
+                name="Other",
+                avatar_url=None,
+            )
+            await session.commit()
+
+        response = await self._post_protobuf(
+            "/api/users/search",
+            debt_pb2.UserSearchRequest(query="mem", limit=10),
+            "owner-token",
+        )
+        parsed = self._parse_message(debt_pb2.UsersResponse, response)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(parsed.success)
+        self.assertEqual(
+            [user.email for user in parsed.users],
+            ["member@example.com", "member.two@example.com"],
+        )
+        self.assertNotIn(self.owner.id, [user.id for user in parsed.users])
+
+    async def test_users_search_respects_limit_cap(self) -> None:
+        async with db.async_session_maker() as session:
+            for index in range(12):
+                await db.get_or_create_user(
+                    session=session,
+                    sub=f"auth0|prefix-{index}",
+                    email=f"prefix-{index}@example.com",
+                    name=f"Prefix {index}",
+                    avatar_url=None,
+                )
+            await session.commit()
+
+        response = await self._post_protobuf(
+            "/api/users/search",
+            debt_pb2.UserSearchRequest(query="pre", limit=99),
+            "owner-token",
+        )
+        parsed = self._parse_message(debt_pb2.UsersResponse, response)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(parsed.success)
+        self.assertEqual(len(parsed.users), 10)
+
     async def test_receipts_get_allows_recipient_member(self) -> None:
         response = await self._post_protobuf(
             "/api/receipts/get",
@@ -1045,6 +1404,33 @@ class LiveApiRegressionTests(AsyncDatabaseTestCase):
 
         self.assertIsNotNone(stored)
         self.assertEqual(stored.original_filename, "Quarterly Report_.pdf")
+
+    async def test_recipient_member_routes_are_owner_only(self) -> None:
+        owner_response = await self._post_protobuf(
+            "/api/recipients/add-member",
+            debt_pb2.RecipientMemberRequest(
+                recipient_id=self.recipient.id,
+                user_id=self.stranger.id,
+            ),
+            "owner-token",
+        )
+        owner_parsed = self._parse_message(debt_pb2.ActionResponse, owner_response)
+
+        self.assertEqual(owner_response.status_code, 200)
+        self.assertTrue(owner_parsed.success)
+
+        member_response = await self._post_protobuf(
+            "/api/recipients/remove-member",
+            debt_pb2.RecipientMemberRequest(
+                recipient_id=self.recipient.id,
+                user_id=self.stranger.id,
+            ),
+            "member-token",
+        )
+        member_parsed = self._parse_message(debt_pb2.ActionResponse, member_response)
+
+        self.assertEqual(member_response.status_code, 403)
+        self.assertFalse(member_parsed.success)
 
 
 class ReceiptListOrderingAndFilterTests(AsyncDatabaseTestCase):

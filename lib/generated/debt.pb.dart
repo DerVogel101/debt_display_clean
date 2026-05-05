@@ -8,7 +8,7 @@
 // ignore_for_file: constant_identifier_names
 // ignore_for_file: curly_braces_in_flow_control_structures
 // ignore_for_file: deprecated_member_use_from_same_package, library_prefixes
-// ignore_for_file: non_constant_identifier_names, prefer_relative_imports
+// ignore_for_file: always_use_package_imports, non_constant_identifier_names, prefer_relative_imports
 
 import 'dart:core' as $core;
 
@@ -626,6 +626,7 @@ class ReceiptRecipientShare extends $pb.GeneratedMessage {
     $core.double? amount,
     $core.String? userName,
     $core.String? userEmail,
+    $core.double? amountPaid,
   }) {
     final result = create();
     if (userId != null) result.userId = userId;
@@ -633,6 +634,7 @@ class ReceiptRecipientShare extends $pb.GeneratedMessage {
     if (amount != null) result.amount = amount;
     if (userName != null) result.userName = userName;
     if (userEmail != null) result.userEmail = userEmail;
+    if (amountPaid != null) result.amountPaid = amountPaid;
     return result;
   }
 
@@ -654,6 +656,7 @@ class ReceiptRecipientShare extends $pb.GeneratedMessage {
     ..aD(3, _omitFieldNames ? '' : 'amount')
     ..aOS(4, _omitFieldNames ? '' : 'userName')
     ..aOS(5, _omitFieldNames ? '' : 'userEmail')
+    ..aD(6, _omitFieldNames ? '' : 'amountPaid')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -720,6 +723,15 @@ class ReceiptRecipientShare extends $pb.GeneratedMessage {
   $core.bool hasUserEmail() => $_has(4);
   @$pb.TagNumber(5)
   void clearUserEmail() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.double get amountPaid => $_getN(5);
+  @$pb.TagNumber(6)
+  set amountPaid($core.double value) => $_setDouble(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasAmountPaid() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearAmountPaid() => $_clearField(6);
 }
 
 class ReceiptSplit extends $pb.GeneratedMessage {
@@ -727,11 +739,13 @@ class ReceiptSplit extends $pb.GeneratedMessage {
     $core.double? ownerSharePercent,
     $core.double? ownerAmount,
     $core.Iterable<ReceiptRecipientShare>? recipientShares,
+    $core.double? ownerAmountPaid,
   }) {
     final result = create();
     if (ownerSharePercent != null) result.ownerSharePercent = ownerSharePercent;
     if (ownerAmount != null) result.ownerAmount = ownerAmount;
     if (recipientShares != null) result.recipientShares.addAll(recipientShares);
+    if (ownerAmountPaid != null) result.ownerAmountPaid = ownerAmountPaid;
     return result;
   }
 
@@ -752,6 +766,7 @@ class ReceiptSplit extends $pb.GeneratedMessage {
     ..aD(2, _omitFieldNames ? '' : 'ownerAmount')
     ..pPM<ReceiptRecipientShare>(3, _omitFieldNames ? '' : 'recipientShares',
         subBuilder: ReceiptRecipientShare.create)
+    ..aD(4, _omitFieldNames ? '' : 'ownerAmountPaid')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -793,6 +808,15 @@ class ReceiptSplit extends $pb.GeneratedMessage {
 
   @$pb.TagNumber(3)
   $pb.PbList<ReceiptRecipientShare> get recipientShares => $_getList(2);
+
+  @$pb.TagNumber(4)
+  $core.double get ownerAmountPaid => $_getN(3);
+  @$pb.TagNumber(4)
+  set ownerAmountPaid($core.double value) => $_setDouble(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasOwnerAmountPaid() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearOwnerAmountPaid() => $_clearField(4);
 }
 
 class Receipt extends $pb.GeneratedMessage {
@@ -1984,6 +2008,72 @@ class UpdateUserRequest extends $pb.GeneratedMessage {
   void clearAvatarUrl() => $_clearField(3);
 }
 
+class UserSearchRequest extends $pb.GeneratedMessage {
+  factory UserSearchRequest({
+    $core.String? query,
+    $core.int? limit,
+  }) {
+    final result = create();
+    if (query != null) result.query = query;
+    if (limit != null) result.limit = limit;
+    return result;
+  }
+
+  UserSearchRequest._();
+
+  factory UserSearchRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory UserSearchRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'UserSearchRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'debt'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'query')
+    ..aI(2, _omitFieldNames ? '' : 'limit')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UserSearchRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UserSearchRequest copyWith(void Function(UserSearchRequest) updates) =>
+      super.copyWith((message) => updates(message as UserSearchRequest))
+          as UserSearchRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static UserSearchRequest create() => UserSearchRequest._();
+  @$core.override
+  UserSearchRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static UserSearchRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<UserSearchRequest>(create);
+  static UserSearchRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get query => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set query($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasQuery() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearQuery() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get limit => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set limit($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasLimit() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearLimit() => $_clearField(2);
+}
+
 class CreateRecipientRequest extends $pb.GeneratedMessage {
   factory CreateRecipientRequest({
     $core.String? name,
@@ -2819,6 +2909,134 @@ class MarkReceiptPaidRequest extends $pb.GeneratedMessage {
   $core.bool hasAmountPaid() => $_has(1);
   @$pb.TagNumber(2)
   void clearAmountPaid() => $_clearField(2);
+}
+
+class ReceiptPaymentInput extends $pb.GeneratedMessage {
+  factory ReceiptPaymentInput({
+    $fixnum.Int64? userId,
+    $core.double? amountPaid,
+  }) {
+    final result = create();
+    if (userId != null) result.userId = userId;
+    if (amountPaid != null) result.amountPaid = amountPaid;
+    return result;
+  }
+
+  ReceiptPaymentInput._();
+
+  factory ReceiptPaymentInput.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ReceiptPaymentInput.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ReceiptPaymentInput',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'debt'),
+      createEmptyInstance: create)
+    ..aInt64(1, _omitFieldNames ? '' : 'userId')
+    ..aD(2, _omitFieldNames ? '' : 'amountPaid')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ReceiptPaymentInput clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ReceiptPaymentInput copyWith(void Function(ReceiptPaymentInput) updates) =>
+      super.copyWith((message) => updates(message as ReceiptPaymentInput))
+          as ReceiptPaymentInput;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ReceiptPaymentInput create() => ReceiptPaymentInput._();
+  @$core.override
+  ReceiptPaymentInput createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ReceiptPaymentInput getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ReceiptPaymentInput>(create);
+  static ReceiptPaymentInput? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get userId => $_getI64(0);
+  @$pb.TagNumber(1)
+  set userId($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasUserId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearUserId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.double get amountPaid => $_getN(1);
+  @$pb.TagNumber(2)
+  set amountPaid($core.double value) => $_setDouble(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasAmountPaid() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearAmountPaid() => $_clearField(2);
+}
+
+class SetReceiptPaymentsRequest extends $pb.GeneratedMessage {
+  factory SetReceiptPaymentsRequest({
+    $fixnum.Int64? receiptId,
+    $core.Iterable<ReceiptPaymentInput>? payments,
+  }) {
+    final result = create();
+    if (receiptId != null) result.receiptId = receiptId;
+    if (payments != null) result.payments.addAll(payments);
+    return result;
+  }
+
+  SetReceiptPaymentsRequest._();
+
+  factory SetReceiptPaymentsRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory SetReceiptPaymentsRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SetReceiptPaymentsRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'debt'),
+      createEmptyInstance: create)
+    ..aInt64(1, _omitFieldNames ? '' : 'receiptId')
+    ..pPM<ReceiptPaymentInput>(2, _omitFieldNames ? '' : 'payments',
+        subBuilder: ReceiptPaymentInput.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SetReceiptPaymentsRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SetReceiptPaymentsRequest copyWith(
+          void Function(SetReceiptPaymentsRequest) updates) =>
+      super.copyWith((message) => updates(message as SetReceiptPaymentsRequest))
+          as SetReceiptPaymentsRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static SetReceiptPaymentsRequest create() => SetReceiptPaymentsRequest._();
+  @$core.override
+  SetReceiptPaymentsRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static SetReceiptPaymentsRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<SetReceiptPaymentsRequest>(create);
+  static SetReceiptPaymentsRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get receiptId => $_getI64(0);
+  @$pb.TagNumber(1)
+  set receiptId($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasReceiptId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearReceiptId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $pb.PbList<ReceiptPaymentInput> get payments => $_getList(1);
 }
 
 class ReceiptFileRequest extends $pb.GeneratedMessage {

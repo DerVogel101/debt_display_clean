@@ -123,28 +123,32 @@ class ReceiptSplitInput(_message.Message):
     def __init__(self, owner_share_percent: _Optional[float] = ..., recipient_shares: _Optional[_Iterable[_Union[ReceiptRecipientShareInput, _Mapping]]] = ...) -> None: ...
 
 class ReceiptRecipientShare(_message.Message):
-    __slots__ = ("user_id", "share_percent", "amount", "user_name", "user_email")
+    __slots__ = ("user_id", "share_percent", "amount", "user_name", "user_email", "amount_paid")
     USER_ID_FIELD_NUMBER: _ClassVar[int]
     SHARE_PERCENT_FIELD_NUMBER: _ClassVar[int]
     AMOUNT_FIELD_NUMBER: _ClassVar[int]
     USER_NAME_FIELD_NUMBER: _ClassVar[int]
     USER_EMAIL_FIELD_NUMBER: _ClassVar[int]
+    AMOUNT_PAID_FIELD_NUMBER: _ClassVar[int]
     user_id: int
     share_percent: float
     amount: float
     user_name: str
     user_email: str
-    def __init__(self, user_id: _Optional[int] = ..., share_percent: _Optional[float] = ..., amount: _Optional[float] = ..., user_name: _Optional[str] = ..., user_email: _Optional[str] = ...) -> None: ...
+    amount_paid: float
+    def __init__(self, user_id: _Optional[int] = ..., share_percent: _Optional[float] = ..., amount: _Optional[float] = ..., user_name: _Optional[str] = ..., user_email: _Optional[str] = ..., amount_paid: _Optional[float] = ...) -> None: ...
 
 class ReceiptSplit(_message.Message):
-    __slots__ = ("owner_share_percent", "owner_amount", "recipient_shares")
+    __slots__ = ("owner_share_percent", "owner_amount", "recipient_shares", "owner_amount_paid")
     OWNER_SHARE_PERCENT_FIELD_NUMBER: _ClassVar[int]
     OWNER_AMOUNT_FIELD_NUMBER: _ClassVar[int]
     RECIPIENT_SHARES_FIELD_NUMBER: _ClassVar[int]
+    OWNER_AMOUNT_PAID_FIELD_NUMBER: _ClassVar[int]
     owner_share_percent: float
     owner_amount: float
     recipient_shares: _containers.RepeatedCompositeFieldContainer[ReceiptRecipientShare]
-    def __init__(self, owner_share_percent: _Optional[float] = ..., owner_amount: _Optional[float] = ..., recipient_shares: _Optional[_Iterable[_Union[ReceiptRecipientShare, _Mapping]]] = ...) -> None: ...
+    owner_amount_paid: float
+    def __init__(self, owner_share_percent: _Optional[float] = ..., owner_amount: _Optional[float] = ..., recipient_shares: _Optional[_Iterable[_Union[ReceiptRecipientShare, _Mapping]]] = ..., owner_amount_paid: _Optional[float] = ...) -> None: ...
 
 class Receipt(_message.Message):
     __slots__ = ("id", "title", "description", "amount_owed", "amount_paid", "due_date", "is_paid", "currency", "paid_at", "notes", "created_at", "updated_at", "owner_id", "recipient_id", "recipient_name", "recipient", "files", "tags", "split")
@@ -308,6 +312,14 @@ class UpdateUserRequest(_message.Message):
     avatar_url: str
     def __init__(self, email: _Optional[str] = ..., name: _Optional[str] = ..., avatar_url: _Optional[str] = ...) -> None: ...
 
+class UserSearchRequest(_message.Message):
+    __slots__ = ("query", "limit")
+    QUERY_FIELD_NUMBER: _ClassVar[int]
+    LIMIT_FIELD_NUMBER: _ClassVar[int]
+    query: str
+    limit: int
+    def __init__(self, query: _Optional[str] = ..., limit: _Optional[int] = ...) -> None: ...
+
 class CreateRecipientRequest(_message.Message):
     __slots__ = ("name", "description", "member_ids")
     NAME_FIELD_NUMBER: _ClassVar[int]
@@ -419,6 +431,22 @@ class MarkReceiptPaidRequest(_message.Message):
     receipt_id: int
     amount_paid: float
     def __init__(self, receipt_id: _Optional[int] = ..., amount_paid: _Optional[float] = ...) -> None: ...
+
+class ReceiptPaymentInput(_message.Message):
+    __slots__ = ("user_id", "amount_paid")
+    USER_ID_FIELD_NUMBER: _ClassVar[int]
+    AMOUNT_PAID_FIELD_NUMBER: _ClassVar[int]
+    user_id: int
+    amount_paid: float
+    def __init__(self, user_id: _Optional[int] = ..., amount_paid: _Optional[float] = ...) -> None: ...
+
+class SetReceiptPaymentsRequest(_message.Message):
+    __slots__ = ("receipt_id", "payments")
+    RECEIPT_ID_FIELD_NUMBER: _ClassVar[int]
+    PAYMENTS_FIELD_NUMBER: _ClassVar[int]
+    receipt_id: int
+    payments: _containers.RepeatedCompositeFieldContainer[ReceiptPaymentInput]
+    def __init__(self, receipt_id: _Optional[int] = ..., payments: _Optional[_Iterable[_Union[ReceiptPaymentInput, _Mapping]]] = ...) -> None: ...
 
 class ReceiptFileRequest(_message.Message):
     __slots__ = ("receipt_id", "original_filename", "content_type", "size_bytes", "sha256")

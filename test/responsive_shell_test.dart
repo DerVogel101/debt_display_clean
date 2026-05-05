@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:auth0_flutter/auth0_flutter.dart';
 import 'package:debt_display/generated/debt.pb.dart';
 import 'package:debt_display/state/auth_session_state.dart';
 import 'package:debt_display/state/bill_list_state.dart';
 import 'package:debt_display/state/navigation_state.dart';
+import 'package:debt_display/state/recipient_group_state.dart';
 import 'package:debt_display/state/theme_state.dart';
 import 'package:debt_display/theme/app_themes.dart';
 import 'package:debt_display/ui/app_sections.dart';
@@ -205,6 +208,458 @@ void main() {
     expect(navigationState.selectedDestination, AppDestination.bills);
   });
 
+  testWidgets('menu section opens recipient group management', (tester) async {
+    final navigationState = NavigationState()
+      ..selectDestination(AppDestination.menu);
+    _setTestSurfaceSize(tester, width: 430, height: 900);
+
+    await tester.pumpWidget(
+      _buildResponsiveShellTestApp(
+        authState: _TestAuthSessionState(),
+        navigationState: navigationState,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _tapVisible(
+      tester,
+      find.text(
+        'Create shared recipient groups and manage who can receive split bills.',
+      ),
+    );
+
+    expect(navigationState.selectedDestination, AppDestination.recipientGroups);
+  });
+
+  testWidgets('desktop burger menu includes recipient groups destination', (
+    tester,
+  ) async {
+    final navigationState = NavigationState();
+    _setTestSurfaceSize(tester, width: 1000, height: 900);
+
+    await tester.pumpWidget(
+      _buildResponsiveShellTestApp(
+        authState: _TestAuthSessionState(),
+        navigationState: navigationState,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Open navigation'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Recipient groups'));
+    await tester.pumpAndSettle();
+
+    expect(navigationState.selectedDestination, AppDestination.recipientGroups);
+  });
+
+  testWidgets('menu recipient groups card shows login action when logged out', (
+    tester,
+  ) async {
+    final authState = _TestAuthSessionState();
+    final navigationState = NavigationState()
+      ..selectDestination(AppDestination.recipientGroups);
+    _setTestSurfaceSize(tester, width: 430, height: 900);
+
+    await tester.pumpWidget(
+      _buildResponsiveShellTestApp(
+        authState: authState,
+        navigationState: navigationState,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Recipient groups'), findsWidgets);
+    await _tapVisible(
+      tester,
+      find.byKey(const ValueKey('recipient-groups-login-button')),
+    );
+
+    expect(authState.loginCalls, 1);
+  });
+
+  testWidgets('authenticated menu loads recipient groups', (tester) async {
+    final fakeService = _FakeDebtBackendService(
+      onListReceipts: (_) => ReceiptsResponse(success: true),
+      recipients: [
+        _testRecipient(
+          id: 77,
+          name: 'Roommates',
+          ownerId: 10,
+          members: [_testUser(id: 20, name: 'Alice', email: 'alice@test.dev')],
+        ),
+      ],
+    );
+    final navigationState = NavigationState()
+      ..selectDestination(AppDestination.recipientGroups);
+    _setTestSurfaceSize(tester, width: 430, height: 900);
+
+    await tester.pumpWidget(
+      _buildResponsiveShellTestApp(
+        authState: _TestAuthSessionState(
+          isAuthenticatedValue: true,
+          accessTokenValue: 'token',
+          userIdValue: 10,
+        ),
+        navigationState: navigationState,
+        recipientGroupState: RecipientGroupState(
+          debtBackendService: fakeService,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(fakeService.listRecipientsCalls, 1);
+    expect(find.text('Roommates'), findsOneWidget);
+    expect(find.text('Alice'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('recipient-group-edit-77')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('recipient user search waits for three characters', (
+    tester,
+  ) async {
+    final fakeService = _FakeDebtBackendService(
+      onListReceipts: (_) => ReceiptsResponse(success: true),
+      onSearchUsers: (_) {
+        final response = UsersResponse(success: true);
+        response.users.add(
+          _testUser(id: 20, name: 'Alice', email: 'alice@test.dev'),
+        );
+        return response;
+      },
+    );
+    final navigationState = NavigationState()
+      ..selectDestination(AppDestination.recipientGroups);
+    _setTestSurfaceSize(tester, width: 430, height: 900);
+
+    await tester.pumpWidget(
+      _buildResponsiveShellTestApp(
+        authState: _TestAuthSessionState(
+          isAuthenticatedValue: true,
+          accessTokenValue: 'token',
+          userIdValue: 10,
+        ),
+        navigationState: navigationState,
+        recipientGroupState: RecipientGroupState(
+          debtBackendService: fakeService,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _tapVisible(
+      tester,
+      find.byKey(const ValueKey('recipient-groups-create-button')),
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('recipient-user-search-field')),
+      'Al',
+    );
+    await tester.pumpAndSettle();
+
+    expect(fakeService.searchRequests, isEmpty);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('recipient-user-search-field')),
+      'Ali',
+    );
+    await tester.pumpAndSettle();
+
+    expect(fakeService.searchRequests.single.query, 'Ali');
+    expect(
+      find.byKey(const ValueKey('recipient-user-search-result-20')),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const ValueKey('recipient-user-add-20')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('recipient-selected-member-20')),
+      findsOneWidget,
+    );
+  });
+
+  test('recipient group state ignores stale user search responses', () async {
+    final searchCompleters = <String, Completer<UsersResponse>>{};
+    final fakeService = _FakeDebtBackendService(
+      onListReceipts: (_) => ReceiptsResponse(success: true),
+      onSearchUsers: (request) {
+        final completer = Completer<UsersResponse>();
+        searchCompleters[request.query] = completer;
+        return completer.future;
+      },
+    );
+    final state = RecipientGroupState(debtBackendService: fakeService)
+      ..updateAuthSession(
+        _TestAuthSessionState(
+          isAuthenticatedValue: true,
+          accessTokenValue: 'token',
+          userIdValue: 10,
+        ),
+      );
+
+    final aliSearch = state.searchUsers('Ali');
+    final bobSearch = state.searchUsers('Bob');
+
+    searchCompleters['Bob']!.complete(
+      UsersResponse(success: true)
+        ..users.add(_testUser(id: 21, name: 'Bob', email: 'bob@test.dev')),
+    );
+    await bobSearch;
+
+    expect(state.searchResults.map((user) => user.name), ['Bob']);
+
+    searchCompleters['Ali']!.complete(
+      UsersResponse(success: true)
+        ..users.add(_testUser(id: 20, name: 'Alice', email: 'alice@test.dev')),
+    );
+    await aliSearch;
+
+    expect(state.searchResults.map((user) => user.name), ['Bob']);
+  });
+
+  testWidgets('recipient group editor clears search results when reopened', (
+    tester,
+  ) async {
+    final fakeService = _FakeDebtBackendService(
+      onListReceipts: (_) => ReceiptsResponse(success: true),
+      onSearchUsers: (_) {
+        final response = UsersResponse(success: true);
+        response.users.add(
+          _testUser(id: 20, name: 'Alice', email: 'alice@test.dev'),
+        );
+        return response;
+      },
+    );
+    final navigationState = NavigationState()
+      ..selectDestination(AppDestination.recipientGroups);
+    _setTestSurfaceSize(tester, width: 430, height: 900);
+
+    await tester.pumpWidget(
+      _buildResponsiveShellTestApp(
+        authState: _TestAuthSessionState(
+          isAuthenticatedValue: true,
+          accessTokenValue: 'token',
+          userIdValue: 10,
+        ),
+        navigationState: navigationState,
+        recipientGroupState: RecipientGroupState(
+          debtBackendService: fakeService,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _tapVisible(
+      tester,
+      find.byKey(const ValueKey('recipient-groups-create-button')),
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('recipient-user-search-field')),
+      'Ali',
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('recipient-user-search-result-20')),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
+    await tester.pumpAndSettle();
+    await _tapVisible(
+      tester,
+      find.byKey(const ValueKey('recipient-groups-create-button')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('recipient-user-search-result-20')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('recipient group create sends selected members', (tester) async {
+    final fakeService = _FakeDebtBackendService(
+      onListReceipts: (_) => ReceiptsResponse(success: true),
+      onSearchUsers: (_) {
+        final response = UsersResponse(success: true);
+        response.users.add(
+          _testUser(id: 20, name: 'Alice', email: 'alice@test.dev'),
+        );
+        return response;
+      },
+    );
+    final navigationState = NavigationState()
+      ..selectDestination(AppDestination.recipientGroups);
+    _setTestSurfaceSize(tester, width: 430, height: 900);
+
+    await tester.pumpWidget(
+      _buildResponsiveShellTestApp(
+        authState: _TestAuthSessionState(
+          isAuthenticatedValue: true,
+          accessTokenValue: 'token',
+          userIdValue: 10,
+        ),
+        navigationState: navigationState,
+        recipientGroupState: RecipientGroupState(
+          debtBackendService: fakeService,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _tapVisible(
+      tester,
+      find.byKey(const ValueKey('recipient-groups-create-button')),
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('recipient-group-name-field')),
+      'Trip crew',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('recipient-group-description-field')),
+      'Weekend expenses',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('recipient-user-search-field')),
+      'Ali',
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('recipient-user-add-20')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('recipient-group-save-button')));
+    await tester.pumpAndSettle();
+
+    expect(fakeService.createRecipientRequests, hasLength(1));
+    final request = fakeService.createRecipientRequests.single;
+    expect(request.name, 'Trip crew');
+    expect(request.description, 'Weekend expenses');
+    expect(request.memberIds.map((id) => id.toInt()), [20]);
+    expect(find.text('Trip crew'), findsOneWidget);
+  });
+
+  testWidgets('recipient group edit removes member and delete confirms', (
+    tester,
+  ) async {
+    final fakeService = _FakeDebtBackendService(
+      onListReceipts: (_) => ReceiptsResponse(success: true),
+      recipients: [
+        _testRecipient(
+          id: 77,
+          name: 'Roommates',
+          ownerId: 10,
+          members: [
+            _testUser(id: 20, name: 'Alice', email: 'alice@test.dev'),
+            _testUser(id: 21, name: 'Bob', email: 'bob@test.dev'),
+          ],
+        ),
+      ],
+    );
+    final navigationState = NavigationState()
+      ..selectDestination(AppDestination.recipientGroups);
+    _setTestSurfaceSize(tester, width: 430, height: 1000);
+
+    await tester.pumpWidget(
+      _buildResponsiveShellTestApp(
+        authState: _TestAuthSessionState(
+          isAuthenticatedValue: true,
+          accessTokenValue: 'token',
+          userIdValue: 10,
+        ),
+        navigationState: navigationState,
+        recipientGroupState: RecipientGroupState(
+          debtBackendService: fakeService,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _tapVisible(
+      tester,
+      find.byKey(const ValueKey('recipient-group-edit-77')),
+    );
+    await _tapVisible(
+      tester,
+      find.byKey(const ValueKey('recipient-selected-member-remove-20')),
+    );
+    await tester.tap(find.byKey(const ValueKey('recipient-group-save-button')));
+    await tester.pumpAndSettle();
+
+    expect(fakeService.updateRecipientRequests, hasLength(1));
+    expect(fakeService.removeMemberRequests.single.userId.toInt(), 20);
+
+    await _tapVisible(
+      tester,
+      find.byKey(const ValueKey('recipient-group-delete-77')),
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('recipient-group-confirm-delete-button')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(fakeService.deleteRecipientRequests.single.recipientId.toInt(), 77);
+    expect(find.text('Roommates'), findsNothing);
+  });
+
+  test('recipient group state clears data on auth change', () async {
+    final fakeService = _FakeDebtBackendService(
+      onListReceipts: (_) => ReceiptsResponse(success: true),
+      recipients: [_testRecipient(id: 77, name: 'Roommates', ownerId: 10)],
+    );
+    final authState = _TestAuthSessionState(
+      isAuthenticatedValue: true,
+      accessTokenValue: 'token',
+      userIdValue: 10,
+    );
+    final state = RecipientGroupState(debtBackendService: fakeService)
+      ..updateAuthSession(authState);
+
+    await state.ensureLoaded();
+    expect(state.groups, hasLength(1));
+
+    authState.updateSession(
+      isAuthenticated: false,
+      accessToken: null,
+      userId: null,
+    );
+    state.updateAuthSession(authState);
+
+    expect(state.groups, isEmpty);
+    expect(state.errorMessage, isNull);
+  });
+
+  test('recipient group state keeps list when create fails', () async {
+    final fakeService = _FakeDebtBackendService(
+      onListReceipts: (_) => ReceiptsResponse(success: true),
+      recipients: [_testRecipient(id: 77, name: 'Roommates', ownerId: 10)],
+      createRecipientSucceeds: false,
+      mutationErrorMessage: 'Create failed',
+    );
+    final state = RecipientGroupState(debtBackendService: fakeService)
+      ..updateAuthSession(
+        _TestAuthSessionState(
+          isAuthenticatedValue: true,
+          accessTokenValue: 'token',
+          userIdValue: 10,
+        ),
+      );
+
+    await state.ensureLoaded();
+    final saved = await state.saveGroup(
+      name: 'Trip crew',
+      description: '',
+      memberIds: const [],
+    );
+
+    expect(saved, isFalse);
+    expect(state.groups.single.name, 'Roommates');
+    expect(state.errorMessage, 'Create failed');
+  });
+
   testWidgets('bills view shows login prompt when unauthenticated', (
     tester,
   ) async {
@@ -257,6 +712,176 @@ void main() {
     expect(fakeService.requests, hasLength(1));
   });
 
+  testWidgets(
+    'bills view shows description, tags, shares, and my split amount',
+    (tester) async {
+      _setTestSurfaceSize(tester, width: 430, height: 1000);
+
+      final fakeService = _FakeDebtBackendService(
+        availableTags: const [],
+        onListReceipts: (_) {
+          final response = ReceiptsResponse(success: true);
+          response.receipts.add(
+            _testReceipt(
+              id: 42,
+              title: 'Shared split receipt',
+              description: 'One-line subtitle that fades when space is tight',
+              amountOwed: 100,
+              amountPaid: 55,
+              tags: [
+                TagIndex(
+                  id: Int64(1),
+                  icon: '🏠',
+                  text: 'Home',
+                  color: '#FFB74D',
+                ),
+              ],
+              split: ReceiptSplit(
+                ownerSharePercent: 40,
+                ownerAmount: 40,
+                ownerAmountPaid: 25,
+                recipientShares: [
+                  ReceiptRecipientShare(
+                    userId: Int64(20),
+                    sharePercent: 60,
+                    amount: 60,
+                    amountPaid: 30,
+                    userName: 'Alice',
+                    userEmail: 'alice@test.dev',
+                  ),
+                ],
+              ),
+            ),
+          );
+          return response;
+        },
+      );
+
+      await tester.pumpWidget(
+        _buildBillsSectionTestApp(
+          authState: _TestAuthSessionState(
+            isAuthenticatedValue: true,
+            accessTokenValue: 'token-1',
+            userIdValue: 10,
+          ),
+          billListState: BillListState(debtBackendService: fakeService),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('One-line subtitle that fades when space is tight'),
+        findsOneWidget,
+      );
+      expect(find.text('🏠'), findsOneWidget);
+      expect(find.text('Home'), findsOneWidget);
+      expect(find.textContaining('Alice'), findsOneWidget);
+      expect(find.textContaining('60%'), findsOneWidget);
+      expect(find.text('Paid'), findsWidgets);
+      expect(
+        find.text(_formatExpectedCurrency(55, const Locale('en', 'US'))),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining(
+          'paid ${_formatExpectedCurrency(30, const Locale('en', 'US'))}',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.text(_formatExpectedCurrency(40, const Locale('en', 'US'))),
+        findsWidgets,
+      );
+    },
+  );
+
+  testWidgets('owner payment edit flow updates paid amount in bills view', (
+    tester,
+  ) async {
+    _setTestSurfaceSize(tester, width: 430, height: 1000);
+
+    var receipt = _testReceipt(
+      id: 43,
+      title: 'Editable split receipt',
+      amountOwed: 100,
+      amountPaid: 10,
+      split: ReceiptSplit(
+        ownerSharePercent: 40,
+        ownerAmount: 40,
+        ownerAmountPaid: 10,
+        recipientShares: [
+          ReceiptRecipientShare(
+            userId: Int64(20),
+            sharePercent: 60,
+            amount: 60,
+            amountPaid: 0,
+            userName: 'Alice',
+            userEmail: 'alice@test.dev',
+          ),
+        ],
+      ),
+    );
+    final fakeService = _FakeDebtBackendService(
+      availableTags: const [],
+      onListReceipts: (_) {
+        final response = ReceiptsResponse(success: true);
+        response.receipts.add(receipt.deepCopy());
+        return response;
+      },
+      onSetReceiptPayments: (request) {
+        final ownerPayment = request.payments.firstWhere(
+          (payment) => !payment.hasUserId(),
+        );
+        final alicePayment = request.payments.firstWhere(
+          (payment) => payment.userId.toInt() == 20,
+        );
+        receipt = receipt.deepCopy()
+          ..amountPaid = ownerPayment.amountPaid + alicePayment.amountPaid
+          ..split.ownerAmountPaid = ownerPayment.amountPaid
+          ..split.recipientShares[0].amountPaid = alicePayment.amountPaid;
+        return ReceiptResponse(success: true, receipt: receipt.deepCopy());
+      },
+    );
+
+    await tester.pumpWidget(
+      _buildBillsSectionTestApp(
+        authState: _TestAuthSessionState(
+          isAuthenticatedValue: true,
+          accessTokenValue: 'token-1',
+          userIdValue: 10,
+        ),
+        billListState: BillListState(debtBackendService: fakeService),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('receipt-payments-43')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('receipt-payment-owner-field')),
+      '25',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('receipt-payment-user-20-field')),
+      '30',
+    );
+    await tester.tap(find.byKey(const ValueKey('receipt-payment-save-button')));
+    await tester.pumpAndSettle();
+
+    expect(fakeService.setPaymentRequests, hasLength(1));
+    expect(fakeService.setPaymentRequests.single.receiptId.toInt(), 43);
+    expect(
+      find.text(_formatExpectedCurrency(55, const Locale('en', 'US'))),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'paid ${_formatExpectedCurrency(30, const Locale('en', 'US'))}',
+      ),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('bills filters are collapsed by default and toggle open/closed', (
     tester,
   ) async {
@@ -279,93 +904,116 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('bills-filters-toggle-button')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('bills-filters-toggle-button')),
+      findsOneWidget,
+    );
     expect(find.text('Role'), findsNothing);
-    expect(find.byKey(const ValueKey('bills-apply-filters-button')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('bills-apply-filters-button')),
+      findsNothing,
+    );
 
     await _toggleBillsFilters(tester);
     expect(find.text('Role'), findsOneWidget);
-    expect(find.byKey(const ValueKey('bills-apply-filters-button')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('bills-apply-filters-button')),
+      findsOneWidget,
+    );
 
     await _toggleBillsFilters(tester);
     expect(find.text('Role'), findsNothing);
-    expect(find.byKey(const ValueKey('bills-apply-filters-button')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('bills-apply-filters-button')),
+      findsNothing,
+    );
   });
 
-  testWidgets('bills draft changes wait for apply and reset pagination to page 1', (
-    tester,
-  ) async {
-    _setTestSurfaceSize(tester, width: 430, height: 1000);
+  testWidgets(
+    'bills draft changes wait for apply and reset pagination to page 1',
+    (tester) async {
+      _setTestSurfaceSize(tester, width: 430, height: 1000);
 
-    final fakeService = _FakeDebtBackendService(
-      availableTags: const [],
-      onListReceipts: (request) {
-        final response = ReceiptsResponse(success: true);
-        if (request.hasIsPaid() && request.isPaid) {
+      final fakeService = _FakeDebtBackendService(
+        availableTags: const [],
+        onListReceipts: (request) {
+          final response = ReceiptsResponse(success: true);
+          if (request.hasIsPaid() && request.isPaid) {
+            response.receipts.add(
+              _testReceipt(
+                id: 91,
+                title: 'Paid only',
+                amountOwed: 12,
+                isPaid: true,
+              ),
+            );
+            return response;
+          }
+          if (request.hasPageToken() && request.pageToken == 'page-2') {
+            response.receipts.add(
+              _testReceipt(id: 2, title: 'Page 2 receipt', amountOwed: 24),
+            );
+            return response;
+          }
           response.receipts.add(
-            _testReceipt(
-              id: 91,
-              title: 'Paid only',
-              amountOwed: 12,
-              isPaid: true,
-            ),
+            _testReceipt(id: 1, title: 'Page 1 receipt', amountOwed: 18),
           );
+          response.nextPageToken = 'page-2';
           return response;
-        }
-        if (request.hasPageToken() && request.pageToken == 'page-2') {
-          response.receipts.add(
-            _testReceipt(id: 2, title: 'Page 2 receipt', amountOwed: 24),
-          );
-          return response;
-        }
-        response.receipts.add(
-          _testReceipt(id: 1, title: 'Page 1 receipt', amountOwed: 18),
-        );
-        response.nextPageToken = 'page-2';
-        return response;
-      },
-    );
-    final billListState = BillListState(debtBackendService: fakeService);
+        },
+      );
+      final billListState = BillListState(debtBackendService: fakeService);
 
-    await tester.pumpWidget(
-      _buildBillsSectionTestApp(
-        authState: _TestAuthSessionState(
-          isAuthenticatedValue: true,
-          accessTokenValue: 'token-1',
-          userIdValue: 10,
+      await tester.pumpWidget(
+        _buildBillsSectionTestApp(
+          authState: _TestAuthSessionState(
+            isAuthenticatedValue: true,
+            accessTokenValue: 'token-1',
+            userIdValue: 10,
+          ),
+          billListState: billListState,
         ),
-        billListState: billListState,
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.text('Page 1 receipt'), findsOneWidget);
-    expect(find.byKey(const ValueKey('bills-page-indicator')), findsOneWidget);
-    expect(find.text('Page 1'), findsOneWidget);
+      expect(find.text('Page 1 receipt'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('bills-page-indicator')),
+        findsOneWidget,
+      );
+      expect(find.text('Page 1'), findsOneWidget);
 
-    await tester.tap(find.byKey(const ValueKey('bills-page-next-button')));
-    await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('bills-page-next-button')));
+      await tester.pumpAndSettle();
 
-    expect(find.text('Page 2 receipt'), findsOneWidget);
-    expect(find.text('Page 2'), findsOneWidget);
-    expect(fakeService.requests, hasLength(2));
+      expect(find.text('Page 2 receipt'), findsOneWidget);
+      expect(find.text('Page 2'), findsOneWidget);
+      expect(fakeService.requests, hasLength(2));
 
-    await _toggleBillsFilters(tester);
-    await tester.tap(find.text('Paid'));
-    await tester.pumpAndSettle();
+      await _toggleBillsFilters(tester);
+      await tester.tap(
+        find.descendant(
+          of: find.byKey(const ValueKey('bills-payment-filter-control')),
+          matching: find.text('Paid'),
+        ),
+      );
+      await tester.pumpAndSettle();
 
-    expect(fakeService.requests, hasLength(2));
-    expect(find.text('Page 2'), findsOneWidget);
+      expect(fakeService.requests, hasLength(2));
+      expect(find.text('Page 2'), findsOneWidget);
 
-    await tester.tap(find.byKey(const ValueKey('bills-apply-filters-button')));
-    await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('bills-apply-filters-button')),
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.text('Paid only'), findsOneWidget);
-    expect(find.text('Page 1'), findsOneWidget);
-    expect(fakeService.requests.last.hasPageToken(), isFalse);
-    expect(fakeService.requests.last.hasIsPaid(), isTrue);
-    expect(fakeService.requests.last.isPaid, isTrue);
-  });
+      expect(find.text('Paid only'), findsOneWidget);
+      expect(find.text('Page 1'), findsOneWidget);
+      expect(fakeService.requests.last.hasPageToken(), isFalse);
+      expect(fakeService.requests.last.hasIsPaid(), isTrue);
+      expect(fakeService.requests.last.isPaid, isTrue);
+    },
+  );
 
   testWidgets('bills auth refresh keeps active filters when user id arrives', (
     tester,
@@ -374,21 +1022,12 @@ void main() {
 
     final fakeService = _FakeDebtBackendService(
       availableTags: [
-        TagIndex(
-          id: Int64(5),
-          icon: 'u',
-          text: 'Utilities',
-          color: '#123456',
-        ),
+        TagIndex(id: Int64(5), icon: 'u', text: 'Utilities', color: '#123456'),
       ],
       onListReceipts: (request) {
         final response = ReceiptsResponse(success: true);
         response.receipts.add(
-          _testReceipt(
-            id: 51,
-            title: 'Filtered receipt',
-            amountOwed: 19,
-          ),
+          _testReceipt(id: 51, title: 'Filtered receipt', amountOwed: 19),
         );
         return response;
       },
@@ -442,12 +1081,7 @@ void main() {
 
     final fakeService = _FakeDebtBackendService(
       availableTags: [
-        TagIndex(
-          id: Int64(5),
-          icon: 'u',
-          text: 'Utilities',
-          color: '#123456',
-        ),
+        TagIndex(id: Int64(5), icon: 'u', text: 'Utilities', color: '#123456'),
       ],
       onListReceipts: (request) {
         final response = ReceiptsResponse(success: true);
@@ -490,7 +1124,9 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('bills-apply-filters-button')));
     await tester.pumpAndSettle();
 
-    await tester.ensureVisible(find.byKey(const ValueKey('bills-page-next-button')));
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('bills-page-next-button')),
+    );
     await tester.tap(find.byKey(const ValueKey('bills-page-next-button')));
     await tester.pumpAndSettle();
 
@@ -525,7 +1161,11 @@ void main() {
       onListReceipts: (_) {
         final response = ReceiptsResponse(success: true);
         response.receipts.add(
-          _testReceipt(id: 72, title: 'Applied default receipt', amountOwed: 27),
+          _testReceipt(
+            id: 72,
+            title: 'Applied default receipt',
+            amountOwed: 27,
+          ),
         );
         return response;
       },
@@ -684,81 +1324,86 @@ void main() {
     expect(find.text('Due page 2'), findsOneWidget);
   });
 
-  testWidgets('bills draft reset restores controls without triggering a request', (tester) async {
-    _setTestSurfaceSize(tester, width: 430, height: 1000);
+  testWidgets(
+    'bills draft reset restores controls without triggering a request',
+    (tester) async {
+      _setTestSurfaceSize(tester, width: 430, height: 1000);
 
-    final fakeService = _FakeDebtBackendService(
-      availableTags: const [],
-      onListReceipts: (request) {
-        final response = ReceiptsResponse(success: true);
-        response.receipts.add(
-          _testReceipt(id: 71, title: 'Reset candidate', amountOwed: 27),
-        );
-        return response;
-      },
-    );
+      final fakeService = _FakeDebtBackendService(
+        availableTags: const [],
+        onListReceipts: (request) {
+          final response = ReceiptsResponse(success: true);
+          response.receipts.add(
+            _testReceipt(id: 71, title: 'Reset candidate', amountOwed: 27),
+          );
+          return response;
+        },
+      );
 
-    await tester.pumpWidget(
-      _buildBillsSectionTestApp(
-        authState: _TestAuthSessionState(
-          isAuthenticatedValue: true,
-          accessTokenValue: 'token-1',
-          userIdValue: 10,
+      await tester.pumpWidget(
+        _buildBillsSectionTestApp(
+          authState: _TestAuthSessionState(
+            isAuthenticatedValue: true,
+            accessTokenValue: 'token-1',
+            userIdValue: 10,
+          ),
+          billListState: BillListState(debtBackendService: fakeService),
         ),
-        billListState: BillListState(debtBackendService: fakeService),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    await _toggleBillsFilters(tester);
-    await _selectDropdownItem(
-      tester,
-      const ValueKey('bills-sort-dropdown'),
-      'Total',
-    );
-    await _selectDropdownItem(
-      tester,
-      const ValueKey('bills-page-size-dropdown'),
-      '50',
-    );
-    expect(fakeService.requests, hasLength(1));
+      await _toggleBillsFilters(tester);
+      await _selectDropdownItem(
+        tester,
+        const ValueKey('bills-sort-dropdown'),
+        'Total',
+      );
+      await _selectDropdownItem(
+        tester,
+        const ValueKey('bills-page-size-dropdown'),
+        '50',
+      );
+      expect(fakeService.requests, hasLength(1));
 
-    expect(
-      find.descendant(
-        of: find.byKey(const ValueKey('bills-sort-dropdown')),
-        matching: find.text('Total'),
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(
-        of: find.byKey(const ValueKey('bills-page-size-dropdown')),
-        matching: find.text('50'),
-      ),
-      findsOneWidget,
-    );
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('bills-sort-dropdown')),
+          matching: find.text('Total'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('bills-page-size-dropdown')),
+          matching: find.text('50'),
+        ),
+        findsOneWidget,
+      );
 
-    await tester.tap(find.byKey(const ValueKey('bills-draft-reset-button')));
-    await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('bills-draft-reset-button')));
+      await tester.pumpAndSettle();
 
-    expect(
-      find.descendant(
-        of: find.byKey(const ValueKey('bills-sort-dropdown')),
-        matching: find.text('ID'),
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(
-        of: find.byKey(const ValueKey('bills-page-size-dropdown')),
-        matching: find.text('20'),
-      ),
-      findsOneWidget,
-    );
-    expect(fakeService.requests, hasLength(1));
-  });
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('bills-sort-dropdown')),
+          matching: find.text('ID'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('bills-page-size-dropdown')),
+          matching: find.text('20'),
+        ),
+        findsOneWidget,
+      );
+      expect(fakeService.requests, hasLength(1));
+    },
+  );
 
-  testWidgets('bills view tolerates malformed backend tag colors', (tester) async {
+  testWidgets('bills view tolerates malformed backend tag colors', (
+    tester,
+  ) async {
     _setTestSurfaceSize(tester, width: 430, height: 1000);
 
     final fakeService = _FakeDebtBackendService(
@@ -822,6 +1467,29 @@ void main() {
     expect(navigationBar.selectedIndex, 2);
   });
 
+  testWidgets(
+    'mobile recipient groups state maps to the menu bottom-nav selection',
+    (tester) async {
+      final navigationState = NavigationState()
+        ..selectDestination(AppDestination.recipientGroups);
+      _setTestSurfaceSize(tester, width: 430, height: 900);
+
+      await tester.pumpWidget(
+        _buildResponsiveShellTestApp(
+          authState: _TestAuthSessionState(),
+          navigationState: navigationState,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final navigationBar = tester.widget<NavigationBar>(
+        find.byKey(const ValueKey('mobile-navigation-bar')),
+      );
+
+      expect(navigationBar.selectedIndex, 2);
+    },
+  );
+
   testWidgets('desktop account summary opens profile', (tester) async {
     final navigationState = NavigationState();
     _setTestSurfaceSize(tester, width: 1280, height: 900);
@@ -874,15 +1542,30 @@ Future<void> _toggleBillsFilters(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+Future<void> _tapVisible(WidgetTester tester, Finder finder) async {
+  await tester.ensureVisible(finder);
+  await tester.pumpAndSettle();
+  await tester.tap(finder);
+  await tester.pumpAndSettle();
+}
+
 Widget _buildResponsiveShellTestApp({
   required _TestAuthSessionState authState,
   required NavigationState navigationState,
   BillListState? billListState,
+  RecipientGroupState? recipientGroupState,
   Locale locale = const Locale('en', 'US'),
 }) {
   final resolvedBillListState =
       billListState ??
       BillListState(
+        debtBackendService: _FakeDebtBackendService(
+          onListReceipts: (_) => ReceiptsResponse(success: true),
+        ),
+      );
+  final resolvedRecipientGroupState =
+      recipientGroupState ??
+      RecipientGroupState(
         debtBackendService: _FakeDebtBackendService(
           onListReceipts: (_) => ReceiptsResponse(success: true),
         ),
@@ -902,6 +1585,12 @@ Widget _buildResponsiveShellTestApp({
           create: (_) => resolvedBillListState,
           update: (_, authSessionState, billListState) =>
               (billListState ?? resolvedBillListState)
+                ..updateAuthSession(authSessionState),
+        ),
+        ChangeNotifierProxyProvider<AuthSessionState, RecipientGroupState>(
+          create: (_) => resolvedRecipientGroupState,
+          update: (_, authSessionState, recipientGroupState) =>
+              (recipientGroupState ?? resolvedRecipientGroupState)
                 ..updateAuthSession(authSessionState),
         ),
       ],
@@ -1012,12 +1701,15 @@ Receipt _testReceipt({
   required int id,
   required String title,
   required double amountOwed,
+  double? amountPaid,
   bool isPaid = false,
   int ownerId = 10,
   String? dueDate,
+  String? description,
   List<TagIndex> tags = const [],
+  ReceiptSplit? split,
 }) {
-  return Receipt(
+  final receipt = Receipt(
     id: Int64(id),
     title: title,
     amountOwed: amountOwed,
@@ -1028,17 +1720,84 @@ Receipt _testReceipt({
     dueDate: dueDate,
     tags: tags,
   );
+  if (description != null) {
+    receipt.description = description;
+  }
+  if (amountPaid != null) {
+    receipt.amountPaid = amountPaid;
+  }
+  if (split != null) {
+    receipt.split = split;
+  }
+  return receipt;
+}
+
+User _testUser({required int id, required String name, required String email}) {
+  return User(id: Int64(id), sub: 'auth0|$id', name: name, email: email);
+}
+
+Recipient _testRecipient({
+  required int id,
+  required String name,
+  required int ownerId,
+  String? description,
+  List<User> members = const [],
+}) {
+  final recipient = Recipient(
+    id: Int64(id),
+    name: name,
+    ownerId: Int64(ownerId),
+    createdAt: '2026-05-05T00:00:00Z',
+  );
+  if (description != null) {
+    recipient.description = description;
+  }
+  recipient.members.addAll(members.map((member) => member.deepCopy()));
+  recipient.memberIds.addAll(members.map((member) => member.id));
+  return recipient;
 }
 
 class _FakeDebtBackendService extends DebtBackendService {
   _FakeDebtBackendService({
     required this.onListReceipts,
     this.availableTags = const [],
-  }) : super(dio: Dio());
+    List<Recipient>? recipients,
+    this.onSearchUsers,
+    this.onSetReceiptPayments,
+    this.createRecipientSucceeds = true,
+    this.mutationErrorMessage = 'Mutation failed',
+  }) : super(dio: Dio()) {
+    if (recipients != null) {
+      this.recipients.addAll(
+        recipients.map((recipient) => recipient.deepCopy()),
+      );
+    }
+  }
 
   final List<TagIndex> availableTags;
   final ReceiptsResponse Function(ReceiptListRequest request) onListReceipts;
+  final FutureOr<UsersResponse> Function(UserSearchRequest request)?
+  onSearchUsers;
+  final ReceiptResponse Function(SetReceiptPaymentsRequest request)?
+  onSetReceiptPayments;
+  final bool createRecipientSucceeds;
+  final String mutationErrorMessage;
+  final List<Recipient> recipients = <Recipient>[];
   final List<ReceiptListRequest> requests = <ReceiptListRequest>[];
+  final List<UserSearchRequest> searchRequests = <UserSearchRequest>[];
+  final List<CreateRecipientRequest> createRecipientRequests =
+      <CreateRecipientRequest>[];
+  final List<UpdateRecipientRequest> updateRecipientRequests =
+      <UpdateRecipientRequest>[];
+  final List<RecipientMemberRequest> addMemberRequests =
+      <RecipientMemberRequest>[];
+  final List<RecipientMemberRequest> removeMemberRequests =
+      <RecipientMemberRequest>[];
+  final List<RecipientLookupRequest> deleteRecipientRequests =
+      <RecipientLookupRequest>[];
+  final List<SetReceiptPaymentsRequest> setPaymentRequests =
+      <SetReceiptPaymentsRequest>[];
+  int listRecipientsCalls = 0;
 
   @override
   Future<ReceiptsResponse> listReceipts(
@@ -1055,6 +1814,138 @@ class _FakeDebtBackendService extends DebtBackendService {
     final response = TagsResponse(success: true);
     response.tags.addAll(availableTags.map((tag) => tag.deepCopy()));
     return response;
+  }
+
+  @override
+  Future<UsersResponse> searchUsers(
+    String accessToken,
+    UserSearchRequest request,
+  ) async {
+    final clonedRequest = request.deepCopy();
+    searchRequests.add(clonedRequest);
+    if (onSearchUsers != null) {
+      return await onSearchUsers!(clonedRequest);
+    }
+    return UsersResponse(success: true);
+  }
+
+  @override
+  Future<ReceiptResponse> setReceiptPayments(
+    String accessToken,
+    SetReceiptPaymentsRequest request,
+  ) async {
+    final clonedRequest = request.deepCopy();
+    setPaymentRequests.add(clonedRequest);
+    if (onSetReceiptPayments != null) {
+      return onSetReceiptPayments!(clonedRequest);
+    }
+    return ReceiptResponse(success: true);
+  }
+
+  @override
+  Future<RecipientsResponse> listRecipients(String accessToken) async {
+    listRecipientsCalls += 1;
+    final response = RecipientsResponse(success: true);
+    response.recipients.addAll(
+      recipients.map((recipient) => recipient.deepCopy()),
+    );
+    return response;
+  }
+
+  @override
+  Future<RecipientResponse> createRecipient(
+    String accessToken,
+    CreateRecipientRequest request,
+  ) async {
+    final clonedRequest = request.deepCopy();
+    createRecipientRequests.add(clonedRequest);
+    if (!createRecipientSucceeds) {
+      return RecipientResponse(success: false, message: mutationErrorMessage);
+    }
+    final recipient = Recipient(
+      id: Int64(100 + recipients.length),
+      name: clonedRequest.name,
+      ownerId: Int64(10),
+      createdAt: '2026-05-05T00:00:00Z',
+    );
+    if (clonedRequest.hasDescription()) {
+      recipient.description = clonedRequest.description;
+    }
+    recipient.memberIds.addAll(clonedRequest.memberIds);
+    recipients.add(recipient);
+    return RecipientResponse(success: true, recipient: recipient.deepCopy());
+  }
+
+  @override
+  Future<RecipientResponse> updateRecipient(
+    String accessToken,
+    UpdateRecipientRequest request,
+  ) async {
+    final clonedRequest = request.deepCopy();
+    updateRecipientRequests.add(clonedRequest);
+    final index = recipients.indexWhere(
+      (recipient) => recipient.id == clonedRequest.recipientId,
+    );
+    if (index >= 0) {
+      if (clonedRequest.hasName()) {
+        recipients[index].name = clonedRequest.name;
+      }
+      if (clonedRequest.hasDescription()) {
+        recipients[index].description = clonedRequest.description;
+      }
+      return RecipientResponse(
+        success: true,
+        recipient: recipients[index].deepCopy(),
+      );
+    }
+    return RecipientResponse(success: false, message: 'Recipient not found');
+  }
+
+  @override
+  Future<ActionResponse> addRecipientMember(
+    String accessToken,
+    RecipientMemberRequest request,
+  ) async {
+    final clonedRequest = request.deepCopy();
+    addMemberRequests.add(clonedRequest);
+    final group = _findRecipient(clonedRequest.recipientId);
+    group?.memberIds.add(clonedRequest.userId);
+    return ActionResponse(success: true);
+  }
+
+  @override
+  Future<ActionResponse> removeRecipientMember(
+    String accessToken,
+    RecipientMemberRequest request,
+  ) async {
+    final clonedRequest = request.deepCopy();
+    removeMemberRequests.add(clonedRequest);
+    final group = _findRecipient(clonedRequest.recipientId);
+    group?.memberIds.remove(clonedRequest.userId);
+    group?.members.removeWhere((user) => user.id == clonedRequest.userId);
+    return ActionResponse(success: true);
+  }
+
+  @override
+  Future<ActionResponse> deleteRecipient(
+    String accessToken,
+    RecipientLookupRequest request,
+  ) async {
+    final clonedRequest = request.deepCopy();
+    deleteRecipientRequests.add(clonedRequest);
+    recipients.removeWhere(
+      (recipient) => recipient.id == clonedRequest.recipientId,
+    );
+    return ActionResponse(success: true);
+  }
+
+  Recipient? _findRecipient(Int64 recipientId) {
+    for (final recipient in recipients) {
+      if (recipient.id == recipientId) {
+        return recipient;
+      }
+    }
+    return null;
   }
 }
 
