@@ -570,6 +570,16 @@ async def mark_receipt_paid_for_owner(
     return await db.mark_receipt_paid(session, receipt_id, amount_paid=amount_paid)
 
 
+async def set_receipt_payments_for_owner(
+    session: AsyncSession,
+    actor_user_id: int,
+    receipt_id: int,
+    payments: list[tuple[int | None, float]],
+) -> Receipt:
+    await get_owned_receipt(session, actor_user_id, receipt_id)
+    return await db.set_receipt_payments(session, receipt_id, payments)
+
+
 async def mark_receipt_unpaid_for_owner(
     session: AsyncSession,
     actor_user_id: int,

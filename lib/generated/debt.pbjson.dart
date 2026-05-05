@@ -282,6 +282,7 @@ const ReceiptRecipientShare$json = {
       '10': 'userEmail',
       '17': true
     },
+    {'1': 'amount_paid', '3': 6, '4': 1, '5': 1, '10': 'amountPaid'},
   ],
   '8': [
     {'1': '_user_name'},
@@ -294,7 +295,8 @@ final $typed_data.Uint8List receiptRecipientShareDescriptor = $convert.base64Dec
     'ChVSZWNlaXB0UmVjaXBpZW50U2hhcmUSFwoHdXNlcl9pZBgBIAEoA1IGdXNlcklkEiMKDXNoYX'
     'JlX3BlcmNlbnQYAiABKAFSDHNoYXJlUGVyY2VudBIWCgZhbW91bnQYAyABKAFSBmFtb3VudBIg'
     'Cgl1c2VyX25hbWUYBCABKAlIAFIIdXNlck5hbWWIAQESIgoKdXNlcl9lbWFpbBgFIAEoCUgBUg'
-    'l1c2VyRW1haWyIAQFCDAoKX3VzZXJfbmFtZUINCgtfdXNlcl9lbWFpbA==');
+    'l1c2VyRW1haWyIAQESHwoLYW1vdW50X3BhaWQYBiABKAFSCmFtb3VudFBhaWRCDAoKX3VzZXJf'
+    'bmFtZUINCgtfdXNlcl9lbWFpbA==');
 
 @$core.Deprecated('Use receiptSplitDescriptor instead')
 const ReceiptSplit$json = {
@@ -316,6 +318,7 @@ const ReceiptSplit$json = {
       '6': '.debt.ReceiptRecipientShare',
       '10': 'recipientShares'
     },
+    {'1': 'owner_amount_paid', '3': 4, '4': 1, '5': 1, '10': 'ownerAmountPaid'},
   ],
 };
 
@@ -324,7 +327,7 @@ final $typed_data.Uint8List receiptSplitDescriptor = $convert.base64Decode(
     'CgxSZWNlaXB0U3BsaXQSLgoTb3duZXJfc2hhcmVfcGVyY2VudBgBIAEoAVIRb3duZXJTaGFyZV'
     'BlcmNlbnQSIQoMb3duZXJfYW1vdW50GAIgASgBUgtvd25lckFtb3VudBJGChByZWNpcGllbnRf'
     'c2hhcmVzGAMgAygLMhsuZGVidC5SZWNlaXB0UmVjaXBpZW50U2hhcmVSD3JlY2lwaWVudFNoYX'
-    'Jlcw==');
+    'JlcxIqChFvd25lcl9hbW91bnRfcGFpZBgEIAEoAVIPb3duZXJBbW91bnRQYWlk');
 
 @$core.Deprecated('Use receiptDescriptor instead')
 const Receipt$json = {
@@ -1098,6 +1101,53 @@ const MarkReceiptPaidRequest$json = {
 final $typed_data.Uint8List markReceiptPaidRequestDescriptor = $convert.base64Decode(
     'ChZNYXJrUmVjZWlwdFBhaWRSZXF1ZXN0Eh0KCnJlY2VpcHRfaWQYASABKANSCXJlY2VpcHRJZB'
     'IkCgthbW91bnRfcGFpZBgCIAEoAUgAUgphbW91bnRQYWlkiAEBQg4KDF9hbW91bnRfcGFpZA==');
+
+@$core.Deprecated('Use receiptPaymentInputDescriptor instead')
+const ReceiptPaymentInput$json = {
+  '1': 'ReceiptPaymentInput',
+  '2': [
+    {
+      '1': 'user_id',
+      '3': 1,
+      '4': 1,
+      '5': 3,
+      '9': 0,
+      '10': 'userId',
+      '17': true
+    },
+    {'1': 'amount_paid', '3': 2, '4': 1, '5': 1, '10': 'amountPaid'},
+  ],
+  '8': [
+    {'1': '_user_id'},
+  ],
+};
+
+/// Descriptor for `ReceiptPaymentInput`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List receiptPaymentInputDescriptor = $convert.base64Decode(
+    'ChNSZWNlaXB0UGF5bWVudElucHV0EhwKB3VzZXJfaWQYASABKANIAFIGdXNlcklkiAEBEh8KC2'
+    'Ftb3VudF9wYWlkGAIgASgBUgphbW91bnRQYWlkQgoKCF91c2VyX2lk');
+
+@$core.Deprecated('Use setReceiptPaymentsRequestDescriptor instead')
+const SetReceiptPaymentsRequest$json = {
+  '1': 'SetReceiptPaymentsRequest',
+  '2': [
+    {'1': 'receipt_id', '3': 1, '4': 1, '5': 3, '10': 'receiptId'},
+    {
+      '1': 'payments',
+      '3': 2,
+      '4': 3,
+      '5': 11,
+      '6': '.debt.ReceiptPaymentInput',
+      '10': 'payments'
+    },
+  ],
+};
+
+/// Descriptor for `SetReceiptPaymentsRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List setReceiptPaymentsRequestDescriptor = $convert.base64Decode(
+    'ChlTZXRSZWNlaXB0UGF5bWVudHNSZXF1ZXN0Eh0KCnJlY2VpcHRfaWQYASABKANSCXJlY2VpcH'
+    'RJZBI1CghwYXltZW50cxgCIAMoCzIZLmRlYnQuUmVjZWlwdFBheW1lbnRJbnB1dFIIcGF5bWVu'
+    'dHM=');
 
 @$core.Deprecated('Use receiptFileRequestDescriptor instead')
 const ReceiptFileRequest$json = {

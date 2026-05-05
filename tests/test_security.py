@@ -386,6 +386,11 @@ class TestDataSeedTests(AsyncDatabaseTestCase):
                 .where(db.Receipt.title == "Demo rent top-up")
                 .options(selectinload(db.Receipt.recipient_shares), selectinload(db.Receipt.tags))
             )
+            owner_zero_receipts = await session.execute(
+                select(db.Receipt)
+                .where(db.Receipt.title == "Demo team lunch reimbursement")
+                .options(selectinload(db.Receipt.recipient_shares))
+            )
 
         self.assertEqual([user.email for user in users], ["alice.demo@example.com"])
         recipient = recipients.scalar_one_or_none()
@@ -395,8 +400,16 @@ class TestDataSeedTests(AsyncDatabaseTestCase):
         self.assertEqual(recipient.owner_id, first_user.id)
         self.assertEqual(receipt.owner_id, first_user.id)
         self.assertEqual(receipt.owner_share_percent, 40.0)
+        self.assertAlmostEqual(receipt.owner_amount_paid, 170.8)
+        self.assertGreater(receipt.amount_paid, receipt.owner_amount_paid)
         self.assertEqual(len(receipt.recipient_shares), 2)
         self.assertEqual([(tag.icon, tag.text) for tag in receipt.tags], [("🏠", "Rent")])
+        owner_zero_receipt = owner_zero_receipts.scalar_one_or_none()
+        self.assertIsNotNone(owner_zero_receipt)
+        self.assertEqual(owner_zero_receipt.owner_id, first_user.id)
+        self.assertEqual(owner_zero_receipt.owner_share_percent, 0.0)
+        self.assertEqual(owner_zero_receipt.owner_amount_paid, 0.0)
+        self.assertEqual(len(owner_zero_receipt.recipient_shares), 2)
 
 
 class ReceiptAndFileAuthorizationTests(AsyncDatabaseTestCase):
@@ -616,6 +629,145 @@ class ReceiptSplitTests(AsyncDatabaseTestCase):
         self.assertEqual(
             {(share.user_id, share.share_percent) for share in receipt.recipient_shares},
             {(self.member_a.id, 30.0), (self.member_b.id, 40.0)},
+        )
+
+    async def test_set_receipt_payments_accumulates_individual_paid_amounts(self) -> None:
+        create_response = await self._post_protobuf(
+            "/api/receipts/create",
+            self._create_receipt_request_with_split(),
+            "owner-token",
+        )
+        created = self._parse_message(debt_pb2.ReceiptResponse, create_response)
+        request = debt_pb2.SetReceiptPaymentsRequest(receipt_id=created.receipt.id)
+        request.payments.add(amount_paid=15.0)
+        request.payments.add(user_id=self.member_a.id, amount_paid=20.0)
+
+        response = await self._post_protobuf(
+            "/api/receipts/set-payments",
+            request,
+            "owner-token",
+        )
+        parsed = self._parse_message(debt_pb2.ReceiptResponse, response)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(parsed.success)
+        self.assertAlmostEqual(parsed.receipt.amount_paid, 35.0)
+        self.assertAlmostEqual(parsed.receipt.split.owner_amount_paid, 15.0)
+        self.assertFalse(parsed.receipt.is_paid)
+        self.assertEqual(
+            {
+                (share.user_id, share.amount_paid)
+                for share in parsed.receipt.split.recipient_shares
+            },
+            {
+                (self.member_a.id, 20.0),
+                (self.member_b.id, 0.0),
+            },
+        )
+
+        async with db.async_session_maker() as session:
+            stored = await db.get_receipt_by_id(session, created.receipt.id)
+
+        self.assertAlmostEqual(stored.amount_paid, 35.0)
+        self.assertAlmostEqual(stored.owner_amount_paid, 15.0)
+        self.assertEqual(
+            {
+                (share.user_id, share.amount_paid)
+                for share in stored.recipient_shares
+            },
+            {
+                (self.member_a.id, 20.0),
+                (self.member_b.id, 0.0),
+            },
+        )
+
+    async def test_set_receipt_payments_rejects_non_owner_and_overpayment(self) -> None:
+        create_response = await self._post_protobuf(
+            "/api/receipts/create",
+            self._create_receipt_request_with_split(),
+            "owner-token",
+        )
+        created = self._parse_message(debt_pb2.ReceiptResponse, create_response)
+
+        member_request = debt_pb2.SetReceiptPaymentsRequest(
+            receipt_id=created.receipt.id
+        )
+        member_request.payments.add(user_id=self.member_a.id, amount_paid=1.0)
+        member_response = await self._post_protobuf(
+            "/api/receipts/set-payments",
+            member_request,
+            "member-a-token",
+        )
+        member_parsed = self._parse_message(debt_pb2.ReceiptResponse, member_response)
+
+        self.assertEqual(member_response.status_code, 403)
+        self.assertFalse(member_parsed.success)
+
+        overpay_request = debt_pb2.SetReceiptPaymentsRequest(
+            receipt_id=created.receipt.id
+        )
+        overpay_request.payments.add(user_id=self.member_a.id, amount_paid=31.0)
+        overpay_response = await self._post_protobuf(
+            "/api/receipts/set-payments",
+            overpay_request,
+            "owner-token",
+        )
+        overpay_parsed = self._parse_message(debt_pb2.ReceiptResponse, overpay_response)
+
+        self.assertEqual(overpay_response.status_code, 400)
+        self.assertFalse(overpay_parsed.success)
+        self.assertIn("cannot exceed", overpay_parsed.message)
+
+    async def test_mark_paid_and_unpaid_fill_and_clear_individual_amounts(self) -> None:
+        create_response = await self._post_protobuf(
+            "/api/receipts/create",
+            self._create_receipt_request_with_split(),
+            "owner-token",
+        )
+        created = self._parse_message(debt_pb2.ReceiptResponse, create_response)
+
+        paid_response = await self._post_protobuf(
+            "/api/receipts/mark-paid",
+            debt_pb2.MarkReceiptPaidRequest(receipt_id=created.receipt.id),
+            "owner-token",
+        )
+        paid = self._parse_message(debt_pb2.ReceiptResponse, paid_response)
+
+        self.assertEqual(paid_response.status_code, 200)
+        self.assertTrue(paid.receipt.is_paid)
+        self.assertAlmostEqual(paid.receipt.amount_paid, 100.0)
+        self.assertAlmostEqual(paid.receipt.split.owner_amount_paid, 30.0)
+        self.assertEqual(
+            {
+                (share.user_id, share.amount_paid)
+                for share in paid.receipt.split.recipient_shares
+            },
+            {
+                (self.member_a.id, 30.0),
+                (self.member_b.id, 40.0),
+            },
+        )
+
+        unpaid_response = await self._post_protobuf(
+            "/api/receipts/mark-unpaid",
+            debt_pb2.ReceiptLookupRequest(receipt_id=created.receipt.id),
+            "owner-token",
+        )
+        unpaid = self._parse_message(debt_pb2.ReceiptResponse, unpaid_response)
+
+        self.assertEqual(unpaid_response.status_code, 200)
+        self.assertFalse(unpaid.receipt.is_paid)
+        self.assertAlmostEqual(unpaid.receipt.amount_paid, 0.0)
+        self.assertAlmostEqual(unpaid.receipt.split.owner_amount_paid, 0.0)
+        self.assertEqual(
+            {
+                (share.user_id, share.amount_paid)
+                for share in unpaid.receipt.split.recipient_shares
+            },
+            {
+                (self.member_a.id, 0.0),
+                (self.member_b.id, 0.0),
+            },
         )
 
     async def test_create_receipt_rejects_split_total_not_equal_to_100(self) -> None:

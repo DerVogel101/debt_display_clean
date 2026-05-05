@@ -37,6 +37,7 @@ async def seed_test_data() -> None:
     """Create idempotent local data for recipient search and shared bills."""
     async with db.engine.begin() as conn:
         await conn.run_sync(db.Base.metadata.create_all)
+    await db.ensure_schema_compatible()
 
     async with db.async_session_maker() as session:
         first_user = await _first_user(session)
@@ -106,8 +107,11 @@ async def seed_test_data() -> None:
         await _set_demo_split(
             session,
             receipt_id=rent_receipt.id,
+            amount_owed=427.0,
             owner_share_percent=40.0,
             member_ids=household_member_ids,
+            owner_amount_paid=170.8,
+            member_paid_fraction=0.25,
         )
 
         utility_receipt = await _get_or_create_receipt(
@@ -123,8 +127,11 @@ async def seed_test_data() -> None:
         await _set_demo_split(
             session,
             receipt_id=utility_receipt.id,
+            amount_owed=248.4,
             owner_share_percent=50.0,
             member_ids=household_member_ids,
+            owner_amount_paid=62.1,
+            member_paid_fraction=0.0,
         )
 
         travel_receipt = await _get_or_create_receipt(
@@ -140,8 +147,31 @@ async def seed_test_data() -> None:
         await _set_demo_split(
             session,
             receipt_id=travel_receipt.id,
+            amount_owed=176.3,
             owner_share_percent=34.0,
             member_ids=trip_member_ids,
+            owner_amount_paid=0.0,
+            member_paid_fraction=0.5,
+        )
+
+        owner_zero_receipt = await _get_or_create_receipt(
+            session,
+            owner_id=owner.id,
+            title="Demo team lunch reimbursement",
+            amount_owed=96.0,
+            recipient_id=recipient.id,
+            description="Owner tracks the bill but owes no share",
+            due_date=datetime.now(timezone.utc) + timedelta(days=3),
+        )
+        await db.set_receipt_tags(session, owner_zero_receipt.id, [utility_tag.id])
+        await _set_demo_split(
+            session,
+            receipt_id=owner_zero_receipt.id,
+            amount_owed=96.0,
+            owner_share_percent=0.0,
+            member_ids=household_member_ids,
+            owner_amount_paid=0.0,
+            member_paid_fraction=0.5,
         )
 
         await session.commit()
@@ -174,8 +204,11 @@ async def _set_demo_split(
     session: AsyncSession,
     *,
     receipt_id: int,
+    amount_owed: float,
     owner_share_percent: float,
     member_ids: list[int],
+    owner_amount_paid: float = 0.0,
+    member_paid_fraction: float = 0.0,
 ) -> None:
     if not member_ids:
         await db.set_receipt_split(
@@ -183,6 +216,11 @@ async def _set_demo_split(
             receipt_id=receipt_id,
             owner_share_percent=100.0,
             recipient_shares=[],
+        )
+        await db.set_receipt_payments(
+            session,
+            receipt_id=receipt_id,
+            payments=[(None, amount_owed)],
         )
         return
 
@@ -194,6 +232,18 @@ async def _set_demo_split(
         owner_share_percent=owner_share_percent,
         recipient_shares=[
             (member_id, member_share_percent) for member_id in member_ids
+        ],
+    )
+    member_share_amount = amount_owed * member_share_percent / 100.0
+    await db.set_receipt_payments(
+        session,
+        receipt_id=receipt_id,
+        payments=[
+            (None, owner_amount_paid),
+            *[
+                (member_id, member_share_amount * member_paid_fraction)
+                for member_id in member_ids
+            ],
         ],
     )
 

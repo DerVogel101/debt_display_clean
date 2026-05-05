@@ -10,7 +10,7 @@ from collections.abc import AsyncGenerator
 from sqlalchemy import (
     String, Integer, ForeignKey, event, DateTime, func,
     BigInteger, UniqueConstraint, Index, Boolean, Table, Column, Text, select,
-    or_,
+    or_, text,
 )
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
@@ -86,6 +86,7 @@ class Receipt(Base):
 
     amount_owed: Mapped[float]         = mapped_column(nullable=False)
     amount_paid: Mapped[float|None]    = mapped_column(nullable=True, default=0.0)
+    owner_amount_paid: Mapped[float]   = mapped_column(nullable=False, default=0.0)
     owner_share_percent: Mapped[float|None] = mapped_column(nullable=True)
     due_date:    Mapped[datetime|None] = mapped_column(DateTime(timezone=True), nullable=True)
     is_paid:     Mapped[bool]          = mapped_column(Boolean, default=False, nullable=False)
@@ -162,6 +163,7 @@ class ReceiptRecipientShare(Base):
     )
     user_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     share_percent: Mapped[float] = mapped_column(nullable=False)
+    amount_paid: Mapped[float] = mapped_column(nullable=False, default=0.0)
     user_name_snapshot: Mapped[str|None] = mapped_column(String(256), nullable=True)
     user_email_snapshot: Mapped[str|None] = mapped_column(String(256), nullable=True)
 
@@ -577,7 +579,12 @@ async def update_receipt(
     currency: str | None = None,
 ) -> "Receipt":
     """Partial update. Only updates provided (non-None) fields."""
-    receipt = await session.get(Receipt, receipt_id)
+    result = await session.execute(
+        select(Receipt)
+        .where(Receipt.id == receipt_id)
+        .options(selectinload(Receipt.recipient_shares))
+    )
+    receipt = result.scalar_one_or_none()
     if receipt is None:
         raise ValueError(f"Receipt {receipt_id} not found")
     if title is not None:
@@ -587,13 +594,15 @@ async def update_receipt(
     if amount_owed is not None:
         receipt.amount_owed = amount_owed
     if amount_paid is not None:
-        receipt.amount_paid = amount_paid
+        raise ValueError("amount_paid is derived from individual receipt payments")
     if due_date is not None:
         receipt.due_date = due_date
     if notes is not None:
         receipt.notes = notes
     if currency is not None:
         receipt.currency = currency
+    _clamp_receipt_payment_amounts(receipt)
+    _sync_receipt_payment_totals(receipt)
     await session.flush()
     return receipt
 
@@ -601,6 +610,52 @@ async def update_receipt(
 def _validate_percent(value: float, field_name: str) -> None:
     if not math.isfinite(value):
         raise ValueError(f"{field_name} must be finite")
+
+
+def _validate_paid_amount(value: float, field_name: str) -> float:
+    normalized = float(value)
+    if not math.isfinite(normalized):
+        raise ValueError(f"{field_name} must be finite")
+    if normalized < 0:
+        raise ValueError(f"{field_name} must be non-negative")
+    return normalized
+
+
+def _receipt_owner_share_amount(receipt: Receipt) -> float:
+    if receipt.owner_share_percent is None:
+        return float(receipt.amount_owed)
+    return float(receipt.amount_owed) * float(receipt.owner_share_percent) / 100.0
+
+
+def _receipt_recipient_share_amount(receipt: Receipt, share: ReceiptRecipientShare) -> float:
+    return float(receipt.amount_owed) * float(share.share_percent) / 100.0
+
+
+def _clamp_receipt_payment_amounts(receipt: Receipt) -> None:
+    receipt.owner_amount_paid = min(
+        float(receipt.owner_amount_paid or 0.0),
+        _receipt_owner_share_amount(receipt),
+    )
+    for share in getattr(receipt, "recipient_shares", []) or []:
+        share.amount_paid = min(
+            float(share.amount_paid or 0.0),
+            _receipt_recipient_share_amount(receipt, share),
+        )
+
+
+def _sync_receipt_payment_totals(receipt: Receipt) -> None:
+    amount_paid = float(receipt.owner_amount_paid or 0.0) + sum(
+        float(share.amount_paid or 0.0)
+        for share in getattr(receipt, "recipient_shares", []) or []
+    )
+    receipt.amount_paid = amount_paid
+
+    is_fully_paid = amount_paid + 1e-6 >= float(receipt.amount_owed)
+    if is_fully_paid and not receipt.is_paid:
+        receipt.paid_at = datetime.now(tz=timezone.utc)
+    elif not is_fully_paid:
+        receipt.paid_at = None
+    receipt.is_paid = is_fully_paid
 
 
 async def set_receipt_split(
@@ -676,6 +731,10 @@ async def set_receipt_split(
             )
             session.add(share)
         share.share_percent = share_percent
+        share.amount_paid = min(
+            float(share.amount_paid or 0.0),
+            _receipt_recipient_share_amount(receipt, share),
+        )
         share.user_name_snapshot = user.name
         share.user_email_snapshot = user.email
         next_shares.append(share)
@@ -684,6 +743,8 @@ async def set_receipt_split(
         await session.delete(stale_share)
 
     receipt.recipient_shares = next_shares
+    _clamp_receipt_payment_amounts(receipt)
+    _sync_receipt_payment_totals(receipt)
 
     await session.flush()
     return receipt
@@ -706,7 +767,55 @@ async def clear_receipt_split(
     for stale_share in list(receipt.recipient_shares):
         await session.delete(stale_share)
     receipt.recipient_shares = []
+    _clamp_receipt_payment_amounts(receipt)
+    _sync_receipt_payment_totals(receipt)
 
+    await session.flush()
+    return receipt
+
+
+async def set_receipt_payments(
+    session: AsyncSession,
+    receipt_id: int,
+    payments: list[tuple[int | None, float]],
+) -> "Receipt":
+    result = await session.execute(
+        select(Receipt)
+        .where(Receipt.id == receipt_id)
+        .options(selectinload(Receipt.recipient_shares))
+    )
+    receipt = result.scalar_one_or_none()
+    if receipt is None:
+        raise ValueError(f"Receipt {receipt_id} not found")
+
+    shares_by_user_id = {
+        share.user_id: share for share in getattr(receipt, "recipient_shares", []) or []
+    }
+    seen_user_ids: set[int] = set()
+    for user_id, raw_amount_paid in payments:
+        paid_amount = _validate_paid_amount(raw_amount_paid, "amount_paid")
+        resolved_user_id = receipt.owner_id if user_id is None else int(user_id)
+        if resolved_user_id in seen_user_ids:
+            raise ValueError(f"Duplicate receipt payment user {resolved_user_id}")
+        seen_user_ids.add(resolved_user_id)
+
+        if resolved_user_id == receipt.owner_id:
+            max_amount = _receipt_owner_share_amount(receipt)
+            if paid_amount - max_amount > 1e-6:
+                raise ValueError("owner amount_paid cannot exceed owner share amount")
+            receipt.owner_amount_paid = paid_amount
+            continue
+
+        share = shares_by_user_id.get(resolved_user_id)
+        if share is None:
+            raise ValueError("Receipt payment user must be in the saved receipt split")
+
+        max_amount = _receipt_recipient_share_amount(receipt, share)
+        if paid_amount - max_amount > 1e-6:
+            raise ValueError("recipient amount_paid cannot exceed recipient share amount")
+        share.amount_paid = paid_amount
+
+    _sync_receipt_payment_totals(receipt)
     await session.flush()
     return receipt
 
@@ -716,14 +825,19 @@ async def mark_receipt_paid(
     receipt_id: int,
     amount_paid: float | None = None,
 ) -> "Receipt":
-    """Sets is_paid=True, paid_at=now(). Optionally records amount_paid."""
-    receipt = await session.get(Receipt, receipt_id)
+    """Fills every participant payment amount and marks the receipt paid."""
+    result = await session.execute(
+        select(Receipt)
+        .where(Receipt.id == receipt_id)
+        .options(selectinload(Receipt.recipient_shares))
+    )
+    receipt = result.scalar_one_or_none()
     if receipt is None:
         raise ValueError(f"Receipt {receipt_id} not found")
-    receipt.is_paid = True
-    receipt.paid_at = datetime.now(tz=timezone.utc)
-    if amount_paid is not None:
-        receipt.amount_paid = amount_paid
+    receipt.owner_amount_paid = _receipt_owner_share_amount(receipt)
+    for share in getattr(receipt, "recipient_shares", []) or []:
+        share.amount_paid = _receipt_recipient_share_amount(receipt, share)
+    _sync_receipt_payment_totals(receipt)
     await session.flush()
     return receipt
 
@@ -732,12 +846,19 @@ async def mark_receipt_unpaid(
     session: AsyncSession,
     receipt_id: int,
 ) -> "Receipt":
-    """Reverses payment: is_paid=False, paid_at=None."""
-    receipt = await session.get(Receipt, receipt_id)
+    """Clears every participant payment amount and marks the receipt unpaid."""
+    result = await session.execute(
+        select(Receipt)
+        .where(Receipt.id == receipt_id)
+        .options(selectinload(Receipt.recipient_shares))
+    )
+    receipt = result.scalar_one_or_none()
     if receipt is None:
         raise ValueError(f"Receipt {receipt_id} not found")
-    receipt.is_paid = False
-    receipt.paid_at = None
+    receipt.owner_amount_paid = 0.0
+    for share in getattr(receipt, "recipient_shares", []) or []:
+        share.amount_paid = 0.0
+    _sync_receipt_payment_totals(receipt)
     await session.flush()
     return receipt
 
@@ -973,6 +1094,36 @@ async def set_receipt_tags(
 
 
 # ── DB Lifecycle & Utilities ──────────────────────────────────────────────────
+
+async def ensure_schema_compatible() -> None:
+    """Applies small SQLite column additions for local databases."""
+    async with engine.begin() as conn:  # type: ignore[arg-type]
+        receipt_columns = {
+            row[1]
+            for row in (await conn.execute(text("PRAGMA table_info(receipts)"))).all()
+        }
+        if "owner_amount_paid" not in receipt_columns:
+            await conn.execute(
+                text(
+                    "ALTER TABLE receipts "
+                    "ADD COLUMN owner_amount_paid FLOAT NOT NULL DEFAULT 0.0"
+                )
+            )
+
+        share_columns = {
+            row[1]
+            for row in (
+                await conn.execute(text("PRAGMA table_info(receipt_recipient_shares)"))
+            ).all()
+        }
+        if "amount_paid" not in share_columns:
+            await conn.execute(
+                text(
+                    "ALTER TABLE receipt_recipient_shares "
+                    "ADD COLUMN amount_paid FLOAT NOT NULL DEFAULT 0.0"
+                )
+            )
+
 
 async def reset_db() -> None:
     """Drops and recreates all tables for local recovery workflows."""

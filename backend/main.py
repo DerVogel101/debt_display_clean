@@ -33,6 +33,9 @@ app.mount(
 
 @app.on_event("startup")
 async def _migrate_db_schema_on_startup() -> None:
+    async with db.engine.begin() as conn:  # type: ignore[arg-type]
+        await conn.run_sync(db.Base.metadata.create_all)
+    await db.ensure_schema_compatible()
     if settings.GENERATE_TEST_DATA_ON_STARTUP:
         await seed_test_data()
 

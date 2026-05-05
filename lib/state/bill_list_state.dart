@@ -133,6 +133,7 @@ class BillListState extends ChangeNotifier {
   bool _hasLoadedTags = false;
   bool _hasLoadedPage = false;
   bool _isLoading = false;
+  bool _isMutating = false;
   String? _errorMessage;
   List<Receipt> _receipts = const [];
   List<TagIndex> _availableTags = const [];
@@ -143,6 +144,7 @@ class BillListState extends ChangeNotifier {
 
   bool get isAuthenticated => _isAuthenticated;
   bool get isLoading => _isLoading;
+  bool get isMutating => _isMutating;
   String? get errorMessage => _errorMessage;
   List<Receipt> get receipts => _receipts;
   List<TagIndex> get availableTags => _availableTags;
@@ -156,6 +158,7 @@ class BillListState extends ChangeNotifier {
   int get currentPage => _currentPageIndex + 1;
   bool get hasPreviousPage => _currentPageIndex > 0;
   bool get hasNextPage => _nextPageToken != null;
+  int? get currentUserId => _currentUserId;
 
   void updateAuthSession(AuthSessionState authSessionState) {
     final previousAuthenticated = _isAuthenticated;
@@ -294,6 +297,51 @@ class BillListState extends ChangeNotifier {
     return 0;
   }
 
+  Future<bool> setReceiptPayments({
+    required Receipt receipt,
+    required double ownerAmountPaid,
+    required Map<int, double> recipientAmountsPaid,
+  }) async {
+    if (!_isAuthenticated || _accessToken == null || _isMutating) {
+      return false;
+    }
+
+    _isMutating = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final request = SetReceiptPaymentsRequest(receiptId: receipt.id);
+      request.payments.add(ReceiptPaymentInput(amountPaid: ownerAmountPaid));
+      for (final entry in recipientAmountsPaid.entries) {
+        request.payments.add(
+          ReceiptPaymentInput(
+            userId: Int64(entry.key),
+            amountPaid: entry.value,
+          ),
+        );
+      }
+
+      final response = await _debtBackendService.setReceiptPayments(
+        _accessToken!,
+        request,
+      );
+      if (!response.success) {
+        throw StateError(response.message);
+      }
+
+      _replaceReceipt(response.receipt);
+      await refresh();
+      return true;
+    } catch (error) {
+      _errorMessage = _formatError(error);
+      return false;
+    } finally {
+      _isMutating = false;
+      notifyListeners();
+    }
+  }
+
   void _resetQueryState() {
     _appliedQuery = BillListQuery.defaults();
     _resetQueryStatePagination();
@@ -315,6 +363,14 @@ class BillListState extends ChangeNotifier {
     _markDataStale();
     _receipts = const [];
     _availableTags = const [];
+  }
+
+  void _replaceReceipt(Receipt receipt) {
+    _receipts = List<Receipt>.unmodifiable(
+      _receipts.map(
+        (existing) => existing.id == receipt.id ? receipt.deepCopy() : existing,
+      ),
+    );
   }
 
   Future<void> _loadPage() async {

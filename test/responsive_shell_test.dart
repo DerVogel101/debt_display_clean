@@ -625,6 +625,7 @@ void main() {
               title: 'Shared split receipt',
               description: 'One-line subtitle that fades when space is tight',
               amountOwed: 100,
+              amountPaid: 55,
               tags: [
                 TagIndex(
                   id: Int64(1),
@@ -636,11 +637,13 @@ void main() {
               split: ReceiptSplit(
                 ownerSharePercent: 40,
                 ownerAmount: 40,
+                ownerAmountPaid: 25,
                 recipientShares: [
                   ReceiptRecipientShare(
                     userId: Int64(20),
                     sharePercent: 60,
                     amount: 60,
+                    amountPaid: 30,
                     userName: 'Alice',
                     userEmail: 'alice@test.dev',
                   ),
@@ -672,12 +675,110 @@ void main() {
       expect(find.text('Home'), findsOneWidget);
       expect(find.textContaining('Alice'), findsOneWidget);
       expect(find.textContaining('60%'), findsOneWidget);
+      expect(find.text('Paid'), findsWidgets);
+      expect(
+        find.text(_formatExpectedCurrency(55, const Locale('en', 'US'))),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining(
+          'paid ${_formatExpectedCurrency(30, const Locale('en', 'US'))}',
+        ),
+        findsOneWidget,
+      );
       expect(
         find.text(_formatExpectedCurrency(40, const Locale('en', 'US'))),
-        findsOneWidget,
+        findsWidgets,
       );
     },
   );
+
+  testWidgets('owner payment edit flow updates paid amount in bills view', (
+    tester,
+  ) async {
+    _setTestSurfaceSize(tester, width: 430, height: 1000);
+
+    var receipt = _testReceipt(
+      id: 43,
+      title: 'Editable split receipt',
+      amountOwed: 100,
+      amountPaid: 10,
+      split: ReceiptSplit(
+        ownerSharePercent: 40,
+        ownerAmount: 40,
+        ownerAmountPaid: 10,
+        recipientShares: [
+          ReceiptRecipientShare(
+            userId: Int64(20),
+            sharePercent: 60,
+            amount: 60,
+            amountPaid: 0,
+            userName: 'Alice',
+            userEmail: 'alice@test.dev',
+          ),
+        ],
+      ),
+    );
+    final fakeService = _FakeDebtBackendService(
+      availableTags: const [],
+      onListReceipts: (_) {
+        final response = ReceiptsResponse(success: true);
+        response.receipts.add(receipt.deepCopy());
+        return response;
+      },
+      onSetReceiptPayments: (request) {
+        final ownerPayment = request.payments.firstWhere(
+          (payment) => !payment.hasUserId(),
+        );
+        final alicePayment = request.payments.firstWhere(
+          (payment) => payment.userId.toInt() == 20,
+        );
+        receipt = receipt.deepCopy()
+          ..amountPaid = ownerPayment.amountPaid + alicePayment.amountPaid
+          ..split.ownerAmountPaid = ownerPayment.amountPaid
+          ..split.recipientShares[0].amountPaid = alicePayment.amountPaid;
+        return ReceiptResponse(success: true, receipt: receipt.deepCopy());
+      },
+    );
+
+    await tester.pumpWidget(
+      _buildBillsSectionTestApp(
+        authState: _TestAuthSessionState(
+          isAuthenticatedValue: true,
+          accessTokenValue: 'token-1',
+          userIdValue: 10,
+        ),
+        billListState: BillListState(debtBackendService: fakeService),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('receipt-payments-43')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('receipt-payment-owner-field')),
+      '25',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('receipt-payment-user-20-field')),
+      '30',
+    );
+    await tester.tap(find.byKey(const ValueKey('receipt-payment-save-button')));
+    await tester.pumpAndSettle();
+
+    expect(fakeService.setPaymentRequests, hasLength(1));
+    expect(fakeService.setPaymentRequests.single.receiptId.toInt(), 43);
+    expect(
+      find.text(_formatExpectedCurrency(55, const Locale('en', 'US'))),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'paid ${_formatExpectedCurrency(30, const Locale('en', 'US'))}',
+      ),
+      findsOneWidget,
+    );
+  });
 
   testWidgets('bills filters are collapsed by default and toggle open/closed', (
     tester,
@@ -788,7 +889,12 @@ void main() {
       expect(fakeService.requests, hasLength(2));
 
       await _toggleBillsFilters(tester);
-      await tester.tap(find.text('Paid'));
+      await tester.tap(
+        find.descendant(
+          of: find.byKey(const ValueKey('bills-payment-filter-control')),
+          matching: find.text('Paid'),
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(fakeService.requests, hasLength(2));
@@ -1493,6 +1599,7 @@ Receipt _testReceipt({
   required int id,
   required String title,
   required double amountOwed,
+  double? amountPaid,
   bool isPaid = false,
   int ownerId = 10,
   String? dueDate,
@@ -1513,6 +1620,9 @@ Receipt _testReceipt({
   );
   if (description != null) {
     receipt.description = description;
+  }
+  if (amountPaid != null) {
+    receipt.amountPaid = amountPaid;
   }
   if (split != null) {
     receipt.split = split;
@@ -1551,6 +1661,7 @@ class _FakeDebtBackendService extends DebtBackendService {
     this.availableTags = const [],
     List<Recipient>? recipients,
     this.onSearchUsers,
+    this.onSetReceiptPayments,
     this.createRecipientSucceeds = true,
     this.mutationErrorMessage = 'Mutation failed',
   }) : super(dio: Dio()) {
@@ -1564,6 +1675,8 @@ class _FakeDebtBackendService extends DebtBackendService {
   final List<TagIndex> availableTags;
   final ReceiptsResponse Function(ReceiptListRequest request) onListReceipts;
   final UsersResponse Function(UserSearchRequest request)? onSearchUsers;
+  final ReceiptResponse Function(SetReceiptPaymentsRequest request)?
+  onSetReceiptPayments;
   final bool createRecipientSucceeds;
   final String mutationErrorMessage;
   final List<Recipient> recipients = <Recipient>[];
@@ -1579,6 +1692,8 @@ class _FakeDebtBackendService extends DebtBackendService {
       <RecipientMemberRequest>[];
   final List<RecipientLookupRequest> deleteRecipientRequests =
       <RecipientLookupRequest>[];
+  final List<SetReceiptPaymentsRequest> setPaymentRequests =
+      <SetReceiptPaymentsRequest>[];
   int listRecipientsCalls = 0;
 
   @override
@@ -1609,6 +1724,19 @@ class _FakeDebtBackendService extends DebtBackendService {
       return onSearchUsers!(clonedRequest);
     }
     return UsersResponse(success: true);
+  }
+
+  @override
+  Future<ReceiptResponse> setReceiptPayments(
+    String accessToken,
+    SetReceiptPaymentsRequest request,
+  ) async {
+    final clonedRequest = request.deepCopy();
+    setPaymentRequests.add(clonedRequest);
+    if (onSetReceiptPayments != null) {
+      return onSetReceiptPayments!(clonedRequest);
+    }
+    return ReceiptResponse(success: true);
   }
 
   @override

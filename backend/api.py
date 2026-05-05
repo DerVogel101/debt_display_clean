@@ -127,6 +127,10 @@ def _receipt_list_actor_filter(value: int) -> str:
 def _status_for_exc(exc: Exception) -> int:
     if isinstance(exc, HTTPException):
         return exc.status_code
+    if isinstance(exc, PermissionError):
+        return 403
+    if isinstance(exc, LookupError):
+        return 404
     if isinstance(exc, ValueError):
         return 404 if "not found" in str(exc).lower() else 400
     return 500
@@ -201,6 +205,16 @@ def _split_input_from_pb(split) -> tuple[float, list[tuple[int, float]]]:
     )
 
 
+def _payment_inputs_from_pb(request) -> list[tuple[int | None, float]]:
+    return [
+        (
+            int(payment.user_id) if _has_field(payment, "user_id") else None,
+            float(payment.amount_paid),
+        )
+        for payment in request.payments
+    ]
+
+
 def _receipt_split_to_pb(receipt) -> debt_pb2.ReceiptSplit | None:
     if receipt.owner_share_percent is None:
         return None
@@ -209,12 +223,14 @@ def _receipt_split_to_pb(receipt) -> debt_pb2.ReceiptSplit | None:
     msg = debt_pb2.ReceiptSplit(
         owner_share_percent=float(receipt.owner_share_percent),
         owner_amount=amount_owed * float(receipt.owner_share_percent) / 100.0,
+        owner_amount_paid=float(receipt.owner_amount_paid or 0.0),
     )
     for share in getattr(receipt, "recipient_shares", []) or []:
         share_msg = msg.recipient_shares.add(
             user_id=share.user_id,
             share_percent=float(share.share_percent),
             amount=amount_owed * float(share.share_percent) / 100.0,
+            amount_paid=float(share.amount_paid or 0.0),
         )
         if share.user_name_snapshot is not None:
             share_msg.user_name = share.user_name_snapshot
@@ -701,6 +717,10 @@ async def update_receipt_route(request: Request, session: AsyncSession = Depends
     proto_req.ParseFromString(body)
     try:
         user = await _current_user(request, session)
+        if _has_field(proto_req, "amount_paid"):
+            raise ValueError(
+                "amount_paid is derived; use /receipts/set-payments"
+            )
         receipt = await services.update_receipt_for_owner(
             session=session,
             actor_user_id=user.id,
@@ -708,7 +728,7 @@ async def update_receipt_route(request: Request, session: AsyncSession = Depends
             title=proto_req.title if _has_field(proto_req, "title") else None,
             description=proto_req.description if _has_field(proto_req, "description") else None,
             amount_owed=proto_req.amount_owed if _has_field(proto_req, "amount_owed") else None,
-            amount_paid=proto_req.amount_paid if _has_field(proto_req, "amount_paid") else None,
+            amount_paid=None,
             due_date=_dt_from_proto(proto_req.due_date if _has_field(proto_req, "due_date") else None),
             notes=proto_req.notes if _has_field(proto_req, "notes") else None,
             currency=proto_req.currency if _has_field(proto_req, "currency") else None,
@@ -732,6 +752,27 @@ async def update_receipt_route(request: Request, session: AsyncSession = Depends
                 actor_user_id=user.id,
                 receipt_id=receipt.id,
             )
+        await session.commit()
+        receipt = await get_receipt_by_id(session, receipt.id)
+        return _pb_response(debt_pb2.ReceiptResponse(success=True, receipt=_receipt_to_pb(receipt)))
+    except Exception as exc:
+        await session.rollback()
+        return _error_response(debt_pb2.ReceiptResponse, exc)
+
+
+@api_app.post("/receipts/set-payments")
+async def set_receipt_payments_route(request: Request, session: AsyncSession = Depends(get_session)) -> ProtobufResponse:
+    body = await request.body()
+    proto_req = debt_pb2.SetReceiptPaymentsRequest()
+    proto_req.ParseFromString(body)
+    try:
+        user = await _current_user(request, session)
+        receipt = await services.set_receipt_payments_for_owner(
+            session=session,
+            actor_user_id=user.id,
+            receipt_id=proto_req.receipt_id,
+            payments=_payment_inputs_from_pb(proto_req),
+        )
         await session.commit()
         receipt = await get_receipt_by_id(session, receipt.id)
         return _pb_response(debt_pb2.ReceiptResponse(success=True, receipt=_receipt_to_pb(receipt)))
