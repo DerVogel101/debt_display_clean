@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 enum AppDestination {
   home('Home', Icons.home_rounded),
   bills('Bills', Icons.receipt_long_rounded),
+  recipientGroups('Recipient groups', Icons.groups_rounded),
   profile('Profile', Icons.person_rounded),
   menu('Menu', Icons.menu_rounded);
 

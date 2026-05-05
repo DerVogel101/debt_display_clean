@@ -8,7 +8,7 @@
 // ignore_for_file: constant_identifier_names
 // ignore_for_file: curly_braces_in_flow_control_structures
 // ignore_for_file: deprecated_member_use_from_same_package, library_prefixes
-// ignore_for_file: non_constant_identifier_names, prefer_relative_imports
+// ignore_for_file: always_use_package_imports, non_constant_identifier_names, prefer_relative_imports
 
 import 'dart:core' as $core;
 
@@ -1982,6 +1982,72 @@ class UpdateUserRequest extends $pb.GeneratedMessage {
   $core.bool hasAvatarUrl() => $_has(2);
   @$pb.TagNumber(3)
   void clearAvatarUrl() => $_clearField(3);
+}
+
+class UserSearchRequest extends $pb.GeneratedMessage {
+  factory UserSearchRequest({
+    $core.String? query,
+    $core.int? limit,
+  }) {
+    final result = create();
+    if (query != null) result.query = query;
+    if (limit != null) result.limit = limit;
+    return result;
+  }
+
+  UserSearchRequest._();
+
+  factory UserSearchRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory UserSearchRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'UserSearchRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'debt'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'query')
+    ..aI(2, _omitFieldNames ? '' : 'limit')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UserSearchRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UserSearchRequest copyWith(void Function(UserSearchRequest) updates) =>
+      super.copyWith((message) => updates(message as UserSearchRequest))
+          as UserSearchRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static UserSearchRequest create() => UserSearchRequest._();
+  @$core.override
+  UserSearchRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static UserSearchRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<UserSearchRequest>(create);
+  static UserSearchRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get query => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set query($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasQuery() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearQuery() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get limit => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set limit($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasLimit() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearLimit() => $_clearField(2);
 }
 
 class CreateRecipientRequest extends $pb.GeneratedMessage {

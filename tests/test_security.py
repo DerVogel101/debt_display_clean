@@ -10,9 +10,10 @@ from fastapi import HTTPException
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.orm import selectinload
 from starlette.requests import Request
 
-from backend import authorization, db, main, services
+from backend import authorization, db, main, seed_test_data, services
 from backend.config import settings
 from backend.proto import debt_pb2
 from backend.proto import auth_pb2
@@ -358,6 +359,44 @@ class LoginHardeningTests(AsyncDatabaseTestCase):
         self.assertEqual(user.email, claims["email"])
         self.assertEqual(user.name, claims["name"])
         self.assertEqual(user.avatar_url, claims["picture"])
+
+
+class TestDataSeedTests(AsyncDatabaseTestCase):
+    async def test_seed_test_data_uses_first_user_and_is_idempotent(self) -> None:
+        first_user = await self._create_user(
+            "auth0|first",
+            "first@example.com",
+            "First User",
+        )
+
+        await seed_test_data.seed_test_data()
+        await seed_test_data.seed_test_data()
+
+        async with db.async_session_maker() as session:
+            users = await db.search_users_by_prefix(
+                session,
+                "ali",
+                exclude_user_id=0,
+            )
+            recipients = await session.execute(
+                select(db.Recipient).where(db.Recipient.name == "Demo household")
+            )
+            receipts = await session.execute(
+                select(db.Receipt)
+                .where(db.Receipt.title == "Demo rent top-up")
+                .options(selectinload(db.Receipt.recipient_shares), selectinload(db.Receipt.tags))
+            )
+
+        self.assertEqual([user.email for user in users], ["alice.demo@example.com"])
+        recipient = recipients.scalar_one_or_none()
+        receipt = receipts.scalar_one_or_none()
+        self.assertIsNotNone(recipient)
+        self.assertIsNotNone(receipt)
+        self.assertEqual(recipient.owner_id, first_user.id)
+        self.assertEqual(receipt.owner_id, first_user.id)
+        self.assertEqual(receipt.owner_share_percent, 40.0)
+        self.assertEqual(len(receipt.recipient_shares), 2)
+        self.assertEqual([(tag.icon, tag.text) for tag in receipt.tags], [("🏠", "Rent")])
 
 
 class ReceiptAndFileAuthorizationTests(AsyncDatabaseTestCase):
@@ -974,6 +1013,87 @@ class LiveApiRegressionTests(AsyncDatabaseTestCase):
             )
             self.assertIsNone(result.scalar_one_or_none())
 
+    async def test_users_search_requires_auth(self) -> None:
+        transport = ASGITransport(app=main.app)
+        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+            response = await client.post(
+                "/api/users/search",
+                content=debt_pb2.UserSearchRequest(query="mem").SerializeToString(),
+                headers={"Content-Type": "application/x-protobuf"},
+            )
+        parsed = self._parse_message(debt_pb2.UsersResponse, response)
+
+        self.assertEqual(response.status_code, 401)
+        self.assertFalse(parsed.success)
+
+    async def test_users_search_rejects_short_query(self) -> None:
+        response = await self._post_protobuf(
+            "/api/users/search",
+            debt_pb2.UserSearchRequest(query="me"),
+            "owner-token",
+        )
+        parsed = self._parse_message(debt_pb2.UsersResponse, response)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(parsed.success)
+        self.assertIn("at least 3 characters", parsed.message)
+
+    async def test_users_search_matches_prefix_and_excludes_current_user(self) -> None:
+        async with db.async_session_maker() as session:
+            await db.get_or_create_user(
+                session=session,
+                sub="auth0|member-two",
+                email="member.two@example.com",
+                name="Member Two",
+                avatar_url=None,
+            )
+            await db.get_or_create_user(
+                session=session,
+                sub="auth0|other",
+                email="other@example.com",
+                name="Other",
+                avatar_url=None,
+            )
+            await session.commit()
+
+        response = await self._post_protobuf(
+            "/api/users/search",
+            debt_pb2.UserSearchRequest(query="mem", limit=10),
+            "owner-token",
+        )
+        parsed = self._parse_message(debt_pb2.UsersResponse, response)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(parsed.success)
+        self.assertEqual(
+            [user.email for user in parsed.users],
+            ["member@example.com", "member.two@example.com"],
+        )
+        self.assertNotIn(self.owner.id, [user.id for user in parsed.users])
+
+    async def test_users_search_respects_limit_cap(self) -> None:
+        async with db.async_session_maker() as session:
+            for index in range(12):
+                await db.get_or_create_user(
+                    session=session,
+                    sub=f"auth0|prefix-{index}",
+                    email=f"prefix-{index}@example.com",
+                    name=f"Prefix {index}",
+                    avatar_url=None,
+                )
+            await session.commit()
+
+        response = await self._post_protobuf(
+            "/api/users/search",
+            debt_pb2.UserSearchRequest(query="pre", limit=99),
+            "owner-token",
+        )
+        parsed = self._parse_message(debt_pb2.UsersResponse, response)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(parsed.success)
+        self.assertEqual(len(parsed.users), 10)
+
     async def test_receipts_get_allows_recipient_member(self) -> None:
         response = await self._post_protobuf(
             "/api/receipts/get",
@@ -1045,6 +1165,33 @@ class LiveApiRegressionTests(AsyncDatabaseTestCase):
 
         self.assertIsNotNone(stored)
         self.assertEqual(stored.original_filename, "Quarterly Report_.pdf")
+
+    async def test_recipient_member_routes_are_owner_only(self) -> None:
+        owner_response = await self._post_protobuf(
+            "/api/recipients/add-member",
+            debt_pb2.RecipientMemberRequest(
+                recipient_id=self.recipient.id,
+                user_id=self.stranger.id,
+            ),
+            "owner-token",
+        )
+        owner_parsed = self._parse_message(debt_pb2.ActionResponse, owner_response)
+
+        self.assertEqual(owner_response.status_code, 200)
+        self.assertTrue(owner_parsed.success)
+
+        member_response = await self._post_protobuf(
+            "/api/recipients/remove-member",
+            debt_pb2.RecipientMemberRequest(
+                recipient_id=self.recipient.id,
+                user_id=self.stranger.id,
+            ),
+            "member-token",
+        )
+        member_parsed = self._parse_message(debt_pb2.ActionResponse, member_response)
+
+        self.assertEqual(member_response.status_code, 403)
+        self.assertFalse(member_parsed.success)
 
 
 class ReceiptListOrderingAndFilterTests(AsyncDatabaseTestCase):

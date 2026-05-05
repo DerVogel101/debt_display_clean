@@ -6,6 +6,7 @@ from backend import db
 from backend.api import api_app
 from backend.config import settings
 from backend.frontend import FrontendStaticFiles
+from backend.seed_test_data import seed_test_data
 
 app = FastAPI(title="root")
 app.add_middleware(
@@ -32,7 +33,8 @@ app.mount(
 
 @app.on_event("startup")
 async def _migrate_db_schema_on_startup() -> None:
-    pass
+    if settings.GENERATE_TEST_DATA_ON_STARTUP:
+        await seed_test_data()
 
 
 if __name__ == "__main__":

@@ -721,6 +721,23 @@ final $typed_data.Uint8List updateUserRequestDescriptor = $convert.base64Decode(
     'IgASgJSAFSBG5hbWWIAQESIgoKYXZhdGFyX3VybBgDIAEoCUgCUglhdmF0YXJVcmyIAQFCCAoG'
     'X2VtYWlsQgcKBV9uYW1lQg0KC19hdmF0YXJfdXJs');
 
+@$core.Deprecated('Use userSearchRequestDescriptor instead')
+const UserSearchRequest$json = {
+  '1': 'UserSearchRequest',
+  '2': [
+    {'1': 'query', '3': 1, '4': 1, '5': 9, '10': 'query'},
+    {'1': 'limit', '3': 2, '4': 1, '5': 5, '9': 0, '10': 'limit', '17': true},
+  ],
+  '8': [
+    {'1': '_limit'},
+  ],
+};
+
+/// Descriptor for `UserSearchRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List userSearchRequestDescriptor = $convert.base64Decode(
+    'ChFVc2VyU2VhcmNoUmVxdWVzdBIUCgVxdWVyeRgBIAEoCVIFcXVlcnkSGQoFbGltaXQYAiABKA'
+    'VIAFIFbGltaXSIAQFCCAoGX2xpbWl0');
+
 @$core.Deprecated('Use createRecipientRequestDescriptor instead')
 const CreateRecipientRequest$json = {
   '1': 'CreateRecipientRequest',

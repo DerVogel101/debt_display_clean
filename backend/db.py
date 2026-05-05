@@ -10,6 +10,7 @@ from collections.abc import AsyncGenerator
 from sqlalchemy import (
     String, Integer, ForeignKey, event, DateTime, func,
     BigInteger, UniqueConstraint, Index, Boolean, Table, Column, Text, select,
+    or_,
 )
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
@@ -304,6 +305,34 @@ async def update_user_profile(
         user.avatar_url = avatar_url
     await session.flush()
     return user
+
+
+async def search_users_by_prefix(
+    session: AsyncSession,
+    query: str,
+    *,
+    exclude_user_id: int,
+    limit: int = 10,
+) -> "list[User]":
+    normalized = query.strip().lower()
+    if len(normalized) < 3:
+        raise ValueError("User search query must be at least 3 characters")
+
+    capped_limit = max(1, min(limit, 10))
+    prefix = f"{normalized}%"
+    result = await session.execute(
+        select(User)
+        .where(User.id != exclude_user_id)
+        .where(
+            or_(
+                func.lower(User.name).like(prefix),
+                func.lower(User.email).like(prefix),
+            )
+        )
+        .order_by(func.lower(func.coalesce(User.name, User.email, "")), User.id)
+        .limit(capped_limit)
+    )
+    return list(result.scalars().all())
 
 
 async def delete_user(session: AsyncSession, user_id: int) -> list[str]:

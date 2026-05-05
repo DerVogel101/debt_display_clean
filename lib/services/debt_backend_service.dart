@@ -65,4 +65,85 @@ class DebtBackendService {
     );
     return _parseProtobufResponse(response, TagsResponse.fromBuffer);
   }
+
+  Future<UsersResponse> searchUsers(
+    String accessToken,
+    UserSearchRequest request,
+  ) async {
+    final response = await _dio.post(
+      '/api/users/search',
+      data: request.writeToBuffer(),
+      options: _withAuthToken(accessToken),
+    );
+    return _parseProtobufResponse(response, UsersResponse.fromBuffer);
+  }
+
+  Future<RecipientsResponse> listRecipients(String accessToken) async {
+    final response = await _dio.post(
+      '/api/recipients/list',
+      data: EmptyRequest().writeToBuffer(),
+      options: _withAuthToken(accessToken),
+    );
+    return _parseProtobufResponse(response, RecipientsResponse.fromBuffer);
+  }
+
+  Future<RecipientResponse> createRecipient(
+    String accessToken,
+    CreateRecipientRequest request,
+  ) async {
+    final response = await _dio.post(
+      '/api/recipients/create',
+      data: request.writeToBuffer(),
+      options: _withAuthToken(accessToken),
+    );
+    return _parseProtobufResponse(response, RecipientResponse.fromBuffer);
+  }
+
+  Future<RecipientResponse> updateRecipient(
+    String accessToken,
+    UpdateRecipientRequest request,
+  ) async {
+    final response = await _dio.post(
+      '/api/recipients/update',
+      data: request.writeToBuffer(),
+      options: _withAuthToken(accessToken),
+    );
+    return _parseProtobufResponse(response, RecipientResponse.fromBuffer);
+  }
+
+  Future<ActionResponse> addRecipientMember(
+    String accessToken,
+    RecipientMemberRequest request,
+  ) async {
+    final response = await _dio.post(
+      '/api/recipients/add-member',
+      data: request.writeToBuffer(),
+      options: _withAuthToken(accessToken),
+    );
+    return _parseProtobufResponse(response, ActionResponse.fromBuffer);
+  }
+
+  Future<ActionResponse> removeRecipientMember(
+    String accessToken,
+    RecipientMemberRequest request,
+  ) async {
+    final response = await _dio.post(
+      '/api/recipients/remove-member',
+      data: request.writeToBuffer(),
+      options: _withAuthToken(accessToken),
+    );
+    return _parseProtobufResponse(response, ActionResponse.fromBuffer);
+  }
+
+  Future<ActionResponse> deleteRecipient(
+    String accessToken,
+    RecipientLookupRequest request,
+  ) async {
+    final response = await _dio.post(
+      '/api/recipients/delete',
+      data: request.writeToBuffer(),
+      options: _withAuthToken(accessToken),
+    );
+    return _parseProtobufResponse(response, ActionResponse.fromBuffer);
+  }
 }

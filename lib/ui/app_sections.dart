@@ -1,6 +1,8 @@
 import 'package:auth0_flutter/auth0_flutter.dart';
+import 'package:debt_display/generated/debt.pb.dart';
 import 'package:debt_display/state/auth_session_state.dart';
 import 'package:debt_display/state/navigation_state.dart';
+import 'package:debt_display/state/recipient_group_state.dart';
 import 'package:debt_display/state/theme_state.dart';
 import 'package:debt_display/theme/app_themes.dart';
 import 'package:debt_display/ui/bills_section.dart';
@@ -150,6 +152,8 @@ class _AppSectionsState extends State<AppSections> {
           key: const ValueKey('bills'),
           isDesktop: widget.isDesktop,
         );
+      case AppDestination.recipientGroups:
+        return const RecipientGroupsSection(key: ValueKey('recipient-groups'));
       case AppDestination.profile:
         return const ProfileSection(key: ValueKey('profile'));
       case AppDestination.menu:
@@ -412,6 +416,15 @@ class ProfileSection extends StatelessWidget {
   }
 }
 
+class RecipientGroupsSection extends StatelessWidget {
+  const RecipientGroupsSection({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const Column(children: [_RecipientGroupsCard()]);
+  }
+}
+
 class MenuSection extends StatelessWidget {
   const MenuSection({super.key});
 
@@ -441,6 +454,13 @@ class MenuSection extends StatelessWidget {
             'Open the full bills view with filters, sorting, and pagination controls.',
         icon: Icons.receipt_long_rounded,
         destination: AppDestination.bills,
+      ),
+      (
+        title: 'Recipient groups',
+        body:
+            'Create shared recipient groups and manage who can receive split bills.',
+        icon: Icons.groups_rounded,
+        destination: AppDestination.recipientGroups,
       ),
       (
         title: 'Profile',
@@ -1023,6 +1043,551 @@ class _MenuActionTile extends StatelessWidget {
       ),
     );
   }
+}
+
+class _RecipientGroupsCard extends StatefulWidget {
+  const _RecipientGroupsCard();
+
+  @override
+  State<_RecipientGroupsCard> createState() => _RecipientGroupsCardState();
+}
+
+class _RecipientGroupsCardState extends State<_RecipientGroupsCard> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      context.read<RecipientGroupState>().ensureLoaded();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = context.watch<RecipientGroupState>();
+
+    return GlassPanel.secondary(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      borderRadius: const BorderRadius.all(Radius.circular(24)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            alignment: WrapAlignment.spaceBetween,
+            children: [
+              Text(
+                'Recipient groups',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              if (state.isAuthenticated)
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    OutlinedButton.icon(
+                      key: const ValueKey('recipient-groups-refresh-button'),
+                      onPressed: state.isLoadingGroups || state.isMutating
+                          ? null
+                          : state.refresh,
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: const Text('Refresh'),
+                    ),
+                    FilledButton.icon(
+                      key: const ValueKey('recipient-groups-create-button'),
+                      onPressed: state.isMutating
+                          ? null
+                          : () => _showRecipientGroupDialog(context),
+                      icon: const Icon(Icons.group_add_rounded),
+                      label: const Text('Create'),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Create shared recipient groups and manage who can receive split bills.',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: mutedForegroundColor(context, alpha: 0.88),
+            ),
+          ),
+          const SizedBox(height: 18),
+          if (!state.isAuthenticated)
+            FilledButton.icon(
+              key: const ValueKey('recipient-groups-login-button'),
+              onPressed: () {
+                context.read<AuthSessionState>().login();
+              },
+              icon: const Icon(Icons.login_rounded),
+              label: const Text('Log in to manage groups'),
+            )
+          else ...[
+            if (state.isLoadingGroups)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: SizedBox(
+                  width: 26,
+                  height: 26,
+                  child: CircularProgressIndicator(strokeWidth: 2.6),
+                ),
+              ),
+            if (state.errorMessage != null) ...[
+              _InlineError(message: state.errorMessage!),
+              const SizedBox(height: 12),
+            ],
+            if (!state.isLoadingGroups && state.groups.isEmpty)
+              Text(
+                'No recipient groups yet.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: mutedForegroundColor(context, alpha: 0.82),
+                ),
+              )
+            else
+              ...state.groups.map(
+                (group) => Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: _RecipientGroupTile(group: group),
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+Future<void> _showRecipientGroupDialog(
+  BuildContext context, {
+  Recipient? group,
+}) {
+  final recipientGroupState = context.read<RecipientGroupState>();
+  return showDialog<void>(
+    context: context,
+    builder: (dialogContext) =>
+        ChangeNotifierProvider<RecipientGroupState>.value(
+          value: recipientGroupState,
+          child: _RecipientGroupEditorDialog(group: group),
+        ),
+  );
+}
+
+class _RecipientGroupTile extends StatelessWidget {
+  const _RecipientGroupTile({required this.group});
+
+  final Recipient group;
+
+  @override
+  Widget build(BuildContext context) {
+    final state = context.watch<RecipientGroupState>();
+    final isOwner = group.ownerId.toInt() == state.currentUserId;
+
+    return DecoratedBox(
+      decoration: glassSurfaceDecoration(
+        context,
+        variant: AppGlassVariant.secondary,
+        borderRadius: const BorderRadius.all(Radius.circular(18)),
+        includeShadows: false,
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    group.name,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _RoleBadge(label: isOwner ? 'Owner' : 'Member'),
+                if (isOwner) ...[
+                  const SizedBox(width: 4),
+                  IconButton(
+                    key: ValueKey('recipient-group-edit-${group.id}'),
+                    tooltip: 'Edit group',
+                    onPressed: state.isMutating
+                        ? null
+                        : () =>
+                              _showRecipientGroupDialog(context, group: group),
+                    icon: const Icon(Icons.edit_rounded),
+                  ),
+                  IconButton(
+                    key: ValueKey('recipient-group-delete-${group.id}'),
+                    tooltip: 'Delete group',
+                    onPressed: state.isMutating
+                        ? null
+                        : () => _confirmDelete(context, group),
+                    icon: const Icon(Icons.delete_outline_rounded),
+                  ),
+                ],
+              ],
+            ),
+            if (group.hasDescription() &&
+                group.description.trim().isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(
+                group.description,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: mutedForegroundColor(context, alpha: 0.84),
+                ),
+              ),
+            ],
+            const SizedBox(height: 10),
+            if (group.members.isEmpty)
+              Text(
+                'No members',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: mutedForegroundColor(context, alpha: 0.78),
+                  fontWeight: FontWeight.w700,
+                ),
+              )
+            else
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: group.members
+                    .map((member) => _UserChip(user: member))
+                    .toList(),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmDelete(BuildContext context, Recipient group) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete recipient group?'),
+        content: Text(
+          'Delete ${group.name}? Existing receipt snapshots remain.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            key: const ValueKey('recipient-group-confirm-delete-button'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      await context.read<RecipientGroupState>().deleteGroup(group);
+    }
+  }
+}
+
+class _RecipientGroupEditorDialog extends StatefulWidget {
+  const _RecipientGroupEditorDialog({this.group});
+
+  final Recipient? group;
+
+  @override
+  State<_RecipientGroupEditorDialog> createState() =>
+      _RecipientGroupEditorDialogState();
+}
+
+class _RecipientGroupEditorDialogState
+    extends State<_RecipientGroupEditorDialog> {
+  late final TextEditingController _nameController;
+  late final TextEditingController _descriptionController;
+  late final TextEditingController _searchController;
+  late final Map<int, User> _selectedMembers;
+
+  @override
+  void initState() {
+    super.initState();
+    final group = widget.group;
+    _nameController = TextEditingController(text: group?.name ?? '');
+    _descriptionController = TextEditingController(
+      text: group?.hasDescription() == true ? group!.description : '',
+    );
+    _searchController = TextEditingController();
+    _selectedMembers = {
+      for (final member in group?.members ?? <User>[])
+        member.id.toInt(): member.deepCopy(),
+    };
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _descriptionController.dispose();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = context.watch<RecipientGroupState>();
+    final title = widget.group == null
+        ? 'Create recipient group'
+        : 'Edit recipient group';
+
+    return AlertDialog(
+      title: Text(title),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 560),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                key: const ValueKey('recipient-group-name-field'),
+                controller: _nameController,
+                decoration: const InputDecoration(labelText: 'Group name'),
+                textInputAction: TextInputAction.next,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                key: const ValueKey('recipient-group-description-field'),
+                controller: _descriptionController,
+                decoration: const InputDecoration(labelText: 'Description'),
+                maxLines: 2,
+              ),
+              const SizedBox(height: 18),
+              Text(
+                'Members',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 8),
+              if (_selectedMembers.isEmpty)
+                Text(
+                  'No members selected',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: mutedForegroundColor(context, alpha: 0.82),
+                  ),
+                )
+              else
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _selectedMembers.values
+                      .map(
+                        (user) => InputChip(
+                          key: ValueKey('recipient-selected-member-${user.id}'),
+                          label: Text(_userLabel(user)),
+                          deleteIcon: Icon(
+                            Icons.close_rounded,
+                            key: ValueKey(
+                              'recipient-selected-member-remove-${user.id}',
+                            ),
+                          ),
+                          onDeleted: () {
+                            setState(() {
+                              _selectedMembers.remove(user.id.toInt());
+                            });
+                          },
+                        ),
+                      )
+                      .toList(),
+                ),
+              const SizedBox(height: 14),
+              TextField(
+                key: const ValueKey('recipient-user-search-field'),
+                controller: _searchController,
+                decoration: InputDecoration(
+                  labelText: 'Find user',
+                  helperText: 'Type at least 3 characters from name or email.',
+                  suffixIcon: state.isSearchingUsers
+                      ? const Padding(
+                          padding: EdgeInsets.all(14),
+                          child: SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2.4),
+                          ),
+                        )
+                      : null,
+                ),
+                onChanged: context.read<RecipientGroupState>().searchUsers,
+              ),
+              if (state.searchErrorMessage != null) ...[
+                const SizedBox(height: 10),
+                _InlineError(message: state.searchErrorMessage!),
+              ],
+              if (state.searchResults.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                ...state.searchResults.map(
+                  (user) => _UserSearchResultTile(
+                    user: user,
+                    isSelected: _selectedMembers.containsKey(user.id.toInt()),
+                    onAdd: () {
+                      setState(() {
+                        _selectedMembers[user.id.toInt()] = user.deepCopy();
+                      });
+                    },
+                  ),
+                ),
+              ],
+              if (state.errorMessage != null) ...[
+                const SizedBox(height: 12),
+                _InlineError(message: state.errorMessage!),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: state.isMutating
+              ? null
+              : () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          key: const ValueKey('recipient-group-save-button'),
+          onPressed: state.isMutating ? null : () => _save(context),
+          child: state.isMutating
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2.4),
+                )
+              : const Text('Save'),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _save(BuildContext context) async {
+    final saved = await context.read<RecipientGroupState>().saveGroup(
+      existingGroup: widget.group,
+      name: _nameController.text,
+      description: _descriptionController.text,
+      memberIds: _selectedMembers.keys,
+    );
+    if (saved && context.mounted) {
+      Navigator.of(context).pop();
+    }
+  }
+}
+
+class _UserSearchResultTile extends StatelessWidget {
+  const _UserSearchResultTile({
+    required this.user,
+    required this.isSelected,
+    required this.onAdd,
+  });
+
+  final User user;
+  final bool isSelected;
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      key: ValueKey('recipient-user-search-result-${user.id}'),
+      contentPadding: EdgeInsets.zero,
+      leading: const Icon(Icons.person_add_alt_1_rounded),
+      title: Text(_userLabel(user)),
+      subtitle: Text(_userSubtitle(user)),
+      trailing: isSelected
+          ? const Icon(Icons.check_circle_rounded, color: brandPrimary)
+          : IconButton(
+              key: ValueKey('recipient-user-add-${user.id}'),
+              tooltip: 'Add member',
+              onPressed: onAdd,
+              icon: const Icon(Icons.add_circle_outline_rounded),
+            ),
+      onTap: isSelected ? null : onAdd,
+    );
+  }
+}
+
+class _UserChip extends StatelessWidget {
+  const _UserChip({required this.user});
+
+  final User user;
+
+  @override
+  Widget build(BuildContext context) {
+    return Chip(
+      avatar: const Icon(Icons.person_rounded, size: 18),
+      label: Text(_userLabel(user)),
+    );
+  }
+}
+
+class _RoleBadge extends StatelessWidget {
+  const _RoleBadge({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: glassSurfaceDecoration(
+        context,
+        variant: AppGlassVariant.secondary,
+        borderRadius: const BorderRadius.all(Radius.circular(999)),
+        includeShadows: false,
+      ),
+      child: Text(
+        label,
+        style: Theme.of(
+          context,
+        ).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w800),
+      ),
+    );
+  }
+}
+
+class _InlineError extends StatelessWidget {
+  const _InlineError({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      message,
+      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+        color: Theme.of(context).colorScheme.error,
+        fontWeight: FontWeight.w700,
+      ),
+    );
+  }
+}
+
+String _userLabel(User user) {
+  if (user.hasName() && user.name.trim().isNotEmpty) {
+    return user.name;
+  }
+  if (user.hasEmail() && user.email.trim().isNotEmpty) {
+    return user.email;
+  }
+  return 'User ${user.id}';
+}
+
+String _userSubtitle(User user) {
+  if (user.hasEmail() && user.email.trim().isNotEmpty) {
+    return user.email;
+  }
+  return 'ID ${user.id}';
 }
 
 class _ThemeSettingsCard extends StatelessWidget {

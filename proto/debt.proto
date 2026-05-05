@@ -157,6 +157,11 @@ message UpdateUserRequest {
   optional string avatar_url = 3;
 }
 
+message UserSearchRequest {
+  string query = 1;
+  optional int32 limit = 2;
+}
+
 message CreateRecipientRequest {
   string name = 1;
   optional string description = 2;

@@ -308,6 +308,14 @@ class UpdateUserRequest(_message.Message):
     avatar_url: str
     def __init__(self, email: _Optional[str] = ..., name: _Optional[str] = ..., avatar_url: _Optional[str] = ...) -> None: ...
 
+class UserSearchRequest(_message.Message):
+    __slots__ = ("query", "limit")
+    QUERY_FIELD_NUMBER: _ClassVar[int]
+    LIMIT_FIELD_NUMBER: _ClassVar[int]
+    query: str
+    limit: int
+    def __init__(self, query: _Optional[str] = ..., limit: _Optional[int] = ...) -> None: ...
+
 class CreateRecipientRequest(_message.Message):
     __slots__ = ("name", "description", "member_ids")
     NAME_FIELD_NUMBER: _ClassVar[int]

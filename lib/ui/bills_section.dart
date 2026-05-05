@@ -383,7 +383,9 @@ class _BillsFilterCard extends StatelessWidget {
                     query: draftQuery,
                     isLoading: state.isLoading,
                     onChanged: (value) {
-                      onDraftChanged(draftQuery.copyWith(orderDirection: value));
+                      onDraftChanged(
+                        draftQuery.copyWith(orderDirection: value),
+                      );
                     },
                   ),
                   const SizedBox(height: 18),
@@ -698,6 +700,19 @@ class _BillReceiptTile extends StatelessWidget {
                         fontWeight: FontWeight.w800,
                       ),
                     ),
+                    if (receipt.hasDescription() &&
+                        receipt.description.trim().isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        receipt.description,
+                        maxLines: 1,
+                        softWrap: false,
+                        overflow: TextOverflow.fade,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: mutedForegroundColor(context, alpha: 0.82),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 6),
                     Wrap(
                       spacing: 8,
@@ -746,6 +761,14 @@ class _BillReceiptTile extends StatelessWidget {
               _MetricText(label: 'Due', value: dueLabel),
             ],
           ),
+          if (receipt.hasSplit() &&
+              receipt.split.recipientShares.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            _ReceiptSplitShareRow(
+              shares: receipt.split.recipientShares,
+              amountFormat: amountFormat,
+            ),
+          ],
           if (receipt.tags.isNotEmpty) ...[
             const SizedBox(height: 14),
             Wrap(
@@ -758,6 +781,82 @@ class _BillReceiptTile extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ReceiptSplitShareRow extends StatelessWidget {
+  const _ReceiptSplitShareRow({
+    required this.shares,
+    required this.amountFormat,
+  });
+
+  final List<ReceiptRecipientShare> shares;
+  final NumberFormat amountFormat;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: shares
+          .map(
+            (share) => _SplitSharePill(
+              label: _shareUserLabel(share),
+              amountLabel: amountFormat.format(share.amount),
+              percentLabel: '${share.sharePercent.toStringAsFixed(0)}%',
+            ),
+          )
+          .toList(),
+    );
+  }
+}
+
+class _SplitSharePill extends StatelessWidget {
+  const _SplitSharePill({
+    required this.label,
+    required this.amountLabel,
+    required this.percentLabel,
+  });
+
+  final String label;
+  final String amountLabel;
+  final String percentLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: glassSurfaceDecoration(
+        context,
+        variant: AppGlassVariant.secondary,
+        tone: brandPrimary,
+        borderRadius: const BorderRadius.all(Radius.circular(999)),
+        includeShadows: false,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.person_rounded, size: 16, color: brandPrimary),
+          const SizedBox(width: 6),
+          Text(
+            '$label · $amountLabel · $percentLabel',
+            style: Theme.of(
+              context,
+            ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _shareUserLabel(ReceiptRecipientShare share) {
+  if (share.hasUserName() && share.userName.trim().isNotEmpty) {
+    return share.userName;
+  }
+  if (share.hasUserEmail() && share.userEmail.trim().isNotEmpty) {
+    return share.userEmail;
+  }
+  return 'User ${share.userId}';
 }
 
 class _ControlBlock extends StatelessWidget {

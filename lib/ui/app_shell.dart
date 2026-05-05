@@ -531,6 +531,7 @@ class _MobileBottomNavigation extends StatelessWidget {
     );
     final selectedDestination = switch (currentDestination) {
       AppDestination.profile => AppDestination.menu,
+      AppDestination.recipientGroups => AppDestination.menu,
       AppDestination.home => AppDestination.home,
       AppDestination.bills => AppDestination.bills,
       AppDestination.menu => AppDestination.menu,

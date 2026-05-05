@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     FRONTEND_HTML_CACHE_SECONDS: int = 0
     FRONTEND_SHELL_CACHE_SECONDS: int = 0
 
+    # Local/demo seed data. Disable in production with GENERATE_TEST_DATA_ON_STARTUP=false.
+    GENERATE_TEST_DATA_ON_STARTUP: bool = True
+
     # ── Server ports ──────────────────────────────────────────────────────────
     # Dev:  Flutter runs on :3000, backend on :3300
     # Prod: set BACKEND_HOST/BACKEND_PORT in backend/.env or environment

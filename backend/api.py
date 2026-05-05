@@ -24,6 +24,7 @@ from backend.db import (
     list_files_for_receipt,
     list_recipients_for_user,
     remove_member_from_recipient,
+    search_users_by_prefix,
     tag_receipt,
     untag_receipt,
     update_recipient,
@@ -391,6 +392,30 @@ async def update_me(request: Request, session: AsyncSession = Depends(get_sessio
     except Exception as exc:
         await session.rollback()
         return _error_response(debt_pb2.UserResponse, exc)
+
+
+@api_app.post("/users/search")
+async def search_users_route(request: Request, session: AsyncSession = Depends(get_session)) -> ProtobufResponse:
+    body = await request.body()
+    proto_req = debt_pb2.UserSearchRequest()
+    proto_req.ParseFromString(body)
+    try:
+        user = await _current_user(request, session)
+        limit = proto_req.limit if _has_field(proto_req, "limit") else 10
+        users = await search_users_by_prefix(
+            session,
+            proto_req.query,
+            exclude_user_id=user.id,
+            limit=limit,
+        )
+        await session.commit()
+        resp = debt_pb2.UsersResponse(success=True)
+        for matched_user in users:
+            resp.users.add().CopyFrom(_user_to_pb(matched_user))
+        return _pb_response(resp)
+    except Exception as exc:
+        await session.rollback()
+        return _error_response(debt_pb2.UsersResponse, exc)
 
 
 @api_app.post("/users/delete")
