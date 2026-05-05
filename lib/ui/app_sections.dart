@@ -286,7 +286,7 @@ class HomeSection extends StatelessWidget {
                       );
                     },
                     icon: const Icon(Icons.receipt_long_rounded),
-                    label: const Text('Open bill list'),
+                    label: const Text('View Bills'),
                   ),
                 ],
               ),

@@ -687,115 +687,128 @@ class _BillReceiptTile extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       borderRadius: const BorderRadius.all(Radius.circular(24)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      receipt.title,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  receipt.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                if (receipt.hasDescription() &&
+                    receipt.description.trim().isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    receipt.description,
+                    maxLines: 1,
+                    softWrap: false,
+                    overflow: TextOverflow.fade,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: mutedForegroundColor(context, alpha: 0.82),
                     ),
-                    if (receipt.hasDescription() &&
-                        receipt.description.trim().isNotEmpty) ...[
-                      const SizedBox(height: 3),
-                      Text(
-                        receipt.description,
-                        maxLines: 1,
-                        softWrap: false,
-                        overflow: TextOverflow.fade,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: mutedForegroundColor(context, alpha: 0.82),
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _MetaChip(
-                          label: roleLabel,
-                          icon: roleLabel == 'Owner'
-                              ? Icons.badge_rounded
-                              : Icons.people_alt_rounded,
-                        ),
-                        _MetaChip(
-                          label: receipt.isPaid ? 'Paid' : 'Unpaid',
-                          icon: receipt.isPaid
-                              ? Icons.check_circle_rounded
-                              : Icons.schedule_rounded,
-                          tone: receipt.isPaid ? Colors.green : Colors.orange,
-                        ),
-                        _MetaChip(
-                          label: recipientLabel,
-                          icon: Icons.group_work_rounded,
-                        ),
-                      ],
+                  ),
+                ],
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _MetaChip(
+                      label: roleLabel,
+                      icon: roleLabel == 'Owner'
+                          ? Icons.badge_rounded
+                          : Icons.people_alt_rounded,
+                    ),
+                    _MetaChip(
+                      label: receipt.isPaid ? 'Paid' : 'Unpaid',
+                      icon: receipt.isPaid
+                          ? Icons.check_circle_rounded
+                          : Icons.schedule_rounded,
+                      tone: receipt.isPaid ? Colors.green : Colors.orange,
+                    ),
+                    _MetaChip(
+                      label: recipientLabel,
+                      icon: Icons.group_work_rounded,
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(width: 14),
-              Text(
-                amountFormat.format(receipt.amountOwed),
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 18,
-            runSpacing: 8,
-            children: [
-              _MetricText(
-                label: 'My share',
-                value: amountFormat.format(myShare),
-              ),
-              _MetricText(
-                label: 'Paid',
-                value: amountFormat.format(amountPaid),
-              ),
-              _MetricText(label: 'Due', value: dueLabel),
-            ],
-          ),
-          if (isOwner) ...[
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              key: ValueKey('receipt-payments-${receipt.id}'),
-              onPressed: state.isMutating
-                  ? null
-                  : () => _showReceiptPaymentsDialog(
-                      context,
-                      state,
-                      receipt,
-                      amountFormat,
+                const SizedBox(height: 14),
+                Wrap(
+                  spacing: 18,
+                  runSpacing: 8,
+                  children: [
+                    _MetricText(
+                      label: 'My share',
+                      value: amountFormat.format(myShare),
                     ),
-              icon: const Icon(Icons.payments_rounded),
-              label: const Text('Payments'),
+                    _MetricText(
+                      label: 'Paid',
+                      value: amountFormat.format(amountPaid),
+                    ),
+                    _MetricText(label: 'Due', value: dueLabel),
+                  ],
+                ),
+                if (isOwner) ...[
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    key: ValueKey('receipt-payments-${receipt.id}'),
+                    onPressed: state.isMutating
+                        ? null
+                        : () => _showReceiptPaymentsDialog(
+                            context,
+                            state,
+                            receipt,
+                            amountFormat,
+                          ),
+                    icon: const Icon(Icons.payments_rounded),
+                    label: const Text('Payments'),
+                  ),
+                ],
+                if (receipt.hasSplit()) ...[
+                  const SizedBox(height: 14),
+                  _ReceiptSplitShareRow(
+                    receipt: receipt,
+                    amountFormat: amountFormat,
+                  ),
+                ],
+                if (receipt.tags.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: receipt.tags
+                        .map((tag) => _TagPill(tag: tag))
+                        .toList(),
+                  ),
+                ],
+              ],
             ),
-          ],
-          if (receipt.hasSplit()) ...[
-            const SizedBox(height: 14),
-            _ReceiptSplitShareRow(receipt: receipt, amountFormat: amountFormat),
-          ],
-          if (receipt.tags.isNotEmpty) ...[
-            const SizedBox(height: 14),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: receipt.tags.map((tag) => _TagPill(tag: tag)).toList(),
+          ),
+          const SizedBox(width: 14),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 104),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  amountFormat.format(receipt.amountOwed),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.right,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ],
       ),
     );
@@ -1184,11 +1197,16 @@ class _MetaChip extends StatelessWidget {
         children: [
           Icon(icon, size: 16, color: tone ?? brandPrimary),
           const SizedBox(width: 6),
-          Text(
-            label,
-            style: Theme.of(
-              context,
-            ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              softWrap: false,
+              style: Theme.of(
+                context,
+              ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700),
+            ),
           ),
         ],
       ),

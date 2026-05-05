@@ -55,7 +55,7 @@ void main() {
     expect(find.text('Weekend train tickets'), findsOneWidget);
     expect(find.text('Internet renewal'), findsOneWidget);
     expect(find.text('Home'), findsOneWidget);
-    expect(find.text('Open bill list'), findsOneWidget);
+    expect(find.text('View Bills'), findsOneWidget);
     expect(find.text('Total still owed'), findsOneWidget);
     expect(find.text(expectedAmount), findsOneWidget);
   });
@@ -794,6 +794,54 @@ void main() {
       );
     },
   );
+
+  testWidgets('bills view keeps trailing amount sized on narrow screens', (
+    tester,
+  ) async {
+    _setTestSurfaceSize(tester, width: 320, height: 1000);
+
+    const longTitle =
+        'Very long shared household receipt title that should stay bounded';
+    const longDescription =
+        'A long one-line description that should not push the amount away';
+    final expectedAmount = _formatExpectedCurrency(
+      123.45,
+      const Locale('en', 'US'),
+    );
+    final fakeService = _FakeDebtBackendService(
+      availableTags: const [],
+      onListReceipts: (_) {
+        final response = ReceiptsResponse(success: true);
+        response.receipts.add(
+          _testReceipt(
+            id: 44,
+            title: longTitle,
+            description: longDescription,
+            amountOwed: 123.45,
+            amountPaid: 12.30,
+            split: ReceiptSplit(ownerSharePercent: 100, ownerAmount: 123.44),
+          ),
+        );
+        return response;
+      },
+    );
+
+    await tester.pumpWidget(
+      _buildBillsSectionTestApp(
+        authState: _TestAuthSessionState(
+          isAuthenticatedValue: true,
+          accessTokenValue: 'token-1',
+          userIdValue: 10,
+        ),
+        billListState: BillListState(debtBackendService: fakeService),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text(longTitle), findsOneWidget);
+    expect(find.text(expectedAmount), findsOneWidget);
+  });
 
   testWidgets('owner payment edit flow updates paid amount in bills view', (
     tester,
