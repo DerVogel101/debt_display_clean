@@ -1,9 +1,12 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:auth0_flutter/auth0_flutter.dart';
 import 'package:debt_display/generated/debt.pb.dart';
 import 'package:debt_display/state/auth_session_state.dart';
+import 'package:debt_display/state/bill_creation_state.dart';
 import 'package:debt_display/state/bill_list_state.dart';
+import 'package:debt_display/state/home_bill_state.dart';
 import 'package:debt_display/state/navigation_state.dart';
 import 'package:debt_display/state/recipient_group_state.dart';
 import 'package:debt_display/state/theme_state.dart';
@@ -31,31 +34,36 @@ void main() {
 
     await tester.pumpWidget(
       _buildHomeSectionTestApp(
-        authState: _TestAuthSessionState(),
+        authState: _TestAuthSessionState(
+          isAuthenticatedValue: true,
+          accessTokenValue: 'token-1',
+          userIdValue: 10,
+        ),
         locale: const Locale('en', 'US'),
         referenceDate: _fixedReferenceDate,
       ),
     );
+    await tester.pumpAndSettle();
 
     final materialLocalizations = _homeMaterialLocalizations(tester);
     final expectedDue = materialLocalizations.formatShortDate(
-      _placeholderDueDate(_fixedReferenceDate, 7),
+      _placeholderDueDate(_fixedReferenceDate, 1),
     );
     final expectedAmount = _formatExpectedCurrency(
-      1357.63,
+      321.45,
       const Locale('en', 'US'),
     );
 
     expect(find.text('Recent outstanding bills'), findsOneWidget);
-    expect(find.textContaining('Due '), findsNWidgets(5));
+    expect(find.textContaining('Due '), findsNWidgets(3));
     expect(find.text('Due $expectedDue'), findsOneWidget);
     expect(find.text('Studio rent top-up'), findsOneWidget);
     expect(find.text('Quarterly electricity bill'), findsOneWidget);
     expect(find.text('Spring grocery split'), findsOneWidget);
-    expect(find.text('Weekend train tickets'), findsOneWidget);
-    expect(find.text('Internet renewal'), findsOneWidget);
-    expect(find.text('Home'), findsOneWidget);
-    expect(find.text('View Bills'), findsOneWidget);
+    expect(find.text('Weekend train tickets'), findsNothing);
+    expect(find.text('Internet renewal'), findsNothing);
+    expect(find.text('View'), findsOneWidget);
+    expect(find.text('Create'), findsOneWidget);
     expect(find.text('Total still owed'), findsOneWidget);
     expect(find.text(expectedAmount), findsOneWidget);
   });
@@ -67,18 +75,23 @@ void main() {
 
     await tester.pumpWidget(
       _buildHomeSectionTestApp(
-        authState: _TestAuthSessionState(),
+        authState: _TestAuthSessionState(
+          isAuthenticatedValue: true,
+          accessTokenValue: 'token-1',
+          userIdValue: 10,
+        ),
         locale: const Locale('de', 'DE'),
         referenceDate: _fixedReferenceDate,
       ),
     );
+    await tester.pumpAndSettle();
 
     final materialLocalizations = _homeMaterialLocalizations(tester);
     final expectedDue = materialLocalizations.formatShortDate(
-      _placeholderDueDate(_fixedReferenceDate, 7),
+      _placeholderDueDate(_fixedReferenceDate, 1),
     );
     final expectedAmount = _formatExpectedCurrency(
-      1357.63,
+      321.45,
       const Locale('de', 'DE'),
     );
 
@@ -94,7 +107,11 @@ void main() {
 
     await tester.pumpWidget(
       _buildHomeSectionTestApp(
-        authState: _TestAuthSessionState(),
+        authState: _TestAuthSessionState(
+          isAuthenticatedValue: true,
+          accessTokenValue: 'token-1',
+          userIdValue: 10,
+        ),
         navigationState: navigationState,
         referenceDate: _fixedReferenceDate,
       ),
@@ -106,6 +123,30 @@ void main() {
     expect(navigationState.selectedDestination, AppDestination.bills);
   });
 
+  testWidgets('home dashboard create button opens bill creation', (
+    tester,
+  ) async {
+    final navigationState = NavigationState();
+    _setTestSurfaceSize(tester, width: 430, height: 1000);
+
+    await tester.pumpWidget(
+      _buildHomeSectionTestApp(
+        authState: _TestAuthSessionState(
+          isAuthenticatedValue: true,
+          accessTokenValue: 'token-1',
+          userIdValue: 10,
+        ),
+        navigationState: navigationState,
+        referenceDate: _fixedReferenceDate,
+      ),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('open-bill-create-button')));
+    await tester.pumpAndSettle();
+
+    expect(navigationState.selectedDestination, AppDestination.createBill);
+  });
+
   testWidgets(
     'home dashboard collapses hidden bill tags into an overflow chip',
     (tester) async {
@@ -113,41 +154,50 @@ void main() {
 
       await tester.pumpWidget(
         _buildHomeSectionTestApp(
-          authState: _TestAuthSessionState(),
+          authState: _TestAuthSessionState(
+            isAuthenticatedValue: true,
+            accessTokenValue: 'token-1',
+            userIdValue: 10,
+          ),
           referenceDate: _fixedReferenceDate,
         ),
       );
+      await tester.pumpAndSettle();
 
-      expect(find.text('+5'), findsOneWidget);
+      expect(find.text('+4'), findsOneWidget);
     },
   );
 
-  testWidgets(
-    'home dashboard generates placeholder due dates from reference date',
-    (tester) async {
-      _setTestSurfaceSize(tester, width: 430, height: 1000);
+  testWidgets('home dashboard loads real due dates from home state', (
+    tester,
+  ) async {
+    _setTestSurfaceSize(tester, width: 430, height: 1000);
 
-      final referenceDate = DateTime(2030, 1, 10);
-      await tester.pumpWidget(
-        _buildHomeSectionTestApp(
-          authState: _TestAuthSessionState(),
-          locale: const Locale('en', 'US'),
-          referenceDate: referenceDate,
+    final referenceDate = DateTime(2030, 1, 10);
+    await tester.pumpWidget(
+      _buildHomeSectionTestApp(
+        authState: _TestAuthSessionState(
+          isAuthenticatedValue: true,
+          accessTokenValue: 'token-1',
+          userIdValue: 10,
         ),
+        locale: const Locale('en', 'US'),
+        referenceDate: referenceDate,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final materialLocalizations = _homeMaterialLocalizations(tester);
+    const dueOffsets = [1, 2, 3];
+    for (final dueOffset in dueOffsets) {
+      final expectedDue = materialLocalizations.formatShortDate(
+        _placeholderDueDate(referenceDate, dueOffset),
       );
+      expect(find.text('Due $expectedDue'), findsOneWidget);
+    }
+  });
 
-      final materialLocalizations = _homeMaterialLocalizations(tester);
-      const dueOffsets = [7, 5, 4, 2, 1];
-      for (final dueOffset in dueOffsets) {
-        final expectedDue = materialLocalizations.formatShortDate(
-          _placeholderDueDate(referenceDate, dueOffset),
-        );
-        expect(find.text('Due $expectedDue'), findsOneWidget);
-      }
-    },
-  );
-
-  testWidgets('mobile bottom navigation shows home, bills, and menu', (
+  testWidgets('mobile bottom navigation shows home, view, create, and menu', (
     tester,
   ) async {
     final navigationState = NavigationState();
@@ -169,7 +219,11 @@ void main() {
       findsOneWidget,
     );
     expect(
-      find.descendant(of: navigationBar, matching: find.text('Bills')),
+      find.descendant(of: navigationBar, matching: find.text('View')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: navigationBar, matching: find.text('Create')),
       findsOneWidget,
     );
     expect(
@@ -206,6 +260,25 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(navigationState.selectedDestination, AppDestination.bills);
+  });
+
+  testWidgets('menu section includes bill creation action', (tester) async {
+    final navigationState = NavigationState()
+      ..selectDestination(AppDestination.menu);
+    _setTestSurfaceSize(tester, width: 430, height: 900);
+
+    await tester.pumpWidget(
+      _buildResponsiveShellTestApp(
+        authState: _TestAuthSessionState(),
+        navigationState: navigationState,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Create Bill'), findsOneWidget);
+    await _tapVisible(tester, find.text('Create Bill'));
+
+    expect(navigationState.selectedDestination, AppDestination.createBill);
   });
 
   testWidgets('menu section opens recipient group management', (tester) async {
@@ -660,6 +733,128 @@ void main() {
     expect(state.errorMessage, 'Create failed');
   });
 
+  testWidgets(
+    'bill creation defaults group shares and submits localized amount',
+    (tester) async {
+      final navigationState = NavigationState()
+        ..selectDestination(AppDestination.createBill);
+      _setTestSurfaceSize(tester, width: 430, height: 1400);
+      final fakeService = _FakeDebtBackendService(
+        availableTags: [
+          TagIndex(id: Int64(1), icon: '🏠', text: 'Home', color: '#FFB74D'),
+        ],
+        recipients: [
+          _testRecipient(
+            id: 77,
+            name: 'Roommates',
+            ownerId: 10,
+            members: [
+              _testUser(id: 20, name: 'Alice', email: 'alice@test.dev'),
+              _testUser(id: 30, name: 'Bob', email: 'bob@test.dev'),
+            ],
+          ),
+        ],
+        onListReceipts: (_) => ReceiptsResponse(success: true),
+      );
+
+      await tester.pumpWidget(
+        _buildResponsiveShellTestApp(
+          authState: _TestAuthSessionState(
+            isAuthenticatedValue: true,
+            accessTokenValue: 'token-1',
+            userIdValue: 10,
+          ),
+          navigationState: navigationState,
+          billCreationState: BillCreationState(debtBackendService: fakeService),
+          billListState: BillListState(debtBackendService: fakeService),
+          locale: const Locale('de', 'DE'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const ValueKey('bill-create-title-field')),
+        'Electricity',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('bill-create-description-field')),
+        'April bill',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('bill-create-amount-field')),
+        '123,45',
+      );
+      await _selectDropdownItem(
+        tester,
+        const ValueKey('bill-create-group-field'),
+        'Roommates',
+      );
+      await tester.tap(find.widgetWithText(FilterChip, 'Home'));
+      await tester.enterText(
+        find.byKey(const ValueKey('bill-create-tag-text-field')),
+        'Utilities',
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('bill-create-add-tag-button')),
+      );
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('bill-create-submit-button')),
+      );
+      await tester.tap(find.byKey(const ValueKey('bill-create-submit-button')));
+      await tester.pumpAndSettle();
+
+      expect(fakeService.createReceiptRequests, hasLength(1));
+      final request = fakeService.createReceiptRequests.single;
+      expect(request.title, 'Electricity');
+      expect(request.description, 'April bill');
+      expect(request.amountOwed, 123.45);
+      expect(request.currency, 'EUR');
+      expect(request.recipientId.toInt(), 77);
+      expect(request.split.ownerSharePercent, 0);
+      expect(
+        request.split.recipientShares.map((share) => share.sharePercent),
+        everyElement(closeTo(50, 0.001)),
+      );
+      expect(fakeService.setReceiptTagRequests, hasLength(1));
+      expect(fakeService.tagUpsertRequests.single.text, 'Utilities');
+      expect(navigationState.selectedDestination, AppDestination.bills);
+    },
+  );
+
+  testWidgets('bill creation validates required title and amount', (
+    tester,
+  ) async {
+    final navigationState = NavigationState()
+      ..selectDestination(AppDestination.createBill);
+    _setTestSurfaceSize(tester, width: 430, height: 1200);
+    final fakeService = _FakeDebtBackendService(
+      onListReceipts: (_) => ReceiptsResponse(success: true),
+    );
+
+    await tester.pumpWidget(
+      _buildResponsiveShellTestApp(
+        authState: _TestAuthSessionState(
+          isAuthenticatedValue: true,
+          accessTokenValue: 'token-1',
+          userIdValue: 10,
+        ),
+        navigationState: navigationState,
+        billCreationState: BillCreationState(debtBackendService: fakeService),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('bill-create-submit-button')),
+    );
+    await tester.tap(find.byKey(const ValueKey('bill-create-submit-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Title is required.'), findsOneWidget);
+    expect(find.text('Enter a valid amount.'), findsOneWidget);
+    expect(fakeService.createReceiptRequests, isEmpty);
+  });
+
   testWidgets('bills view shows login prompt when unauthenticated', (
     tester,
   ) async {
@@ -776,12 +971,24 @@ void main() {
       expect(find.text('🏠'), findsOneWidget);
       expect(find.text('Home'), findsOneWidget);
       expect(find.textContaining('Alice'), findsOneWidget);
-      expect(find.textContaining('60%'), findsOneWidget);
-      expect(find.text('Paid'), findsWidgets);
+      expect(find.text('Unpaid'), findsOneWidget);
+      expect(
+        find.text(_formatExpectedCurrency(55, const Locale('en', 'US'))),
+        findsNothing,
+      );
+      expect(find.textContaining('60%'), findsNothing);
+      expect(find.textContaining('paid '), findsNothing);
+      expect(find.byKey(const ValueKey('receipt-payments-42')), findsNothing);
+
+      await tester.tap(find.byKey(const ValueKey('receipt-row-42')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Paid'), findsOneWidget);
       expect(
         find.text(_formatExpectedCurrency(55, const Locale('en', 'US'))),
         findsOneWidget,
       );
+      expect(find.textContaining('60%'), findsOneWidget);
       expect(
         find.textContaining(
           'paid ${_formatExpectedCurrency(30, const Locale('en', 'US'))}',
@@ -903,6 +1110,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await tester.tap(find.byKey(const ValueKey('receipt-row-43')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('receipt-payments-43')));
     await tester.pumpAndSettle();
     await tester.enterText(
@@ -1512,7 +1721,7 @@ void main() {
       find.byKey(const ValueKey('mobile-navigation-bar')),
     );
 
-    expect(navigationBar.selectedIndex, 2);
+    expect(navigationBar.selectedIndex, 3);
   });
 
   testWidgets(
@@ -1534,7 +1743,7 @@ void main() {
         find.byKey(const ValueKey('mobile-navigation-bar')),
       );
 
-      expect(navigationBar.selectedIndex, 2);
+      expect(navigationBar.selectedIndex, 3);
     },
   );
 
@@ -1601,6 +1810,8 @@ Widget _buildResponsiveShellTestApp({
   required _TestAuthSessionState authState,
   required NavigationState navigationState,
   BillListState? billListState,
+  BillCreationState? billCreationState,
+  HomeBillState? homeBillState,
   RecipientGroupState? recipientGroupState,
   Locale locale = const Locale('en', 'US'),
 }) {
@@ -1614,6 +1825,20 @@ Widget _buildResponsiveShellTestApp({
   final resolvedRecipientGroupState =
       recipientGroupState ??
       RecipientGroupState(
+        debtBackendService: _FakeDebtBackendService(
+          onListReceipts: (_) => ReceiptsResponse(success: true),
+        ),
+      );
+  final resolvedBillCreationState =
+      billCreationState ??
+      BillCreationState(
+        debtBackendService: _FakeDebtBackendService(
+          onListReceipts: (_) => ReceiptsResponse(success: true),
+        ),
+      );
+  final resolvedHomeBillState =
+      homeBillState ??
+      HomeBillState(
         debtBackendService: _FakeDebtBackendService(
           onListReceipts: (_) => ReceiptsResponse(success: true),
         ),
@@ -1635,6 +1860,18 @@ Widget _buildResponsiveShellTestApp({
               (billListState ?? resolvedBillListState)
                 ..updateAuthSession(authSessionState),
         ),
+        ChangeNotifierProxyProvider<AuthSessionState, BillCreationState>(
+          create: (_) => resolvedBillCreationState,
+          update: (_, authSessionState, billCreationState) =>
+              (billCreationState ?? resolvedBillCreationState)
+                ..updateAuthSession(authSessionState),
+        ),
+        ChangeNotifierProxyProvider<AuthSessionState, HomeBillState>(
+          create: (_) => resolvedHomeBillState,
+          update: (_, authSessionState, homeBillState) =>
+              (homeBillState ?? resolvedHomeBillState)
+                ..updateAuthSession(authSessionState),
+        ),
         ChangeNotifierProxyProvider<AuthSessionState, RecipientGroupState>(
           create: (_) => resolvedRecipientGroupState,
           update: (_, authSessionState, recipientGroupState) =>
@@ -1653,6 +1890,14 @@ Widget _buildHomeSectionTestApp({
   Locale locale = const Locale('en', 'US'),
   DateTime? referenceDate,
 }) {
+  final homeBillState = HomeBillState(
+    debtBackendService: _FakeDebtBackendService(
+      onListReceipts: (_) => ReceiptsResponse(
+        success: true,
+        receipts: _homeTestReceipts(referenceDate ?? _fixedReferenceDate),
+      ),
+    ),
+  );
   return MaterialApp(
     locale: locale,
     localizationsDelegates: GlobalMaterialLocalizations.delegates,
@@ -1663,6 +1908,11 @@ Widget _buildHomeSectionTestApp({
         ChangeNotifierProvider<AuthSessionState>.value(value: authState),
         ChangeNotifierProvider<NavigationState>.value(
           value: navigationState ?? NavigationState(),
+        ),
+        ChangeNotifierProxyProvider<AuthSessionState, HomeBillState>(
+          create: (_) => homeBillState,
+          update: (_, authSessionState, state) =>
+              (state ?? homeBillState)..updateAuthSession(authSessionState),
         ),
       ],
       child: Scaffold(
@@ -1702,6 +1952,57 @@ Widget _buildBillsSectionTestApp({
 
 MaterialLocalizations _homeMaterialLocalizations(WidgetTester tester) {
   return MaterialLocalizations.of(tester.element(find.byType(HomeSection)));
+}
+
+List<Receipt> _homeTestReceipts(DateTime referenceDate) {
+  final amounts = [120.00, 101.45, 100.00, 90.00];
+  final titles = [
+    'Studio rent top-up',
+    'Quarterly electricity bill',
+    'Spring grocery split',
+    'Weekend train tickets',
+  ];
+  return [
+    for (var index = 0; index < amounts.length; index++)
+      _testReceipt(
+        id: 100 + index,
+        title: titles[index],
+        amountOwed: amounts[index],
+        dueDate: _placeholderDueDate(
+          referenceDate,
+          index + 1,
+        ).toIso8601String(),
+        tags: [
+          TagIndex(
+            id: Int64(10 + index),
+            icon: '🏷️',
+            text: 'Home tag ${index + 1}',
+            color: '#64B5F6',
+          ),
+          if (index == 0)
+            TagIndex(
+              id: Int64(99),
+              icon: '⚠️',
+              text: 'Long recommendation tag',
+              color: '#E57373',
+            ),
+          if (index == 0)
+            TagIndex(
+              id: Int64(100),
+              icon: '💡',
+              text: 'Shared utilities',
+              color: '#BA68C8',
+            ),
+          if (index == 0)
+            TagIndex(
+              id: Int64(101),
+              icon: '🧾',
+              text: 'April household',
+              color: '#4DB6AC',
+            ),
+        ],
+      ),
+  ];
 }
 
 DateTime _placeholderDueDate(DateTime referenceDate, int dueInDays) {
@@ -1845,6 +2146,13 @@ class _FakeDebtBackendService extends DebtBackendService {
       <RecipientLookupRequest>[];
   final List<SetReceiptPaymentsRequest> setPaymentRequests =
       <SetReceiptPaymentsRequest>[];
+  final List<CreateReceiptRequest> createReceiptRequests =
+      <CreateReceiptRequest>[];
+  final List<TagUpsertRequest> tagUpsertRequests = <TagUpsertRequest>[];
+  final List<SetReceiptTagsRequest> setReceiptTagRequests =
+      <SetReceiptTagsRequest>[];
+  final List<({int receiptId, String filename, Uint8List bytes})>
+  uploadedFiles = <({int receiptId, String filename, Uint8List bytes})>[];
   int listRecipientsCalls = 0;
 
   @override
@@ -1859,6 +2167,13 @@ class _FakeDebtBackendService extends DebtBackendService {
 
   @override
   Future<TagsResponse> listTags(String accessToken) async {
+    final response = TagsResponse(success: true);
+    response.tags.addAll(availableTags.map((tag) => tag.deepCopy()));
+    return response;
+  }
+
+  @override
+  Future<TagsResponse> listRecommendedTags(String accessToken) async {
     final response = TagsResponse(success: true);
     response.tags.addAll(availableTags.map((tag) => tag.deepCopy()));
     return response;
@@ -1891,6 +2206,23 @@ class _FakeDebtBackendService extends DebtBackendService {
   }
 
   @override
+  Future<ReceiptResponse> createReceipt(
+    String accessToken,
+    CreateReceiptRequest request,
+  ) async {
+    final clonedRequest = request.deepCopy();
+    createReceiptRequests.add(clonedRequest);
+    return ReceiptResponse(
+      success: true,
+      receipt: _testReceipt(
+        id: 900 + createReceiptRequests.length,
+        title: clonedRequest.title,
+        amountOwed: clonedRequest.amountOwed,
+      ),
+    );
+  }
+
+  @override
   Future<RecipientsResponse> listRecipients(String accessToken) async {
     listRecipientsCalls += 1;
     final response = RecipientsResponse(success: true);
@@ -1898,6 +2230,54 @@ class _FakeDebtBackendService extends DebtBackendService {
       recipients.map((recipient) => recipient.deepCopy()),
     );
     return response;
+  }
+
+  @override
+  Future<TagResponse> getOrCreateTag(
+    String accessToken,
+    TagUpsertRequest request,
+  ) async {
+    final clonedRequest = request.deepCopy();
+    tagUpsertRequests.add(clonedRequest);
+    return TagResponse(
+      success: true,
+      tag: TagIndex(
+        id: Int64(300 + tagUpsertRequests.length),
+        text: clonedRequest.text,
+        icon: clonedRequest.icon,
+        color: clonedRequest.color,
+      ),
+    );
+  }
+
+  @override
+  Future<ActionResponse> setReceiptTags(
+    String accessToken,
+    SetReceiptTagsRequest request,
+  ) async {
+    setReceiptTagRequests.add(request.deepCopy());
+    return ActionResponse(success: true);
+  }
+
+  @override
+  Future<FileResponse> uploadReceiptFile(
+    String accessToken, {
+    required int receiptId,
+    required String filename,
+    required Uint8List bytes,
+    String? contentType,
+  }) async {
+    uploadedFiles.add((receiptId: receiptId, filename: filename, bytes: bytes));
+    return FileResponse(
+      success: true,
+      file: ReceiptFile(
+        id: Int64(400 + uploadedFiles.length),
+        receiptId: Int64(receiptId),
+        originalFilename: filename,
+        contentType: contentType,
+        sizeBytes: Int64(bytes.length),
+      ),
+    );
   }
 
   @override

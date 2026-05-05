@@ -1,4 +1,7 @@
 import 'package:debt_display/generated/debt.pb.dart';
+import 'package:debt_display/services/debt_backend_service.dart';
+import 'package:debt_display/services/file_preview.dart';
+import 'package:debt_display/services/file_viewer.dart';
 import 'package:debt_display/state/auth_session_state.dart';
 import 'package:debt_display/state/bill_list_state.dart';
 import 'package:debt_display/theme/app_themes.dart';
@@ -556,16 +559,38 @@ class _PageSizeControl extends StatelessWidget {
   }
 }
 
-class _BillsListCard extends StatelessWidget {
+class _BillsListCard extends StatefulWidget {
   const _BillsListCard({required this.isDesktop, required this.state});
 
   final bool isDesktop;
   final BillListState state;
 
   @override
+  State<_BillsListCard> createState() => _BillsListCardState();
+}
+
+class _BillsListCardState extends State<_BillsListCard> {
+  int? _selectedReceiptId;
+
+  Receipt? _selectedReceipt() {
+    final selectedId = _selectedReceiptId;
+    if (selectedId == null) {
+      return null;
+    }
+    for (final receipt in widget.state.receipts) {
+      if (receipt.id.toInt() == selectedId) {
+        return receipt;
+      }
+    }
+    return null;
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final state = widget.state;
+    final selectedReceipt = _selectedReceipt();
     return PageSection(
-      padding: EdgeInsets.all(isDesktop ? 28 : 22),
+      padding: EdgeInsets.all(widget.isDesktop ? 28 : 22),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -634,31 +659,100 @@ class _BillsListCard extends StatelessWidget {
               ),
             )
           else
-            Column(
-              children: [
-                for (var index = 0; index < state.receipts.length; index++)
-                  Padding(
-                    padding: EdgeInsets.only(
-                      bottom: index == state.receipts.length - 1 ? 0 : 12,
-                    ),
-                    child: _BillReceiptTile(
-                      receipt: state.receipts[index],
-                      state: state,
-                    ),
-                  ),
-              ],
-            ),
+            widget.isDesktop
+                ? Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: _buildReceiptList(context, state)),
+                      const SizedBox(width: 16),
+                      SizedBox(
+                        width: 390,
+                        child: selectedReceipt == null
+                            ? _SelectBillPlaceholder(state: state)
+                            : _BillDetailPanel(
+                                receipt: selectedReceipt,
+                                state: state,
+                                isDesktop: true,
+                              ),
+                      ),
+                    ],
+                  )
+                : _buildReceiptList(context, state),
         ],
+      ),
+    );
+  }
+
+  Widget _buildReceiptList(BuildContext context, BillListState state) {
+    return Column(
+      children: [
+        for (var index = 0; index < state.receipts.length; index++)
+          Padding(
+            padding: EdgeInsets.only(
+              bottom: index == state.receipts.length - 1 ? 0 : 12,
+            ),
+            child: _BillReceiptTile(
+              receipt: state.receipts[index],
+              state: state,
+              selected: _selectedReceiptId == state.receipts[index].id.toInt(),
+              onTap: () => _selectReceipt(context, state.receipts[index]),
+            ),
+          ),
+      ],
+    );
+  }
+
+  void _selectReceipt(BuildContext context, Receipt receipt) {
+    if (widget.isDesktop) {
+      setState(() {
+        _selectedReceiptId = receipt.id.toInt();
+      });
+      return;
+    }
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.9,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (_, scrollController) => SingleChildScrollView(
+          controller: scrollController,
+          padding: const EdgeInsets.all(18),
+          child: ListenableBuilder(
+            listenable: widget.state,
+            builder: (context, child) {
+              final state = widget.state;
+              final currentReceipt = state.receipts.firstWhere(
+                (candidate) => candidate.id == receipt.id,
+                orElse: () => receipt,
+              );
+              return _BillDetailPanel(
+                receipt: currentReceipt,
+                state: state,
+                isDesktop: false,
+              );
+            },
+          ),
+        ),
       ),
     );
   }
 }
 
 class _BillReceiptTile extends StatelessWidget {
-  const _BillReceiptTile({required this.receipt, required this.state});
+  const _BillReceiptTile({
+    required this.receipt,
+    required this.state,
+    required this.selected,
+    required this.onTap,
+  });
 
   final Receipt receipt;
   final BillListState state;
+  final bool selected;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -678,8 +772,167 @@ class _BillReceiptTile extends StatelessWidget {
     final recipientLabel = receipt.hasRecipientName()
         ? receipt.recipientName
         : (receipt.hasRecipient() ? receipt.recipient.name : 'Personal bill');
-    final myShare = state.myShareFor(receipt);
     final roleLabel = state.roleLabelFor(receipt);
+    final peopleLabel = _receiptPeopleLabel(receipt);
+    final filesLabel = receipt.files.length == 1
+        ? '1 file included'
+        : '${receipt.files.length} files included';
+
+    return InkWell(
+      key: ValueKey('receipt-row-${receipt.id}'),
+      onTap: onTap,
+      borderRadius: const BorderRadius.all(Radius.circular(24)),
+      child: GlassPanel.secondary(
+        width: double.infinity,
+        padding: const EdgeInsets.all(18),
+        borderRadius: const BorderRadius.all(Radius.circular(24)),
+        tone: selected ? brandPrimary : null,
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    receipt.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  if (receipt.hasDescription() &&
+                      receipt.description.trim().isNotEmpty) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      receipt.description,
+                      maxLines: 1,
+                      softWrap: false,
+                      overflow: TextOverflow.fade,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: mutedForegroundColor(context, alpha: 0.82),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _MetaChip(
+                        label: roleLabel,
+                        icon: roleLabel == 'Owner'
+                            ? Icons.badge_rounded
+                            : Icons.people_alt_rounded,
+                      ),
+                      _MetaChip(
+                        label: receipt.isPaid ? 'Paid' : 'Unpaid',
+                        icon: receipt.isPaid
+                            ? Icons.check_circle_rounded
+                            : Icons.schedule_rounded,
+                        tone: receipt.isPaid ? Colors.green : Colors.orange,
+                      ),
+                      _MetaChip(
+                        label: peopleLabel.isEmpty
+                            ? recipientLabel
+                            : peopleLabel,
+                        icon: Icons.group_work_rounded,
+                      ),
+                      if (receipt.files.isNotEmpty)
+                        _MetaChip(
+                          label: filesLabel,
+                          icon: Icons.attach_file_rounded,
+                        ),
+                    ],
+                  ),
+                  if (receipt.tags.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: receipt.tags
+                          .map((tag) => _TagPill(tag: tag))
+                          .toList(),
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                  Text(
+                    dueLabel,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: mutedForegroundColor(context, alpha: 0.78),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 14),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 104),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    amountFormat.format(receipt.amountOwed),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.right,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SelectBillPlaceholder extends StatelessWidget {
+  const _SelectBillPlaceholder({required this.state});
+
+  final BillListState state;
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassPanel.secondary(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      borderRadius: const BorderRadius.all(Radius.circular(24)),
+      child: Text(
+        'Select a bill to view notes, payments, and files.',
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+          color: mutedForegroundColor(context, alpha: 0.82),
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+class _BillDetailPanel extends StatelessWidget {
+  const _BillDetailPanel({
+    required this.receipt,
+    required this.state,
+    required this.isDesktop,
+  });
+
+  final Receipt receipt;
+  final BillListState state;
+  final bool isDesktop;
+
+  @override
+  Widget build(BuildContext context) {
+    final locale = Localizations.localeOf(context);
+    final amountFormat = NumberFormat.currency(
+      locale: locale.toString(),
+      symbol: receipt.currency == 'EUR' ? '€' : '${receipt.currency} ',
+      decimalDigits: 2,
+    );
     final isOwner = receipt.ownerId.toInt() == state.currentUserId;
     final amountPaid = receipt.hasAmountPaid() ? receipt.amountPaid : 0.0;
 
@@ -687,128 +940,113 @@ class _BillReceiptTile extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       borderRadius: const BorderRadius.all(Radius.circular(24)),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
                   receipt.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
                 ),
-                if (receipt.hasDescription() &&
-                    receipt.description.trim().isNotEmpty) ...[
-                  const SizedBox(height: 3),
-                  Text(
-                    receipt.description,
-                    maxLines: 1,
-                    softWrap: false,
-                    overflow: TextOverflow.fade,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: mutedForegroundColor(context, alpha: 0.82),
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 6),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _MetaChip(
-                      label: roleLabel,
-                      icon: roleLabel == 'Owner'
-                          ? Icons.badge_rounded
-                          : Icons.people_alt_rounded,
-                    ),
-                    _MetaChip(
-                      label: receipt.isPaid ? 'Paid' : 'Unpaid',
-                      icon: receipt.isPaid
-                          ? Icons.check_circle_rounded
-                          : Icons.schedule_rounded,
-                      tone: receipt.isPaid ? Colors.green : Colors.orange,
-                    ),
-                    _MetaChip(
-                      label: recipientLabel,
-                      icon: Icons.group_work_rounded,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                Wrap(
-                  spacing: 18,
-                  runSpacing: 8,
-                  children: [
-                    _MetricText(
-                      label: 'My share',
-                      value: amountFormat.format(myShare),
-                    ),
-                    _MetricText(
-                      label: 'Paid',
-                      value: amountFormat.format(amountPaid),
-                    ),
-                    _MetricText(label: 'Due', value: dueLabel),
-                  ],
-                ),
-                if (isOwner) ...[
-                  const SizedBox(height: 12),
-                  OutlinedButton.icon(
-                    key: ValueKey('receipt-payments-${receipt.id}'),
-                    onPressed: state.isMutating
-                        ? null
-                        : () => _showReceiptPaymentsDialog(
-                            context,
-                            state,
-                            receipt,
-                            amountFormat,
-                          ),
-                    icon: const Icon(Icons.payments_rounded),
-                    label: const Text('Payments'),
-                  ),
-                ],
-                if (receipt.hasSplit()) ...[
-                  const SizedBox(height: 14),
-                  _ReceiptSplitShareRow(
-                    receipt: receipt,
-                    amountFormat: amountFormat,
-                  ),
-                ],
-                if (receipt.tags.isNotEmpty) ...[
-                  const SizedBox(height: 14),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: receipt.tags
-                        .map((tag) => _TagPill(tag: tag))
-                        .toList(),
-                  ),
-                ],
-              ],
-            ),
+              ),
+              _MetaChip(
+                label: state.roleLabelFor(receipt),
+                icon: isOwner ? Icons.badge_rounded : Icons.people_alt_rounded,
+              ),
+            ],
           ),
-          const SizedBox(width: 14),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 104),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  amountFormat.format(receipt.amountOwed),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.right,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ],
+          if (receipt.hasDescription() &&
+              receipt.description.trim().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              receipt.description,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: mutedForegroundColor(context, alpha: 0.84),
+              ),
             ),
+          ],
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 18,
+            runSpacing: 8,
+            children: [
+              _MetricText(
+                label: 'Total',
+                value: amountFormat.format(receipt.amountOwed),
+              ),
+              _MetricText(
+                label: 'My share',
+                value: amountFormat.format(state.myShareFor(receipt)),
+              ),
+              _MetricText(
+                label: 'Paid',
+                value: amountFormat.format(amountPaid),
+              ),
+            ],
           ),
+          if (isOwner) ...[
+            const SizedBox(height: 14),
+            OutlinedButton.icon(
+              key: ValueKey('receipt-payments-${receipt.id}'),
+              onPressed: state.isMutating
+                  ? null
+                  : () => _showReceiptPaymentsDialog(
+                      context,
+                      state,
+                      receipt,
+                      amountFormat,
+                    ),
+              icon: const Icon(Icons.payments_rounded),
+              label: const Text('Payments'),
+            ),
+          ],
+          if (receipt.hasSplit()) ...[
+            const SizedBox(height: 16),
+            Text(
+              'Participants',
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 10),
+            _ReceiptSplitShareRow(receipt: receipt, amountFormat: amountFormat),
+          ],
+          if (receipt.hasNotes() && receipt.notes.trim().isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Text(
+              'Notes',
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              receipt.notes,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: mutedForegroundColor(context, alpha: 0.86),
+              ),
+            ),
+          ],
+          if (receipt.files.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Text(
+              'Files',
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 10),
+            _ReceiptFilesDetail(
+              receipt: receipt,
+              state: state,
+              isDesktop: isDesktop,
+            ),
+          ],
         ],
       ),
     );
@@ -850,6 +1088,7 @@ class _ReceiptPaymentsDialogState extends State<_ReceiptPaymentsDialog> {
   late final TextEditingController _ownerController;
   late final Map<int, TextEditingController> _recipientControllers;
   String? _errorText;
+  bool _didApplyLocaleFormat = false;
 
   @override
   void initState() {
@@ -877,6 +1116,23 @@ class _ReceiptPaymentsDialogState extends State<_ReceiptPaymentsDialog> {
     super.dispose();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_didApplyLocaleFormat) {
+      return;
+    }
+    _ownerController.text = _formatEditableAmount(_initialOwnerPaidAmount());
+    final split = widget.receipt.hasSplit() ? widget.receipt.split : null;
+    if (split != null) {
+      for (final share in split.recipientShares) {
+        _recipientControllers[share.userId.toInt()]?.text =
+            _formatEditableAmount(share.amountPaid);
+      }
+    }
+    _didApplyLocaleFormat = true;
+  }
+
   double _initialOwnerPaidAmount() {
     if (widget.receipt.hasSplit()) {
       return widget.receipt.split.ownerAmountPaid;
@@ -899,13 +1155,32 @@ class _ReceiptPaymentsDialogState extends State<_ReceiptPaymentsDialog> {
       });
       return;
     }
+    if (ownerAmountPaid < 0 || ownerAmountPaid - _ownerShareAmount() > 1e-6) {
+      setState(() {
+        _errorText = 'Owner paid amount cannot exceed the owner share.';
+      });
+      return;
+    }
 
     final recipientAmountsPaid = <int, double>{};
+    final split = widget.receipt.hasSplit() ? widget.receipt.split : null;
     for (final entry in _recipientControllers.entries) {
       final amount = _parseAmount(entry.value.text);
       if (amount == null) {
         setState(() {
           _errorText = 'Enter valid recipient paid amounts.';
+        });
+        return;
+      }
+      final share = split?.recipientShares.where(
+        (share) => share.userId.toInt() == entry.key,
+      );
+      final shareAmount = share == null || share.isEmpty
+          ? 0
+          : share.first.amount;
+      if (amount < 0 || amount - shareAmount > 1e-6) {
+        setState(() {
+          _errorText = 'Recipient paid amounts cannot exceed their shares.';
         });
         return;
       }
@@ -930,11 +1205,28 @@ class _ReceiptPaymentsDialogState extends State<_ReceiptPaymentsDialog> {
   }
 
   double? _parseAmount(String raw) {
-    final normalized = raw.trim().replaceAll(',', '.');
+    final locale = Localizations.localeOf(context);
+    var normalized = raw.trim().replaceAll(RegExp(r'\s+'), '');
     if (normalized.isEmpty) {
       return null;
     }
+    final separator = NumberFormat.decimalPattern(
+      locale.toString(),
+    ).symbols.DECIMAL_SEP;
+    if (separator == ',') {
+      normalized = normalized.replaceAll('.', '').replaceAll(',', '.');
+    } else {
+      normalized = normalized.replaceAll(',', '');
+    }
     return double.tryParse(normalized);
+  }
+
+  String _formatEditableAmount(double amount) {
+    final locale = Localizations.localeOf(context);
+    final separator = NumberFormat.decimalPattern(
+      locale.toString(),
+    ).symbols.DECIMAL_SEP;
+    return amount.toStringAsFixed(2).replaceAll('.', separator);
   }
 
   @override
@@ -1049,6 +1341,157 @@ class _ReceiptSplitShareRow extends StatelessWidget {
   }
 }
 
+class _ReceiptFilesDetail extends StatelessWidget {
+  const _ReceiptFilesDetail({
+    required this.receipt,
+    required this.state,
+    required this.isDesktop,
+  });
+
+  final Receipt receipt;
+  final BillListState state;
+  final bool isDesktop;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: receipt.files
+          .map(
+            (file) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _ReceiptFileDetailTile(
+                file: file,
+                state: state,
+                showPreview: isDesktop,
+              ),
+            ),
+          )
+          .toList(),
+    );
+  }
+}
+
+class _ReceiptFileDetailTile extends StatelessWidget {
+  const _ReceiptFileDetailTile({
+    required this.file,
+    required this.state,
+    required this.showPreview,
+  });
+
+  final ReceiptFile file;
+  final BillListState state;
+  final bool showPreview;
+
+  @override
+  Widget build(BuildContext context) {
+    final contentType = file.hasContentType() ? file.contentType : null;
+    return DecoratedBox(
+      decoration: glassSurfaceDecoration(
+        context,
+        variant: AppGlassVariant.secondary,
+        borderRadius: const BorderRadius.all(Radius.circular(18)),
+        includeShadows: false,
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(_fileIcon(contentType), size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    file.originalFilename,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                TextButton.icon(
+                  key: ValueKey('receipt-file-open-${file.id.toInt()}'),
+                  onPressed: () => _openReceiptFile(context, state, file),
+                  icon: const Icon(Icons.open_in_new_rounded, size: 18),
+                  label: const Text('Open'),
+                ),
+              ],
+            ),
+            if (showPreview && _canPreviewInline(contentType)) ...[
+              const SizedBox(height: 10),
+              SizedBox(
+                height: contentType == 'application/pdf' ? 280 : 190,
+                width: double.infinity,
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.all(Radius.circular(12)),
+                  child: _ReceiptFilePreview(file: file, state: state),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ReceiptFilePreview extends StatelessWidget {
+  const _ReceiptFilePreview({required this.file, required this.state});
+
+  final ReceiptFile file;
+  final BillListState state;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<ReceiptFileDownload?>(
+      future: state.downloadReceiptFile(file),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+        }
+        final download = snapshot.data;
+        if (download == null) {
+          return const Center(child: Text('Preview unavailable'));
+        }
+        if (download.contentType.startsWith('image/')) {
+          return Image.memory(download.bytes, fit: BoxFit.contain);
+        }
+        if (download.contentType == 'application/pdf') {
+          return BlobFilePreview(
+            bytes: download.bytes,
+            contentType: download.contentType,
+          );
+        }
+        return const SizedBox.shrink();
+      },
+    );
+  }
+}
+
+Future<void> _openReceiptFile(
+  BuildContext context,
+  BillListState state,
+  ReceiptFile file,
+) async {
+  final pendingWindow = openPendingFileWindow();
+  final download = await state.downloadReceiptFile(file);
+  if (download == null) {
+    if (context.mounted) {
+      ScaffoldMessenger.maybeOf(
+        context,
+      )?.showSnackBar(const SnackBar(content: Text('Could not open file.')));
+    }
+    return;
+  }
+  await pendingWindow.showBytes(
+    bytes: download.bytes,
+    contentType: download.contentType,
+    filename: download.file.originalFilename,
+  );
+}
+
 class _SplitSharePill extends StatelessWidget {
   const _SplitSharePill({
     required this.label,
@@ -1105,6 +1548,24 @@ String _shareUserLabel(ReceiptRecipientShare share) {
     return share.userEmail;
   }
   return 'User ${share.userId}';
+}
+
+String _receiptPeopleLabel(Receipt receipt) {
+  if (receipt.hasSplit() && receipt.split.recipientShares.isNotEmpty) {
+    return receipt.split.recipientShares.map(_shareUserLabel).join(', ');
+  }
+  if (receipt.hasRecipientName() && receipt.recipientName.trim().isNotEmpty) {
+    return receipt.recipientName;
+  }
+  if (receipt.hasRecipient() && receipt.recipient.name.trim().isNotEmpty) {
+    return receipt.recipient.name;
+  }
+  return 'Personal bill';
+}
+
+bool _canPreviewInline(String? contentType) {
+  return contentType == 'application/pdf' ||
+      contentType?.startsWith('image/') == true;
 }
 
 class _ControlBlock extends StatelessWidget {
@@ -1292,4 +1753,14 @@ Color _parseTagColor(String value) {
     }
   }
   return brandPrimary;
+}
+
+IconData _fileIcon(String? contentType) {
+  if (contentType == 'application/pdf') {
+    return Icons.picture_as_pdf_rounded;
+  }
+  if (contentType?.startsWith('image/') == true) {
+    return Icons.image_rounded;
+  }
+  return Icons.insert_drive_file_rounded;
 }

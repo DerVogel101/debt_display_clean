@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import hashlib
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import Response
+import aiofiles
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse as DownloadFileResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend import authorization, services
@@ -23,6 +25,7 @@ from backend.db import (
     list_all_tags,
     list_files_for_receipt,
     list_recipients_for_user,
+    list_visible_recommended_tags,
     remove_member_from_recipient,
     search_users_by_prefix,
     tag_receipt,
@@ -129,7 +132,7 @@ def _status_for_exc(exc: Exception) -> int:
         return exc.status_code
     if isinstance(exc, PermissionError):
         return 403
-    if isinstance(exc, LookupError):
+    if isinstance(exc, (LookupError, FileNotFoundError)):
         return 404
     if isinstance(exc, ValueError):
         return 404 if "not found" in str(exc).lower() else 400
@@ -866,6 +869,45 @@ async def attach_file_route(request: Request, session: AsyncSession = Depends(ge
         return _error_response(debt_pb2.FileResponse, exc)
 
 
+@api_app.post("/files/upload")
+async def upload_file_route(
+    request: Request,
+    receipt_id: int = Form(...),
+    file: UploadFile = File(...),
+    session: AsyncSession = Depends(get_session),
+) -> ProtobufResponse:
+    try:
+        user = await _current_user(request, session)
+        payload = await file.read()
+        filename = file.filename or "file"
+        content_type = file.content_type or "application/octet-stream"
+        sha256 = hashlib.sha256(payload).hexdigest()
+        file_record = await services.create_receipt_file_for_owner(
+            session=session,
+            actor_user_id=user.id,
+            receipt_id=receipt_id,
+            client_filename=filename,
+            content_type=content_type,
+            size_bytes=len(payload),
+            sha256=sha256,
+        )
+        target_path = resolve_storage_path(file_record.storage_key, _upload_root())
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            async with aiofiles.open(target_path, "wb") as handle:
+                await handle.write(payload)
+        except Exception:
+            await session.rollback()
+            target_path.unlink(missing_ok=True)
+            raise
+
+        await session.commit()
+        return _pb_response(debt_pb2.FileResponse(success=True, file=_file_to_pb(file_record)))
+    except Exception as exc:
+        await session.rollback()
+        return _error_response(debt_pb2.FileResponse, exc)
+
+
 @api_app.post("/files/get")
 async def get_file_route(request: Request, session: AsyncSession = Depends(get_session)) -> ProtobufResponse:
     body = await request.body()
@@ -887,6 +929,33 @@ async def get_file_route(request: Request, session: AsyncSession = Depends(get_s
     except Exception as exc:
         await session.rollback()
         return _error_response(debt_pb2.FileResponse, exc)
+
+
+@api_app.get("/files/{file_id}/content")
+async def get_file_content_route(
+    file_id: int,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> DownloadFileResponse:
+    try:
+        user = await _current_user(request, session)
+        file_record = await services.get_file_for_actor(session, user.id, file_id)
+        path = resolve_storage_path(file_record.storage_key, _upload_root())
+        if not path.is_file():
+            raise FileNotFoundError("File content not found")
+        await session.commit()
+        return DownloadFileResponse(
+            path,
+            media_type=file_record.content_type or "application/octet-stream",
+            filename=file_record.original_filename,
+            content_disposition_type="inline",
+        )
+    except Exception as exc:
+        await session.rollback()
+        raise HTTPException(
+            status_code=_status_for_exc(exc),
+            detail=_error_message(exc),
+        ) from exc
 
 
 @api_app.post("/files/list")
@@ -983,6 +1052,21 @@ async def list_tags_route(request: Request, session: AsyncSession = Depends(get_
     try:
         await _current_user(request, session)
         tags = await list_all_tags(session)
+        await session.commit()
+        resp = debt_pb2.TagsResponse(success=True)
+        for tag in tags:
+            resp.tags.add().CopyFrom(_tag_to_pb(tag))
+        return _pb_response(resp)
+    except Exception as exc:
+        await session.rollback()
+        return _error_response(debt_pb2.TagsResponse, exc)
+
+
+@api_app.post("/tags/recommended")
+async def list_recommended_tags_route(request: Request, session: AsyncSession = Depends(get_session)) -> ProtobufResponse:
+    try:
+        user = await _current_user(request, session)
+        tags = await list_visible_recommended_tags(session, user.id)
         await session.commit()
         resp = debt_pb2.TagsResponse(success=True)
         for tag in tags:

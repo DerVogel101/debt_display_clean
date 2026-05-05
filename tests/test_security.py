@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
@@ -662,6 +663,40 @@ class ReceiptSplitTests(AsyncDatabaseTestCase):
                     },
                 )
 
+    async def _upload_file(
+        self,
+        *,
+        token: str,
+        receipt_id: int,
+        filename: str,
+        content: bytes,
+        content_type: str,
+    ):
+        async def verify_side_effect(access_token: str):
+            return self._claims_by_token[access_token]
+
+        transport = ASGITransport(app=main.app)
+        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+            with patch("backend.auth.verify_token", new=AsyncMock(side_effect=verify_side_effect)):
+                return await client.post(
+                    "/api/files/upload",
+                    data={"receipt_id": str(receipt_id)},
+                    files={"file": (filename, content, content_type)},
+                    headers={"Authorization": f"Bearer {token}"},
+                )
+
+    async def _get_file_content(self, *, token: str, file_id: int):
+        async def verify_side_effect(access_token: str):
+            return self._claims_by_token[access_token]
+
+        transport = ASGITransport(app=main.app)
+        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+            with patch("backend.auth.verify_token", new=AsyncMock(side_effect=verify_side_effect)):
+                return await client.get(
+                    f"/api/files/{file_id}/content",
+                    headers={"Authorization": f"Bearer {token}"},
+                )
+
     def _parse_message(self, message_cls, response) -> object:
         message = message_cls()
         message.ParseFromString(response.content)
@@ -1234,6 +1269,40 @@ class LiveApiRegressionTests(AsyncDatabaseTestCase):
                     },
                 )
 
+    async def _upload_file(
+        self,
+        *,
+        token: str,
+        receipt_id: int,
+        filename: str,
+        content: bytes,
+        content_type: str,
+    ):
+        async def verify_side_effect(access_token: str):
+            return self._claims_by_token[access_token]
+
+        transport = ASGITransport(app=main.app)
+        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+            with patch("backend.auth.verify_token", new=AsyncMock(side_effect=verify_side_effect)):
+                return await client.post(
+                    "/api/files/upload",
+                    data={"receipt_id": str(receipt_id)},
+                    files={"file": (filename, content, content_type)},
+                    headers={"Authorization": f"Bearer {token}"},
+                )
+
+    async def _get_file_content(self, *, token: str, file_id: int):
+        async def verify_side_effect(access_token: str):
+            return self._claims_by_token[access_token]
+
+        transport = ASGITransport(app=main.app)
+        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+            with patch("backend.auth.verify_token", new=AsyncMock(side_effect=verify_side_effect)):
+                return await client.get(
+                    f"/api/files/{file_id}/content",
+                    headers={"Authorization": f"Bearer {token}"},
+                )
+
     def _parse_message(self, message_cls, response) -> object:
         message = message_cls()
         message.ParseFromString(response.content)
@@ -1404,6 +1473,69 @@ class LiveApiRegressionTests(AsyncDatabaseTestCase):
 
         self.assertIsNotNone(stored)
         self.assertEqual(stored.original_filename, "Quarterly Report_.pdf")
+
+    async def test_files_upload_writes_bytes_and_metadata(self) -> None:
+        payload = b"%PDF-1.4\nreceipt"
+        response = await self._upload_file(
+            token="owner-token",
+            receipt_id=self.shared_receipt.id,
+            filename=r"..\..\Quarterly Report?.pdf",
+            content=payload,
+            content_type="application/pdf",
+        )
+        parsed = self._parse_message(debt_pb2.FileResponse, response)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(parsed.success)
+        self.assertEqual(parsed.file.original_filename, "Quarterly Report_.pdf")
+        self.assertEqual(parsed.file.content_type, "application/pdf")
+        self.assertEqual(parsed.file.size_bytes, len(payload))
+
+        async with db.async_session_maker() as session:
+            stored = await session.get(db.ReceiptFile, parsed.file.id)
+
+        self.assertIsNotNone(stored)
+        self.assertEqual(stored.sha256, hashlib.sha256(payload).hexdigest())
+        stored_path = resolve_storage_path(stored.storage_key, self._tmpdir.name)
+        self.assertEqual(stored_path.read_bytes(), payload)
+
+    async def test_files_upload_requires_receipt_owner(self) -> None:
+        response = await self._upload_file(
+            token="member-token",
+            receipt_id=self.shared_receipt.id,
+            filename="member.pdf",
+            content=b"not allowed",
+            content_type="application/pdf",
+        )
+        parsed = self._parse_message(debt_pb2.FileResponse, response)
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(parsed.success)
+
+    async def test_files_content_allows_member_and_rejects_stranger(self) -> None:
+        payload = b"\x89PNG\r\nreceipt"
+        upload = await self._upload_file(
+            token="owner-token",
+            receipt_id=self.shared_receipt.id,
+            filename="receipt.png",
+            content=payload,
+            content_type="image/png",
+        )
+        uploaded = self._parse_message(debt_pb2.FileResponse, upload)
+
+        member_response = await self._get_file_content(
+            token="member-token",
+            file_id=uploaded.file.id,
+        )
+        stranger_response = await self._get_file_content(
+            token="stranger-token",
+            file_id=uploaded.file.id,
+        )
+
+        self.assertEqual(member_response.status_code, 200)
+        self.assertEqual(member_response.content, payload)
+        self.assertEqual(member_response.headers["content-type"], "image/png")
+        self.assertEqual(stranger_response.status_code, 404)
 
     async def test_recipient_member_routes_are_owner_only(self) -> None:
         owner_response = await self._post_protobuf(

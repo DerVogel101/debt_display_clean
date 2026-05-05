@@ -342,6 +342,20 @@ class BillListState extends ChangeNotifier {
     }
   }
 
+  Future<ReceiptFileDownload?> downloadReceiptFile(ReceiptFile file) async {
+    if (!_isAuthenticated || _accessToken == null) {
+      return null;
+    }
+
+    try {
+      return await _debtBackendService.downloadReceiptFile(_accessToken!, file);
+    } catch (error) {
+      _errorMessage = _formatError(error);
+      notifyListeners();
+      return null;
+    }
+  }
+
   void _resetQueryState() {
     _appliedQuery = BillListQuery.defaults();
     _resetQueryStatePagination();

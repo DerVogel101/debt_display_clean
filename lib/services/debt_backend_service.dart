@@ -45,6 +45,45 @@ class DebtBackendService {
     return (options ?? Options()).copyWith(headers: headers);
   }
 
+  Uint8List _bytesFromResponse(Response<dynamic> response) {
+    final data = response.data;
+    if (data is Uint8List) {
+      return data;
+    }
+    if (data is List<int>) {
+      return Uint8List.fromList(data);
+    }
+    throw DioException(
+      requestOptions: response.requestOptions,
+      response: response,
+      message: 'Backend returned non-binary response',
+    );
+  }
+
+  Future<ReceiptResponse> createReceipt(
+    String accessToken,
+    CreateReceiptRequest request,
+  ) async {
+    final response = await _dio.post(
+      '/api/receipts/create',
+      data: request.writeToBuffer(),
+      options: _withAuthToken(accessToken),
+    );
+    return _parseProtobufResponse(response, ReceiptResponse.fromBuffer);
+  }
+
+  Future<ReceiptResponse> updateReceipt(
+    String accessToken,
+    UpdateReceiptRequest request,
+  ) async {
+    final response = await _dio.post(
+      '/api/receipts/update',
+      data: request.writeToBuffer(),
+      options: _withAuthToken(accessToken),
+    );
+    return _parseProtobufResponse(response, ReceiptResponse.fromBuffer);
+  }
+
   Future<ReceiptsResponse> listReceipts(
     String accessToken,
     ReceiptListRequest request,
@@ -64,6 +103,39 @@ class DebtBackendService {
       options: _withAuthToken(accessToken),
     );
     return _parseProtobufResponse(response, TagsResponse.fromBuffer);
+  }
+
+  Future<TagsResponse> listRecommendedTags(String accessToken) async {
+    final response = await _dio.post(
+      '/api/tags/recommended',
+      data: EmptyRequest().writeToBuffer(),
+      options: _withAuthToken(accessToken),
+    );
+    return _parseProtobufResponse(response, TagsResponse.fromBuffer);
+  }
+
+  Future<TagResponse> getOrCreateTag(
+    String accessToken,
+    TagUpsertRequest request,
+  ) async {
+    final response = await _dio.post(
+      '/api/tags/get-or-create',
+      data: request.writeToBuffer(),
+      options: _withAuthToken(accessToken),
+    );
+    return _parseProtobufResponse(response, TagResponse.fromBuffer);
+  }
+
+  Future<ActionResponse> setReceiptTags(
+    String accessToken,
+    SetReceiptTagsRequest request,
+  ) async {
+    final response = await _dio.post(
+      '/api/receipt-tags/set',
+      data: request.writeToBuffer(),
+      options: _withAuthToken(accessToken),
+    );
+    return _parseProtobufResponse(response, ActionResponse.fromBuffer);
   }
 
   Future<UsersResponse> searchUsers(
@@ -158,4 +230,104 @@ class DebtBackendService {
     );
     return _parseProtobufResponse(response, ActionResponse.fromBuffer);
   }
+
+  Future<FilesResponse> listFiles(
+    String accessToken,
+    FileListRequest request,
+  ) async {
+    final response = await _dio.post(
+      '/api/files/list',
+      data: request.writeToBuffer(),
+      options: _withAuthToken(accessToken),
+    );
+    return _parseProtobufResponse(response, FilesResponse.fromBuffer);
+  }
+
+  Future<FileResponse> attachFile(
+    String accessToken,
+    ReceiptFileRequest request,
+  ) async {
+    final response = await _dio.post(
+      '/api/files/attach',
+      data: request.writeToBuffer(),
+      options: _withAuthToken(accessToken),
+    );
+    return _parseProtobufResponse(response, FileResponse.fromBuffer);
+  }
+
+  Future<FileResponse> uploadReceiptFile(
+    String accessToken, {
+    required int receiptId,
+    required String filename,
+    required Uint8List bytes,
+    String? contentType,
+  }) async {
+    final mediaType = contentType == null || contentType.isEmpty
+        ? null
+        : DioMediaType.parse(contentType);
+    final response = await _dio.post(
+      '/api/files/upload',
+      data: FormData.fromMap({
+        'receipt_id': receiptId.toString(),
+        'file': MultipartFile.fromBytes(
+          bytes,
+          filename: filename,
+          contentType: mediaType,
+        ),
+      }),
+      options: _withAuthToken(
+        accessToken,
+        options: Options(
+          contentType: Headers.multipartFormDataContentType,
+          headers: {'Content-Type': Headers.multipartFormDataContentType},
+        ),
+      ),
+    );
+    return _parseProtobufResponse(response, FileResponse.fromBuffer);
+  }
+
+  Future<ReceiptFileDownload> downloadReceiptFile(
+    String accessToken,
+    ReceiptFile file,
+  ) async {
+    final response = await _dio.get(
+      '/api/files/${file.id.toInt()}/content',
+      options: _withAuthToken(
+        accessToken,
+        options: Options(responseType: ResponseType.bytes),
+      ),
+    );
+    return ReceiptFileDownload(
+      file: file.deepCopy(),
+      bytes: _bytesFromResponse(response),
+      contentType:
+          response.headers.value(Headers.contentTypeHeader) ??
+          (file.hasContentType() ? file.contentType : null) ??
+          'application/octet-stream',
+    );
+  }
+
+  Future<ActionResponse> deleteFile(
+    String accessToken,
+    FileLookupRequest request,
+  ) async {
+    final response = await _dio.post(
+      '/api/files/delete',
+      data: request.writeToBuffer(),
+      options: _withAuthToken(accessToken),
+    );
+    return _parseProtobufResponse(response, ActionResponse.fromBuffer);
+  }
+}
+
+class ReceiptFileDownload {
+  const ReceiptFileDownload({
+    required this.file,
+    required this.bytes,
+    required this.contentType,
+  });
+
+  final ReceiptFile file;
+  final Uint8List bytes;
+  final String contentType;
 }
