@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, patch
 
 from fastapi import HTTPException
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import selectinload
 from starlette.requests import Request
@@ -21,8 +21,8 @@ from backend.storage import resolve_storage_path
 
 
 class SettingsDefaultTests(unittest.TestCase):
-    def test_demo_seed_data_is_opt_in_by_default(self) -> None:
-        self.assertFalse(
+    def test_demo_seed_data_is_enabled_by_default_until_prod_ready(self) -> None:
+        self.assertTrue(
             Settings.model_fields["GENERATE_TEST_DATA_ON_STARTUP"].default
         )
 
@@ -417,6 +417,86 @@ class TestDataSeedTests(AsyncDatabaseTestCase):
         self.assertEqual(owner_zero_receipt.owner_share_percent, 0.0)
         self.assertEqual(owner_zero_receipt.owner_amount_paid, 0.0)
         self.assertEqual(len(owner_zero_receipt.recipient_shares), 2)
+
+
+class SchemaCompatibilityTests(AsyncDatabaseTestCase):
+    async def test_schema_migration_backfills_participant_payments(self) -> None:
+        async with db.engine.begin() as conn:  # type: ignore[arg-type]
+            await conn.run_sync(db.Base.metadata.drop_all)
+            await conn.execute(
+                text(
+                    "CREATE TABLE receipts ("
+                    "id INTEGER PRIMARY KEY, "
+                    "amount_owed FLOAT NOT NULL, "
+                    "amount_paid FLOAT, "
+                    "owner_share_percent FLOAT, "
+                    "is_paid BOOLEAN NOT NULL DEFAULT 0"
+                    ")"
+                )
+            )
+            await conn.execute(
+                text(
+                    "CREATE TABLE receipt_recipient_shares ("
+                    "receipt_id INTEGER NOT NULL, "
+                    "user_id INTEGER NOT NULL, "
+                    "share_percent FLOAT NOT NULL, "
+                    "PRIMARY KEY (receipt_id, user_id)"
+                    ")"
+                )
+            )
+            await conn.execute(
+                text(
+                    "INSERT INTO receipts "
+                    "(id, amount_owed, amount_paid, owner_share_percent, is_paid) "
+                    "VALUES "
+                    "(1, 100.0, 0.0, 25.0, 1), "
+                    "(2, 100.0, 50.0, 40.0, 0), "
+                    "(3, 100.0, 30.0, NULL, 0)"
+                )
+            )
+            await conn.execute(
+                text(
+                    "INSERT INTO receipt_recipient_shares "
+                    "(receipt_id, user_id, share_percent) "
+                    "VALUES (1, 20, 75.0), (2, 21, 60.0)"
+                )
+            )
+
+        await db.ensure_schema_compatible()
+
+        async with db.engine.begin() as conn:  # type: ignore[arg-type]
+            receipts = {
+                row.id: row
+                for row in (
+                    await conn.execute(
+                        text(
+                            "SELECT id, amount_paid, owner_amount_paid "
+                            "FROM receipts ORDER BY id"
+                        )
+                    )
+                ).all()
+            }
+            shares = {
+                (row.receipt_id, row.user_id): row.amount_paid
+                for row in (
+                    await conn.execute(
+                        text(
+                            "SELECT receipt_id, user_id, amount_paid "
+                            "FROM receipt_recipient_shares "
+                            "ORDER BY receipt_id, user_id"
+                        )
+                    )
+                ).all()
+            }
+
+        self.assertAlmostEqual(receipts[1].amount_paid, 100.0)
+        self.assertAlmostEqual(receipts[1].owner_amount_paid, 25.0)
+        self.assertAlmostEqual(shares[(1, 20)], 75.0)
+        self.assertAlmostEqual(receipts[2].amount_paid, 50.0)
+        self.assertAlmostEqual(receipts[2].owner_amount_paid, 20.0)
+        self.assertAlmostEqual(shares[(2, 21)], 30.0)
+        self.assertAlmostEqual(receipts[3].amount_paid, 30.0)
+        self.assertAlmostEqual(receipts[3].owner_amount_paid, 30.0)
 
 
 class ReceiptAndFileAuthorizationTests(AsyncDatabaseTestCase):

@@ -1124,6 +1124,95 @@ async def ensure_schema_compatible() -> None:
                 )
             )
 
+        await conn.execute(
+            text(
+                "CREATE TEMP TABLE IF NOT EXISTS _receipt_payment_backfill ("
+                "receipt_id INTEGER PRIMARY KEY, "
+                "payment_basis FLOAT NOT NULL"
+                ")"
+            )
+        )
+        await conn.execute(text("DELETE FROM _receipt_payment_backfill"))
+        await conn.execute(
+            text(
+                "INSERT INTO _receipt_payment_backfill (receipt_id, payment_basis) "
+                "SELECT r.id, "
+                "CASE WHEN r.is_paid THEN r.amount_owed ELSE COALESCE(r.amount_paid, 0.0) END "
+                "FROM receipts r "
+                "WHERE "
+                "CASE WHEN r.is_paid THEN r.amount_owed ELSE COALESCE(r.amount_paid, 0.0) END > 0 "
+                "AND COALESCE(r.owner_amount_paid, 0.0) = 0.0 "
+                "AND NOT EXISTS ("
+                "SELECT 1 FROM receipt_recipient_shares s "
+                "WHERE s.receipt_id = r.id AND COALESCE(s.amount_paid, 0.0) > 0.0"
+                ")"
+            )
+        )
+        await conn.execute(
+            text(
+                "UPDATE receipts "
+                "SET amount_paid = ("
+                "SELECT payment_basis FROM _receipt_payment_backfill b "
+                "WHERE b.receipt_id = receipts.id"
+                "), "
+                "owner_amount_paid = CASE "
+                "WHEN amount_owed <= 0 THEN 0.0 "
+                "ELSE "
+                "CASE "
+                "WHEN ("
+                "SELECT b.payment_basis FROM _receipt_payment_backfill b "
+                "WHERE b.receipt_id = receipts.id"
+                ") * ("
+                "CASE "
+                "WHEN owner_share_percent IS NULL THEN amount_owed "
+                "ELSE amount_owed * owner_share_percent / 100.0 "
+                "END"
+                ") / amount_owed > ("
+                "CASE "
+                "WHEN owner_share_percent IS NULL THEN amount_owed "
+                "ELSE amount_owed * owner_share_percent / 100.0 "
+                "END"
+                ") THEN ("
+                "CASE "
+                "WHEN owner_share_percent IS NULL THEN amount_owed "
+                "ELSE amount_owed * owner_share_percent / 100.0 "
+                "END"
+                ") "
+                "ELSE ("
+                "SELECT b.payment_basis FROM _receipt_payment_backfill b "
+                "WHERE b.receipt_id = receipts.id"
+                ") * ("
+                "CASE "
+                "WHEN owner_share_percent IS NULL THEN amount_owed "
+                "ELSE amount_owed * owner_share_percent / 100.0 "
+                "END"
+                ") / amount_owed "
+                "END "
+                "END "
+                "WHERE id IN (SELECT receipt_id FROM _receipt_payment_backfill)"
+            )
+        )
+        await conn.execute(
+            text(
+                "UPDATE receipt_recipient_shares "
+                "SET amount_paid = ("
+                "SELECT CASE "
+                "WHEN r.amount_owed <= 0 THEN 0.0 "
+                "WHEN b.payment_basis * receipt_recipient_shares.share_percent / 100.0 "
+                "> r.amount_owed * receipt_recipient_shares.share_percent / 100.0 "
+                "THEN r.amount_owed * receipt_recipient_shares.share_percent / 100.0 "
+                "ELSE b.payment_basis * receipt_recipient_shares.share_percent / 100.0 "
+                "END "
+                "FROM receipts r "
+                "JOIN _receipt_payment_backfill b ON b.receipt_id = r.id "
+                "WHERE r.id = receipt_recipient_shares.receipt_id"
+                ") "
+                "WHERE receipt_id IN (SELECT receipt_id FROM _receipt_payment_backfill) "
+                "AND COALESCE(amount_paid, 0.0) = 0.0"
+            )
+        )
+        await conn.execute(text("DROP TABLE _receipt_payment_backfill"))
+
 
 async def reset_db() -> None:
     """Drops and recreates all tables for local recovery workflows."""
