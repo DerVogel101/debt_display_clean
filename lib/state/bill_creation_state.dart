@@ -53,14 +53,12 @@ class BillCreationState extends ChangeNotifier {
   bool _isLoading = false;
   bool _isMutating = false;
   String? _errorMessage;
-  List<Recipient> _groups = const [];
   List<TagIndex> _availableTags = const [];
 
   bool get isAuthenticated => _isAuthenticated;
   bool get isLoading => _isLoading;
   bool get isMutating => _isMutating;
   String? get errorMessage => _errorMessage;
-  List<Recipient> get groups => _groups;
   List<TagIndex> get availableTags => _availableTags;
 
   void updateAuthSession(AuthSessionState authSessionState) {
@@ -108,17 +106,8 @@ class BillCreationState extends ChangeNotifier {
       if (!tagsResponse.success) {
         throw StateError(tagsResponse.message);
       }
-      final groupsResponse = await _debtBackendService.listRecipients(
-        _accessToken!,
-      );
-      if (!groupsResponse.success) {
-        throw StateError(groupsResponse.message);
-      }
       _availableTags = List<TagIndex>.unmodifiable(
         tagsResponse.tags.map((tag) => tag.deepCopy()),
-      );
-      _groups = List<Recipient>.unmodifiable(
-        groupsResponse.recipients.map((group) => group.deepCopy()),
       );
       _hasLoadedReferenceData = true;
     } catch (error) {
@@ -278,6 +267,11 @@ class BillCreationState extends ChangeNotifier {
     }
   }
 
+  Future<void> refresh() async {
+    _markReferenceDataStale();
+    await ensureLoaded();
+  }
+
   String? _validate({
     required String title,
     required String description,
@@ -327,7 +321,6 @@ class BillCreationState extends ChangeNotifier {
 
   void _clearData() {
     _markReferenceDataStale();
-    _groups = const [];
     _availableTags = const [];
     _errorMessage = null;
   }

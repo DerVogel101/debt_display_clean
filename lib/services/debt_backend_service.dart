@@ -96,6 +96,20 @@ class DebtBackendService {
     return _parseProtobufResponse(response, ReceiptsResponse.fromBuffer);
   }
 
+  Future<ReceiptUnpaidSummaryResponse> getUnpaidReceiptSummary(
+    String accessToken,
+  ) async {
+    final response = await _dio.post(
+      '/api/receipts/unpaid-summary',
+      data: ReceiptUnpaidSummaryRequest().writeToBuffer(),
+      options: _withAuthToken(accessToken),
+    );
+    return _parseProtobufResponse(
+      response,
+      ReceiptUnpaidSummaryResponse.fromBuffer,
+    );
+  }
+
   Future<TagsResponse> listTags(String accessToken) async {
     final response = await _dio.post(
       '/api/tags/list',

@@ -12,6 +12,7 @@ abstract final class AppConfig {
   static late final String auth0ClientId;
   static late final String auth0Audience;
   static late final String auth0FullNameClaim;
+  static late final Duration? autoFetchInterval;
 
   static bool _loaded = false;
 
@@ -38,27 +39,30 @@ abstract final class AppConfig {
     }
 
     final isDebugBuild = kDebugMode && !kReleaseMode;
-    backendUrl =
-        isDebugBuild
-            ? (values['BACKEND_URL_DEBUG'] ??
-                values['BACKEND_URL'] ??
-                'http://localhost:3300')
-            : (values['BACKEND_URL_RELEASE'] ??
-                values['BACKEND_URL'] ??
-                'http://localhost:3300');
-    frontendUrl =
-        isDebugBuild
-            ? (values['FRONTEND_URL_DEBUG'] ??
-                values['FRONTEND_URL'] ??
-                'http://localhost:3000')
-            : (values['FRONTEND_URL_RELEASE'] ??
-                values['FRONTEND_URL'] ??
-                'http://localhost:3000');
+    backendUrl = isDebugBuild
+        ? (values['BACKEND_URL_DEBUG'] ??
+              values['BACKEND_URL'] ??
+              'http://localhost:3300')
+        : (values['BACKEND_URL_RELEASE'] ??
+              values['BACKEND_URL'] ??
+              'http://localhost:3300');
+    frontendUrl = isDebugBuild
+        ? (values['FRONTEND_URL_DEBUG'] ??
+              values['FRONTEND_URL'] ??
+              'http://localhost:3000')
+        : (values['FRONTEND_URL_RELEASE'] ??
+              values['FRONTEND_URL'] ??
+              'http://localhost:3000');
     auth0Domain = values['AUTH0_DOMAIN'] ?? '';
     auth0ClientId = values['AUTH0_CLIENT_ID'] ?? '';
     auth0Audience = values['AUTH0_AUDIENCE'] ?? '';
     auth0FullNameClaim =
         values['AUTH0_FULL_NAME_CLAIM'] ?? defaultAuth0FullNameClaim;
+    final autoFetchSeconds =
+        int.tryParse(values['AUTO_FETCH_INTERVAL_SECONDS'] ?? '15') ?? 15;
+    autoFetchInterval = autoFetchSeconds <= 0
+        ? null
+        : Duration(seconds: autoFetchSeconds);
     _loaded = true;
   }
 }

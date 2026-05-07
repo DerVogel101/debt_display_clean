@@ -8,7 +8,8 @@
 // ignore_for_file: constant_identifier_names
 // ignore_for_file: curly_braces_in_flow_control_structures
 // ignore_for_file: deprecated_member_use_from_same_package, library_prefixes
-// ignore_for_file: always_use_package_imports, non_constant_identifier_names, prefer_relative_imports
+// ignore_for_file: non_constant_identifier_names, prefer_relative_imports
+// ignore_for_file: always_use_package_imports
 
 import 'dart:core' as $core;
 
@@ -1620,6 +1621,140 @@ class ReceiptsResponse extends $pb.GeneratedMessage {
   $core.bool hasNextPageToken() => $_has(3);
   @$pb.TagNumber(4)
   void clearNextPageToken() => $_clearField(4);
+}
+
+class ReceiptUnpaidSummaryRequest extends $pb.GeneratedMessage {
+  factory ReceiptUnpaidSummaryRequest() => create();
+
+  ReceiptUnpaidSummaryRequest._();
+
+  factory ReceiptUnpaidSummaryRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ReceiptUnpaidSummaryRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ReceiptUnpaidSummaryRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'debt'),
+      createEmptyInstance: create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ReceiptUnpaidSummaryRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ReceiptUnpaidSummaryRequest copyWith(
+          void Function(ReceiptUnpaidSummaryRequest) updates) =>
+      super.copyWith(
+              (message) => updates(message as ReceiptUnpaidSummaryRequest))
+          as ReceiptUnpaidSummaryRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ReceiptUnpaidSummaryRequest create() =>
+      ReceiptUnpaidSummaryRequest._();
+  @$core.override
+  ReceiptUnpaidSummaryRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ReceiptUnpaidSummaryRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ReceiptUnpaidSummaryRequest>(create);
+  static ReceiptUnpaidSummaryRequest? _defaultInstance;
+}
+
+class ReceiptUnpaidSummaryResponse extends $pb.GeneratedMessage {
+  factory ReceiptUnpaidSummaryResponse({
+    $core.bool? success,
+    $core.String? message,
+    $core.double? unpaidShareTotal,
+    $core.int? unpaidBillCount,
+  }) {
+    final result = create();
+    if (success != null) result.success = success;
+    if (message != null) result.message = message;
+    if (unpaidShareTotal != null) result.unpaidShareTotal = unpaidShareTotal;
+    if (unpaidBillCount != null) result.unpaidBillCount = unpaidBillCount;
+    return result;
+  }
+
+  ReceiptUnpaidSummaryResponse._();
+
+  factory ReceiptUnpaidSummaryResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ReceiptUnpaidSummaryResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ReceiptUnpaidSummaryResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'debt'),
+      createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'success')
+    ..aOS(2, _omitFieldNames ? '' : 'message')
+    ..aD(3, _omitFieldNames ? '' : 'unpaidShareTotal')
+    ..aI(4, _omitFieldNames ? '' : 'unpaidBillCount')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ReceiptUnpaidSummaryResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ReceiptUnpaidSummaryResponse copyWith(
+          void Function(ReceiptUnpaidSummaryResponse) updates) =>
+      super.copyWith(
+              (message) => updates(message as ReceiptUnpaidSummaryResponse))
+          as ReceiptUnpaidSummaryResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ReceiptUnpaidSummaryResponse create() =>
+      ReceiptUnpaidSummaryResponse._();
+  @$core.override
+  ReceiptUnpaidSummaryResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ReceiptUnpaidSummaryResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ReceiptUnpaidSummaryResponse>(create);
+  static ReceiptUnpaidSummaryResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get success => $_getBF(0);
+  @$pb.TagNumber(1)
+  set success($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSuccess() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSuccess() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get message => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set message($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasMessage() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearMessage() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.double get unpaidShareTotal => $_getN(2);
+  @$pb.TagNumber(3)
+  set unpaidShareTotal($core.double value) => $_setDouble(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasUnpaidShareTotal() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearUnpaidShareTotal() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get unpaidBillCount => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set unpaidBillCount($core.int value) => $_setSignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasUnpaidBillCount() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearUnpaidBillCount() => $_clearField(4);
 }
 
 class FileResponse extends $pb.GeneratedMessage {

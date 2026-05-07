@@ -262,6 +262,22 @@ class ReceiptsResponse(_message.Message):
     next_page_token: str
     def __init__(self, success: _Optional[bool] = ..., message: _Optional[str] = ..., receipts: _Optional[_Iterable[_Union[Receipt, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
 
+class ReceiptUnpaidSummaryRequest(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...
+
+class ReceiptUnpaidSummaryResponse(_message.Message):
+    __slots__ = ("success", "message", "unpaid_share_total", "unpaid_bill_count")
+    SUCCESS_FIELD_NUMBER: _ClassVar[int]
+    MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    UNPAID_SHARE_TOTAL_FIELD_NUMBER: _ClassVar[int]
+    UNPAID_BILL_COUNT_FIELD_NUMBER: _ClassVar[int]
+    success: bool
+    message: str
+    unpaid_share_total: float
+    unpaid_bill_count: int
+    def __init__(self, success: _Optional[bool] = ..., message: _Optional[str] = ..., unpaid_share_total: _Optional[float] = ..., unpaid_bill_count: _Optional[int] = ...) -> None: ...
+
 class FileResponse(_message.Message):
     __slots__ = ("success", "message", "file")
     SUCCESS_FIELD_NUMBER: _ClassVar[int]

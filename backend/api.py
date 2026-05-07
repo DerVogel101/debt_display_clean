@@ -713,6 +713,30 @@ async def list_receipts_route(request: Request, session: AsyncSession = Depends(
         return _error_response(debt_pb2.ReceiptsResponse, exc)
 
 
+@api_app.post("/receipts/unpaid-summary")
+async def unpaid_receipts_summary_route(request: Request, session: AsyncSession = Depends(get_session)) -> ProtobufResponse:
+    body = await request.body()
+    proto_req = debt_pb2.ReceiptUnpaidSummaryRequest()
+    proto_req.ParseFromString(body)
+    try:
+        user = await _current_user(request, session)
+        summary = await services.summarize_visible_unpaid_receipts(
+            session,
+            actor_user_id=user.id,
+        )
+        await session.commit()
+        return _pb_response(
+            debt_pb2.ReceiptUnpaidSummaryResponse(
+                success=True,
+                unpaid_share_total=summary.unpaid_share_total,
+                unpaid_bill_count=summary.unpaid_bill_count,
+            )
+        )
+    except Exception as exc:
+        await session.rollback()
+        return _error_response(debt_pb2.ReceiptUnpaidSummaryResponse, exc)
+
+
 @api_app.post("/receipts/update")
 async def update_receipt_route(request: Request, session: AsyncSession = Depends(get_session)) -> ProtobufResponse:
     body = await request.body()

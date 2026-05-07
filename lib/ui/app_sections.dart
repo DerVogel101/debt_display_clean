@@ -1,6 +1,7 @@
 import 'package:auth0_flutter/auth0_flutter.dart';
 import 'package:debt_display/generated/debt.pb.dart';
 import 'package:debt_display/state/auth_session_state.dart';
+import 'package:debt_display/state/bill_list_state.dart';
 import 'package:debt_display/state/home_bill_state.dart';
 import 'package:debt_display/state/navigation_state.dart';
 import 'package:debt_display/state/recipient_group_state.dart';
@@ -207,7 +208,8 @@ class _HomeSectionState extends State<HomeSection> {
       symbol: '€',
       decimalDigits: 2,
     );
-    final totalStillOwed = homeState.displayedTotal;
+    final billListState = context.watch<BillListState>();
+    final totalStillOwed = homeState.unpaidShareTotal;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -301,6 +303,7 @@ class _HomeSectionState extends State<HomeSection> {
                     ),
                     child: _HomeBillTile(
                       receipt: entry.value,
+                      roleLabel: billListState.roleLabelFor(entry.value),
                       amountLabel: _homeAmountLabel(
                         entry.value,
                         locale,
@@ -309,6 +312,12 @@ class _HomeSectionState extends State<HomeSection> {
                       dueLabel: _homeDueLabel(
                         entry.value,
                         materialLocalizations,
+                      ),
+                      onTap: () => showBillDetailModal(
+                        context,
+                        receipt: entry.value,
+                        state: billListState,
+                        isDesktop: widget.isDesktop,
                       ),
                     ),
                   ),
@@ -334,7 +343,7 @@ class _HomeSectionState extends State<HomeSection> {
               ),
               const SizedBox(height: 10),
               Text(
-                'Combined balance across the displayed unpaid bills.',
+                'Combined balance across all unpaid bills you take part in.',
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   color: mutedForegroundColor(context, alpha: 0.88),
                   height: 1.45,
@@ -358,7 +367,7 @@ class _HomeSectionState extends State<HomeSection> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '${homeState.receipts.length} unpaid bills displayed',
+                      '${homeState.unpaidBillCount} unpaid bills need your share',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         color: mutedForegroundColor(context, alpha: 0.8),
                         fontWeight: FontWeight.w700,
@@ -558,20 +567,69 @@ String _homeDueLabel(
   return 'Due ${materialLocalizations.formatShortDate(dueDate.toLocal())}';
 }
 
+String _homeRecipientLabel(Receipt receipt) {
+  if (receipt.hasRecipientName() && receipt.recipientName.trim().isNotEmpty) {
+    return receipt.recipientName;
+  }
+  if (receipt.hasRecipient() && receipt.recipient.name.trim().isNotEmpty) {
+    return receipt.recipient.name;
+  }
+  return 'Personal bill';
+}
+
+String _homeParticipantsLabel(Receipt receipt) {
+  if (receipt.hasRecipient() && receipt.recipient.members.isNotEmpty) {
+    return receipt.recipient.members.map(_homeUserLabel).join(', ');
+  }
+  if (receipt.hasSplit() && receipt.split.recipientShares.isNotEmpty) {
+    return receipt.split.recipientShares.map(_homeShareUserLabel).join(', ');
+  }
+  return _homeRecipientLabel(receipt);
+}
+
+String _homeUserLabel(User user) {
+  if (user.hasName() && user.name.trim().isNotEmpty) {
+    return user.name;
+  }
+  if (user.hasEmail() && user.email.trim().isNotEmpty) {
+    return user.email;
+  }
+  return 'User ${user.id}';
+}
+
+String _homeShareUserLabel(ReceiptRecipientShare share) {
+  if (share.hasUserName() && share.userName.trim().isNotEmpty) {
+    return share.userName;
+  }
+  if (share.hasUserEmail() && share.userEmail.trim().isNotEmpty) {
+    return share.userEmail;
+  }
+  return 'User ${share.userId}';
+}
+
 class _HomeBillTile extends StatelessWidget {
   const _HomeBillTile({
     required this.receipt,
+    required this.roleLabel,
     required this.dueLabel,
     required this.amountLabel,
+    required this.onTap,
   });
 
   final Receipt receipt;
+  final String roleLabel;
   final String dueLabel;
   final String amountLabel;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return GlassPanel.secondary(
+    final groupLabel = _homeRecipientLabel(receipt);
+    final participantsLabel = _homeParticipantsLabel(receipt);
+    final filesLabel = receipt.files.length == 1
+        ? '1 file included'
+        : '${receipt.files.length} files included';
+    final panel = GlassPanel.secondary(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       borderRadius: const BorderRadius.all(Radius.circular(24)),
@@ -602,7 +660,49 @@ class _HomeBillTile extends StatelessWidget {
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-                const SizedBox(height: 4),
+                if (receipt.hasDescription() &&
+                    receipt.description.trim().isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    receipt.description,
+                    maxLines: 1,
+                    softWrap: false,
+                    overflow: TextOverflow.fade,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: mutedForegroundColor(context, alpha: 0.82),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _HomeMetaChip(
+                      label: roleLabel,
+                      icon: roleLabel == 'Owner'
+                          ? Icons.badge_rounded
+                          : Icons.people_alt_rounded,
+                    ),
+                    _HomeMetaChip(
+                      label: receipt.isPaid ? 'Paid' : 'Unpaid',
+                      icon: receipt.isPaid
+                          ? Icons.check_circle_rounded
+                          : Icons.schedule_rounded,
+                    ),
+                    _HomeMetaChip(
+                      label: groupLabel,
+                      icon: Icons.group_work_rounded,
+                      tooltip: participantsLabel,
+                    ),
+                    if (receipt.files.isNotEmpty)
+                      _HomeMetaChip(
+                        label: filesLabel,
+                        icon: Icons.attach_file_rounded,
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 8),
                 Text(
                   dueLabel,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -625,6 +725,61 @@ class _HomeBillTile extends StatelessWidget {
           ),
         ],
       ),
+    );
+    return InkWell(
+      key: ValueKey('home-receipt-row-${receipt.id}'),
+      onTap: onTap,
+      borderRadius: const BorderRadius.all(Radius.circular(24)),
+      child: panel,
+    );
+  }
+}
+
+class _HomeMetaChip extends StatelessWidget {
+  const _HomeMetaChip({required this.label, required this.icon, this.tooltip});
+
+  final String label;
+  final IconData icon;
+  final String? tooltip;
+
+  @override
+  Widget build(BuildContext context) {
+    final chip = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: glassSurfaceDecoration(
+        context,
+        variant: AppGlassVariant.secondary,
+        tone: brandPrimary,
+        borderRadius: const BorderRadius.all(Radius.circular(999)),
+        includeShadows: false,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: brandPrimary),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              softWrap: false,
+              style: Theme.of(
+                context,
+              ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
+    final message = tooltip?.trim();
+    if (message == null || message.isEmpty || message == label) {
+      return chip;
+    }
+    return Tooltip(
+      message: message,
+      triggerMode: TooltipTriggerMode.tap,
+      child: chip,
     );
   }
 }

@@ -1,11 +1,11 @@
 import 'dart:typed_data';
 
 import 'package:debt_display/generated/debt.pb.dart';
-import 'package:debt_display/services/camera_capture.dart';
 import 'package:debt_display/state/auth_session_state.dart';
 import 'package:debt_display/state/bill_creation_state.dart';
 import 'package:debt_display/state/bill_list_state.dart';
 import 'package:debt_display/state/navigation_state.dart';
+import 'package:debt_display/state/recipient_group_state.dart';
 import 'package:debt_display/theme/app_themes.dart';
 import 'package:debt_display/ui/app_shared.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
@@ -60,6 +60,7 @@ class _BillCreationSectionState extends State<BillCreationSection> {
         return;
       }
       context.read<BillCreationState>().ensureLoaded();
+      context.read<RecipientGroupState>().ensureLoaded();
       _syncShareControllers();
     });
   }
@@ -104,12 +105,13 @@ class _BillCreationSectionState extends State<BillCreationSection> {
       (state) => state.isAuthenticated,
     );
     final state = context.watch<BillCreationState>();
+    final groupState = context.watch<RecipientGroupState>();
 
     if (!isAuthenticated) {
       return _LoggedOutBillCreationSection(isDesktop: widget.isDesktop);
     }
 
-    final groups = state.groups;
+    final groups = groupState.groups;
     final selectedGroup = _selectedGroup(groups);
 
     return PageSection(
@@ -137,9 +139,14 @@ class _BillCreationSectionState extends State<BillCreationSection> {
               ),
             ),
             const SizedBox(height: 22),
-            if (state.isLoading) const LinearProgressIndicator(),
+            if (state.isLoading || groupState.isLoadingGroups)
+              const LinearProgressIndicator(),
             if (state.errorMessage != null) ...[
               _InlineError(message: state.errorMessage!),
+              const SizedBox(height: 16),
+            ],
+            if (groupState.errorMessage != null) ...[
+              _InlineError(message: groupState.errorMessage!),
               const SizedBox(height: 16),
             ],
             _BasicsSection(
@@ -206,6 +213,7 @@ class _BillCreationSectionState extends State<BillCreationSection> {
               attachments: _attachments,
               isPickingFile: _isPickingFile,
               isPickingCamera: _isPickingCamera,
+              isDesktop: widget.isDesktop,
               onUploadFiles: _pickFiles,
               onTakePicture: _takePicture,
               onRemove: _removeAttachment,
@@ -373,7 +381,7 @@ class _BillCreationSectionState extends State<BillCreationSection> {
       _sharePercents.clear();
       Recipient? selected;
       if (groupId != null) {
-        for (final candidate in context.read<BillCreationState>().groups) {
+        for (final candidate in context.read<RecipientGroupState>().groups) {
           if (candidate.id.toInt() == groupId) {
             selected = candidate;
             break;
@@ -501,19 +509,6 @@ class _BillCreationSectionState extends State<BillCreationSection> {
   Future<void> _takePicture() async {
     setState(() => _isPickingCamera = true);
     try {
-      final captured = await captureImageWithCamera(context);
-      if (captured != null) {
-        setState(() {
-          _attachments.add(
-            _AttachmentDraft(
-              filename: captured.filename,
-              bytes: captured.bytes,
-              contentType: captured.contentType,
-            ),
-          );
-        });
-        return;
-      }
       final image = await ImagePicker().pickImage(source: ImageSource.camera);
       if (image == null) {
         return;
@@ -1169,6 +1164,7 @@ class _AttachmentsSection extends StatelessWidget {
     required this.attachments,
     required this.isPickingFile,
     required this.isPickingCamera,
+    required this.isDesktop,
     required this.onUploadFiles,
     required this.onTakePicture,
     required this.onRemove,
@@ -1177,6 +1173,7 @@ class _AttachmentsSection extends StatelessWidget {
   final List<_AttachmentDraft> attachments;
   final bool isPickingFile;
   final bool isPickingCamera;
+  final bool isDesktop;
   final VoidCallback onUploadFiles;
   final VoidCallback onTakePicture;
   final ValueChanged<_AttachmentDraft> onRemove;
@@ -1200,12 +1197,22 @@ class _AttachmentsSection extends StatelessWidget {
               ),
               OutlinedButton.icon(
                 key: const ValueKey('bill-create-camera-button'),
-                onPressed: isPickingCamera ? null : onTakePicture,
+                onPressed: isDesktop || isPickingCamera ? null : onTakePicture,
                 icon: const Icon(Icons.photo_camera_rounded),
                 label: const Text('Take picture'),
               ),
             ],
           ),
+          if (isDesktop) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Take picture is available on mobile browsers so iOS can open the native camera flow.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: mutedForegroundColor(context, alpha: 0.78),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
           if (attachments.isNotEmpty) ...[
             const SizedBox(height: 14),
             ...attachments.map(

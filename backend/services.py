@@ -36,6 +36,12 @@ class ReceiptPage:
 
 
 @dataclass(frozen=True)
+class ReceiptUnpaidSummary:
+    unpaid_share_total: float
+    unpaid_bill_count: int
+
+
+@dataclass(frozen=True)
 class _ReceiptSortSpec:
     order_by: str
     order_direction: str
@@ -523,6 +529,47 @@ async def list_visible_receipts(
         )
 
     return ReceiptPage(receipts=receipts, next_page_token=next_page_token)
+
+
+async def summarize_visible_unpaid_receipts(
+    session: AsyncSession,
+    actor_user_id: int,
+) -> ReceiptUnpaidSummary:
+    result = await session.execute(
+        select(Receipt)
+        .where(_receipt_actor_visibility_filter(actor_user_id, "owner_or_recipient_group"))
+        .where(Receipt.is_paid.is_(False))
+        .options(selectinload(Receipt.recipient_shares))
+    )
+    total = 0.0
+    count = 0
+    for receipt in result.scalars().all():
+        remaining = _remaining_share_for_user(receipt, actor_user_id)
+        if remaining > 1e-6:
+            total += remaining
+            count += 1
+    return ReceiptUnpaidSummary(
+        unpaid_share_total=total,
+        unpaid_bill_count=count,
+    )
+
+
+def _remaining_share_for_user(receipt: Receipt, actor_user_id: int) -> float:
+    if receipt.owner_id == actor_user_id:
+        if receipt.owner_share_percent is None:
+            share_amount = float(receipt.amount_owed)
+        else:
+            share_amount = float(receipt.amount_owed) * float(receipt.owner_share_percent) / 100.0
+        paid = float(receipt.owner_amount_paid or 0.0)
+        return max(0.0, share_amount - paid)
+
+    for share in getattr(receipt, "recipient_shares", []) or []:
+        if share.user_id == actor_user_id:
+            share_amount = float(receipt.amount_owed) * float(share.share_percent) / 100.0
+            paid = float(share.amount_paid or 0.0)
+            return max(0.0, share_amount - paid)
+
+    return 0.0
 
 
 async def update_receipt_for_owner(

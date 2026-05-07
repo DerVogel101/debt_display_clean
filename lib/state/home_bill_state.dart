@@ -16,13 +16,15 @@ class HomeBillState extends ChangeNotifier {
   bool _isLoading = false;
   String? _errorMessage;
   List<Receipt> _receipts = const [];
+  double _unpaidShareTotal = 0;
+  int _unpaidBillCount = 0;
 
   bool get isAuthenticated => _isAuthenticated;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   List<Receipt> get receipts => _receipts;
-  double get displayedTotal =>
-      _receipts.fold<double>(0, (sum, receipt) => sum + receipt.amountOwed);
+  double get unpaidShareTotal => _unpaidShareTotal;
+  int get unpaidBillCount => _unpaidBillCount;
 
   void updateAuthSession(AuthSessionState authSessionState) {
     final nextAccessToken = authSessionState.accessToken;
@@ -40,6 +42,8 @@ class HomeBillState extends ChangeNotifier {
     _errorMessage = null;
     if (!_isAuthenticated) {
       _receipts = const [];
+      _unpaidShareTotal = 0;
+      _unpaidBillCount = 0;
       notifyListeners();
       return;
     }
@@ -72,15 +76,25 @@ class HomeBillState extends ChangeNotifier {
               ReceiptActorFilter.RECEIPT_ACTOR_FILTER_OWNER_OR_RECIPIENT_GROUP,
         ),
       );
+      final summaryResponse = await _debtBackendService.getUnpaidReceiptSummary(
+        _accessToken!,
+      );
       if (!response.success) {
         throw StateError(response.message);
+      }
+      if (!summaryResponse.success) {
+        throw StateError(summaryResponse.message);
       }
       _receipts = List<Receipt>.unmodifiable(
         response.receipts.take(3).map((receipt) => receipt.deepCopy()),
       );
+      _unpaidShareTotal = summaryResponse.unpaidShareTotal;
+      _unpaidBillCount = summaryResponse.unpaidBillCount;
       _hasLoaded = true;
     } catch (error) {
       _receipts = const [];
+      _unpaidShareTotal = 0;
+      _unpaidBillCount = 0;
       _errorMessage = _formatError(error);
     } finally {
       _isLoading = false;

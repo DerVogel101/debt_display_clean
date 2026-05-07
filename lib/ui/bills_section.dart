@@ -10,6 +10,61 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+Future<void> showBillDetailModal(
+  BuildContext context, {
+  required Receipt receipt,
+  required BillListState state,
+  required bool isDesktop,
+}) {
+  Widget buildContent() {
+    return ListenableBuilder(
+      listenable: state,
+      builder: (context, child) {
+        final currentReceipt = state.receipts.firstWhere(
+          (candidate) => candidate.id == receipt.id,
+          orElse: () => receipt,
+        );
+        return _BillDetailPanel(receipt: currentReceipt, state: state);
+      },
+    );
+  }
+
+  if (isDesktop) {
+    return showDialog<void>(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        insetPadding: const EdgeInsets.all(28),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: 820,
+            maxHeight: MediaQuery.of(dialogContext).size.height * 0.9,
+          ),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(18),
+            child: buildContent(),
+          ),
+        ),
+      ),
+    );
+  }
+
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    builder: (sheetContext) => DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.9,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      builder: (_, scrollController) => SingleChildScrollView(
+        controller: scrollController,
+        padding: const EdgeInsets.all(18),
+        child: buildContent(),
+      ),
+    ),
+  );
+}
+
 class BillsSection extends StatefulWidget {
   const BillsSection({super.key, required this.isDesktop});
 
@@ -570,25 +625,9 @@ class _BillsListCard extends StatefulWidget {
 }
 
 class _BillsListCardState extends State<_BillsListCard> {
-  int? _selectedReceiptId;
-
-  Receipt? _selectedReceipt() {
-    final selectedId = _selectedReceiptId;
-    if (selectedId == null) {
-      return null;
-    }
-    for (final receipt in widget.state.receipts) {
-      if (receipt.id.toInt() == selectedId) {
-        return receipt;
-      }
-    }
-    return null;
-  }
-
   @override
   Widget build(BuildContext context) {
     final state = widget.state;
-    final selectedReceipt = _selectedReceipt();
     return PageSection(
       padding: EdgeInsets.all(widget.isDesktop ? 28 : 22),
       child: Column(
@@ -659,25 +698,7 @@ class _BillsListCardState extends State<_BillsListCard> {
               ),
             )
           else
-            widget.isDesktop
-                ? Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(child: _buildReceiptList(context, state)),
-                      const SizedBox(width: 16),
-                      SizedBox(
-                        width: 390,
-                        child: selectedReceipt == null
-                            ? _SelectBillPlaceholder(state: state)
-                            : _BillDetailPanel(
-                                receipt: selectedReceipt,
-                                state: state,
-                                isDesktop: true,
-                              ),
-                      ),
-                    ],
-                  )
-                : _buildReceiptList(context, state),
+            _buildReceiptList(context, state),
         ],
       ),
     );
@@ -694,7 +715,6 @@ class _BillsListCardState extends State<_BillsListCard> {
             child: _BillReceiptTile(
               receipt: state.receipts[index],
               state: state,
-              selected: _selectedReceiptId == state.receipts[index].id.toInt(),
               onTap: () => _selectReceipt(context, state.receipts[index]),
             ),
           ),
@@ -703,40 +723,11 @@ class _BillsListCardState extends State<_BillsListCard> {
   }
 
   void _selectReceipt(BuildContext context, Receipt receipt) {
-    if (widget.isDesktop) {
-      setState(() {
-        _selectedReceiptId = receipt.id.toInt();
-      });
-      return;
-    }
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (sheetContext) => DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: 0.9,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        builder: (_, scrollController) => SingleChildScrollView(
-          controller: scrollController,
-          padding: const EdgeInsets.all(18),
-          child: ListenableBuilder(
-            listenable: widget.state,
-            builder: (context, child) {
-              final state = widget.state;
-              final currentReceipt = state.receipts.firstWhere(
-                (candidate) => candidate.id == receipt.id,
-                orElse: () => receipt,
-              );
-              return _BillDetailPanel(
-                receipt: currentReceipt,
-                state: state,
-                isDesktop: false,
-              );
-            },
-          ),
-        ),
-      ),
+    showBillDetailModal(
+      context,
+      receipt: receipt,
+      state: widget.state,
+      isDesktop: widget.isDesktop,
     );
   }
 }
@@ -745,13 +736,11 @@ class _BillReceiptTile extends StatelessWidget {
   const _BillReceiptTile({
     required this.receipt,
     required this.state,
-    required this.selected,
     required this.onTap,
   });
 
   final Receipt receipt;
   final BillListState state;
-  final bool selected;
   final VoidCallback onTap;
 
   @override
@@ -786,7 +775,6 @@ class _BillReceiptTile extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.all(18),
         borderRadius: const BorderRadius.all(Radius.circular(24)),
-        tone: selected ? brandPrimary : null,
         child: Row(
           children: [
             Expanded(
@@ -833,10 +821,9 @@ class _BillReceiptTile extends StatelessWidget {
                         tone: receipt.isPaid ? Colors.green : Colors.orange,
                       ),
                       _MetaChip(
-                        label: peopleLabel.isEmpty
-                            ? recipientLabel
-                            : peopleLabel,
+                        label: recipientLabel,
                         icon: Icons.group_work_rounded,
+                        tooltip: peopleLabel,
                       ),
                       if (receipt.files.isNotEmpty)
                         _MetaChip(
@@ -892,38 +879,11 @@ class _BillReceiptTile extends StatelessWidget {
   }
 }
 
-class _SelectBillPlaceholder extends StatelessWidget {
-  const _SelectBillPlaceholder({required this.state});
-
-  final BillListState state;
-
-  @override
-  Widget build(BuildContext context) {
-    return GlassPanel.secondary(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      borderRadius: const BorderRadius.all(Radius.circular(24)),
-      child: Text(
-        'Select a bill to view notes, payments, and files.',
-        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-          color: mutedForegroundColor(context, alpha: 0.82),
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
-  }
-}
-
 class _BillDetailPanel extends StatelessWidget {
-  const _BillDetailPanel({
-    required this.receipt,
-    required this.state,
-    required this.isDesktop,
-  });
+  const _BillDetailPanel({required this.receipt, required this.state});
 
   final Receipt receipt;
   final BillListState state;
-  final bool isDesktop;
 
   @override
   Widget build(BuildContext context) {
@@ -1041,11 +1001,7 @@ class _BillDetailPanel extends StatelessWidget {
               ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 10),
-            _ReceiptFilesDetail(
-              receipt: receipt,
-              state: state,
-              isDesktop: isDesktop,
-            ),
+            _ReceiptFilesDetail(receipt: receipt, state: state),
           ],
         ],
       ),
@@ -1316,41 +1272,103 @@ class _ReceiptSplitShareRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final split = receipt.split;
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: [
-        _SplitSharePill(
-          label: 'Owner',
-          amountLabel: amountFormat.format(split.ownerAmount),
-          paidLabel: amountFormat.format(split.ownerAmountPaid),
-          percentLabel: '${split.ownerSharePercent.toStringAsFixed(0)}%',
-          icon: Icons.badge_rounded,
+    final rows = [
+      (
+        participant: 'Owner',
+        percent: split.ownerSharePercent,
+        shareAmount: split.ownerAmount,
+        paidAmount: split.ownerAmountPaid,
+      ),
+      for (final share in split.recipientShares)
+        (
+          participant: _shareUserLabel(share),
+          percent: share.sharePercent,
+          shareAmount: share.amount,
+          paidAmount: share.amountPaid,
         ),
-        ...split.recipientShares.map(
-          (share) => _SplitSharePill(
-            label: _shareUserLabel(share),
-            amountLabel: amountFormat.format(share.amount),
-            paidLabel: amountFormat.format(share.amountPaid),
-            percentLabel: '${share.sharePercent.toStringAsFixed(0)}%',
-            icon: Icons.person_rounded,
+    ];
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minWidth: 560),
+        child: Table(
+          columnWidths: const {
+            0: FlexColumnWidth(1.4),
+            1: FixedColumnWidth(74),
+            2: FixedColumnWidth(112),
+            3: FixedColumnWidth(112),
+            4: FixedColumnWidth(112),
+          },
+          border: TableBorder(
+            horizontalInside: BorderSide(
+              color: Theme.of(
+                context,
+              ).colorScheme.outlineVariant.withValues(alpha: 0.65),
+            ),
           ),
+          children: [
+            _shareTableRow(
+              context,
+              cells: const ['Participant', '%', 'Share', 'Paid', 'Left'],
+              isHeader: true,
+            ),
+            for (final row in rows)
+              _shareTableRow(
+                context,
+                cells: [
+                  row.participant,
+                  '${row.percent.toStringAsFixed(0)}%',
+                  amountFormat.format(row.shareAmount),
+                  amountFormat.format(row.paidAmount),
+                  amountFormat.format(
+                    (row.shareAmount - row.paidAmount).clamp(
+                      0,
+                      double.infinity,
+                    ),
+                  ),
+                ],
+              ),
+          ],
         ),
+      ),
+    );
+  }
+
+  TableRow _shareTableRow(
+    BuildContext context, {
+    required List<String> cells,
+    bool isHeader = false,
+  }) {
+    final style = isHeader
+        ? Theme.of(context).textTheme.labelMedium?.copyWith(
+            fontWeight: FontWeight.w900,
+            color: mutedForegroundColor(context, alpha: 0.78),
+          )
+        : Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700);
+    return TableRow(
+      children: [
+        for (final cell in cells)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 8),
+            child: Text(
+              cell,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: style,
+            ),
+          ),
       ],
     );
   }
 }
 
 class _ReceiptFilesDetail extends StatelessWidget {
-  const _ReceiptFilesDetail({
-    required this.receipt,
-    required this.state,
-    required this.isDesktop,
-  });
+  const _ReceiptFilesDetail({required this.receipt, required this.state});
 
   final Receipt receipt;
   final BillListState state;
-  final bool isDesktop;
 
   @override
   Widget build(BuildContext context) {
@@ -1362,7 +1380,7 @@ class _ReceiptFilesDetail extends StatelessWidget {
               child: _ReceiptFileDetailTile(
                 file: file,
                 state: state,
-                showPreview: isDesktop,
+                showPreview: true,
               ),
             ),
           )
@@ -1492,54 +1510,6 @@ Future<void> _openReceiptFile(
   );
 }
 
-class _SplitSharePill extends StatelessWidget {
-  const _SplitSharePill({
-    required this.label,
-    required this.amountLabel,
-    required this.paidLabel,
-    required this.percentLabel,
-    required this.icon,
-  });
-
-  final String label;
-  final String amountLabel;
-  final String paidLabel;
-  final String percentLabel;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: glassSurfaceDecoration(
-        context,
-        variant: AppGlassVariant.secondary,
-        tone: brandPrimary,
-        borderRadius: const BorderRadius.all(Radius.circular(999)),
-        includeShadows: false,
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: brandPrimary),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Text(
-              '$label · $amountLabel · paid $paidLabel · $percentLabel',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              softWrap: false,
-              style: Theme.of(
-                context,
-              ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 String _shareUserLabel(ReceiptRecipientShare share) {
   if (share.hasUserName() && share.userName.trim().isNotEmpty) {
     return share.userName;
@@ -1551,6 +1521,9 @@ String _shareUserLabel(ReceiptRecipientShare share) {
 }
 
 String _receiptPeopleLabel(Receipt receipt) {
+  if (receipt.hasRecipient() && receipt.recipient.members.isNotEmpty) {
+    return receipt.recipient.members.map(_recipientMemberLabel).join(', ');
+  }
   if (receipt.hasSplit() && receipt.split.recipientShares.isNotEmpty) {
     return receipt.split.recipientShares.map(_shareUserLabel).join(', ');
   }
@@ -1561,6 +1534,16 @@ String _receiptPeopleLabel(Receipt receipt) {
     return receipt.recipient.name;
   }
   return 'Personal bill';
+}
+
+String _recipientMemberLabel(User user) {
+  if (user.hasName() && user.name.trim().isNotEmpty) {
+    return user.name;
+  }
+  if (user.hasEmail() && user.email.trim().isNotEmpty) {
+    return user.email;
+  }
+  return 'User ${user.id}';
 }
 
 bool _canPreviewInline(String? contentType) {
@@ -1636,15 +1619,21 @@ class _BillsErrorCard extends StatelessWidget {
 }
 
 class _MetaChip extends StatelessWidget {
-  const _MetaChip({required this.label, required this.icon, this.tone});
+  const _MetaChip({
+    required this.label,
+    required this.icon,
+    this.tone,
+    this.tooltip,
+  });
 
   final String label;
   final IconData icon;
   final Color? tone;
+  final String? tooltip;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final chip = Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: glassSurfaceDecoration(
         context,
@@ -1671,6 +1660,15 @@ class _MetaChip extends StatelessWidget {
           ),
         ],
       ),
+    );
+    final message = tooltip?.trim();
+    if (message == null || message.isEmpty || message == label) {
+      return chip;
+    }
+    return Tooltip(
+      message: message,
+      triggerMode: TooltipTriggerMode.tap,
+      child: chip,
     );
   }
 }

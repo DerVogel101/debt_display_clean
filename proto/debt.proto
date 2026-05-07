@@ -129,6 +129,15 @@ message ReceiptsResponse {
   optional string next_page_token = 4;
 }
 
+message ReceiptUnpaidSummaryRequest {}
+
+message ReceiptUnpaidSummaryResponse {
+  bool success = 1;
+  string message = 2;
+  double unpaid_share_total = 3;
+  int32 unpaid_bill_count = 4;
+}
+
 message FileResponse {
   bool success = 1;
   string message = 2;

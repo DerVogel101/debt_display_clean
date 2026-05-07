@@ -50,7 +50,7 @@ void main() {
       _placeholderDueDate(_fixedReferenceDate, 1),
     );
     final expectedAmount = _formatExpectedCurrency(
-      321.45,
+      411.45,
       const Locale('en', 'US'),
     );
 
@@ -91,7 +91,7 @@ void main() {
       _placeholderDueDate(_fixedReferenceDate, 1),
     );
     final expectedAmount = _formatExpectedCurrency(
-      321.45,
+      411.45,
       const Locale('de', 'DE'),
     );
 
@@ -766,6 +766,9 @@ void main() {
           ),
           navigationState: navigationState,
           billCreationState: BillCreationState(debtBackendService: fakeService),
+          recipientGroupState: RecipientGroupState(
+            debtBackendService: fakeService,
+          ),
           billListState: BillListState(debtBackendService: fakeService),
           locale: const Locale('de', 'DE'),
         ),
@@ -970,7 +973,8 @@ void main() {
       );
       expect(find.text('🏠'), findsOneWidget);
       expect(find.text('Home'), findsOneWidget);
-      expect(find.textContaining('Alice'), findsOneWidget);
+      expect(find.text('Shared group'), findsOneWidget);
+      expect(find.textContaining('Alice'), findsNothing);
       expect(find.text('Unpaid'), findsOneWidget);
       expect(
         find.text(_formatExpectedCurrency(55, const Locale('en', 'US'))),
@@ -983,17 +987,16 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('receipt-row-42')));
       await tester.pumpAndSettle();
 
-      expect(find.text('Paid'), findsOneWidget);
+      expect(find.text('Paid'), findsWidgets);
       expect(
         find.text(_formatExpectedCurrency(55, const Locale('en', 'US'))),
-        findsOneWidget,
+        findsWidgets,
       );
+      expect(find.textContaining('Alice'), findsOneWidget);
       expect(find.textContaining('60%'), findsOneWidget);
       expect(
-        find.textContaining(
-          'paid ${_formatExpectedCurrency(30, const Locale('en', 'US'))}',
-        ),
-        findsOneWidget,
+        find.text(_formatExpectedCurrency(30, const Locale('en', 'US'))),
+        findsWidgets,
       );
       expect(
         find.text(_formatExpectedCurrency(40, const Locale('en', 'US'))),
@@ -1129,13 +1132,11 @@ void main() {
     expect(fakeService.setPaymentRequests.single.receiptId.toInt(), 43);
     expect(
       find.text(_formatExpectedCurrency(55, const Locale('en', 'US'))),
-      findsOneWidget,
+      findsWidgets,
     );
     expect(
-      find.textContaining(
-        'paid ${_formatExpectedCurrency(30, const Locale('en', 'US'))}',
-      ),
-      findsOneWidget,
+      find.text(_formatExpectedCurrency(30, const Locale('en', 'US'))),
+      findsWidgets,
     );
   });
 
@@ -1892,10 +1893,17 @@ Widget _buildHomeSectionTestApp({
 }) {
   final homeBillState = HomeBillState(
     debtBackendService: _FakeDebtBackendService(
+      unpaidSummaryTotal: 411.45,
+      unpaidSummaryCount: 4,
       onListReceipts: (_) => ReceiptsResponse(
         success: true,
         receipts: _homeTestReceipts(referenceDate ?? _fixedReferenceDate),
       ),
+    ),
+  );
+  final billListState = BillListState(
+    debtBackendService: _FakeDebtBackendService(
+      onListReceipts: (_) => ReceiptsResponse(success: true),
     ),
   );
   return MaterialApp(
@@ -1913,6 +1921,11 @@ Widget _buildHomeSectionTestApp({
           create: (_) => homeBillState,
           update: (_, authSessionState, state) =>
               (state ?? homeBillState)..updateAuthSession(authSessionState),
+        ),
+        ChangeNotifierProxyProvider<AuthSessionState, BillListState>(
+          create: (_) => billListState,
+          update: (_, authSessionState, state) =>
+              (state ?? billListState)..updateAuthSession(authSessionState),
         ),
       ],
       child: Scaffold(
@@ -2110,6 +2123,8 @@ class _FakeDebtBackendService extends DebtBackendService {
   _FakeDebtBackendService({
     required this.onListReceipts,
     this.availableTags = const [],
+    this.unpaidSummaryTotal = 0,
+    this.unpaidSummaryCount = 0,
     List<Recipient>? recipients,
     this.onSearchUsers,
     this.onSetReceiptPayments,
@@ -2124,6 +2139,8 @@ class _FakeDebtBackendService extends DebtBackendService {
   }
 
   final List<TagIndex> availableTags;
+  final double unpaidSummaryTotal;
+  final int unpaidSummaryCount;
   final ReceiptsResponse Function(ReceiptListRequest request) onListReceipts;
   final FutureOr<UsersResponse> Function(UserSearchRequest request)?
   onSearchUsers;
@@ -2163,6 +2180,17 @@ class _FakeDebtBackendService extends DebtBackendService {
     final clonedRequest = request.deepCopy();
     requests.add(clonedRequest);
     return onListReceipts(clonedRequest);
+  }
+
+  @override
+  Future<ReceiptUnpaidSummaryResponse> getUnpaidReceiptSummary(
+    String accessToken,
+  ) async {
+    return ReceiptUnpaidSummaryResponse(
+      success: true,
+      unpaidShareTotal: unpaidSummaryTotal,
+      unpaidBillCount: unpaidSummaryCount,
+    );
   }
 
   @override
