@@ -1053,6 +1053,58 @@ void main() {
     expect(find.text(expectedAmount), findsOneWidget);
   });
 
+  testWidgets('bills view shows still owed and total trailing amounts', (
+    tester,
+  ) async {
+    _setTestSurfaceSize(tester, width: 430, height: 1000);
+
+    final expectedRemaining = _formatExpectedCurrency(
+      55,
+      const Locale('en', 'US'),
+    );
+    final expectedTotal = _formatExpectedCurrency(
+      120,
+      const Locale('en', 'US'),
+    );
+    final fakeService = _FakeDebtBackendService(
+      availableTags: const [],
+      onListReceipts: (_) {
+        final response = ReceiptsResponse(success: true);
+        response.receipts.add(
+          _testReceipt(
+            id: 45,
+            title: 'Remaining split receipt',
+            amountOwed: 120,
+            amountPaid: 25,
+            split: ReceiptSplit(
+              ownerSharePercent: 75,
+              ownerAmount: 80,
+              ownerAmountPaid: 25,
+            ),
+          ),
+        );
+        return response;
+      },
+    );
+
+    await tester.pumpWidget(
+      _buildBillsSectionTestApp(
+        authState: _TestAuthSessionState(
+          isAuthenticatedValue: true,
+          accessTokenValue: 'token-1',
+          userIdValue: 10,
+        ),
+        billListState: BillListState(debtBackendService: fakeService),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Still owed'), findsOneWidget);
+    expect(find.text('Total'), findsOneWidget);
+    expect(find.text(expectedRemaining), findsOneWidget);
+    expect(find.text(expectedTotal), findsOneWidget);
+  });
+
   testWidgets('owner payment edit flow updates paid amount in bills view', (
     tester,
   ) async {
@@ -1272,6 +1324,56 @@ void main() {
       expect(fakeService.requests.last.isPaid, isTrue);
     },
   );
+
+  testWidgets('bills refresh keeps the current page token', (tester) async {
+    _setTestSurfaceSize(tester, width: 430, height: 1000);
+
+    final fakeService = _FakeDebtBackendService(
+      availableTags: const [],
+      onListReceipts: (request) {
+        final response = ReceiptsResponse(success: true);
+        if (request.hasPageToken() && request.pageToken == 'page-2') {
+          response.receipts.add(
+            _testReceipt(id: 2, title: 'Page 2 receipt', amountOwed: 24),
+          );
+          return response;
+        }
+        response.receipts.add(
+          _testReceipt(id: 1, title: 'Page 1 receipt', amountOwed: 18),
+        );
+        response.nextPageToken = 'page-2';
+        return response;
+      },
+    );
+    final billListState = BillListState(debtBackendService: fakeService);
+
+    await tester.pumpWidget(
+      _buildBillsSectionTestApp(
+        authState: _TestAuthSessionState(
+          isAuthenticatedValue: true,
+          accessTokenValue: 'token-1',
+          userIdValue: 10,
+        ),
+        billListState: billListState,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('bills-page-next-button')));
+    await tester.pumpAndSettle();
+    expect(find.text('Page 2'), findsOneWidget);
+    expect(find.text('Page 2 receipt'), findsOneWidget);
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('bills-refresh-button')),
+    );
+    await tester.tap(find.byKey(const ValueKey('bills-refresh-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Page 2'), findsOneWidget);
+    expect(find.text('Page 2 receipt'), findsOneWidget);
+    expect(fakeService.requests.last.pageToken, 'page-2');
+  });
 
   testWidgets('bills auth refresh keeps active filters when user id arrives', (
     tester,
@@ -1580,6 +1682,47 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('bills-page-next-button')));
     await tester.pumpAndSettle();
     expect(find.text('Due page 2'), findsOneWidget);
+  });
+
+  testWidgets('bills sort dropdown sends still owed order', (tester) async {
+    _setTestSurfaceSize(tester, width: 430, height: 1000);
+
+    final fakeService = _FakeDebtBackendService(
+      availableTags: const [],
+      onListReceipts: (request) {
+        final response = ReceiptsResponse(success: true);
+        response.receipts.add(
+          _testReceipt(id: 81, title: 'Sort candidate', amountOwed: 27),
+        );
+        return response;
+      },
+    );
+
+    await tester.pumpWidget(
+      _buildBillsSectionTestApp(
+        authState: _TestAuthSessionState(
+          isAuthenticatedValue: true,
+          accessTokenValue: 'token-1',
+          userIdValue: 10,
+        ),
+        billListState: BillListState(debtBackendService: fakeService),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _toggleBillsFilters(tester);
+    await _selectDropdownItem(
+      tester,
+      const ValueKey('bills-sort-dropdown'),
+      'Still owed',
+    );
+    await tester.tap(find.byKey(const ValueKey('bills-apply-filters-button')));
+    await tester.pumpAndSettle();
+
+    expect(
+      fakeService.requests.last.orderBy,
+      ReceiptOrderBy.RECEIPT_ORDER_BY_REMAINING_FOR_USER,
+    );
   });
 
   testWidgets(

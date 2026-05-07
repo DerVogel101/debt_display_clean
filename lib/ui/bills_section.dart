@@ -521,6 +521,10 @@ class _SortByControl extends StatelessWidget {
               child: Text('My share'),
             ),
             DropdownMenuItem(
+              value: ReceiptOrderBy.RECEIPT_ORDER_BY_REMAINING_FOR_USER,
+              child: Text('Still owed'),
+            ),
+            DropdownMenuItem(
               value: ReceiptOrderBy.RECEIPT_ORDER_BY_DUE_DATE,
               child: Text('Due date'),
             ),
@@ -766,6 +770,7 @@ class _BillReceiptTile extends StatelessWidget {
     final filesLabel = receipt.files.length == 1
         ? '1 file included'
         : '${receipt.files.length} files included';
+    final remainingAmount = state.remainingForCurrentUser(receipt);
 
     return InkWell(
       key: ValueKey('receipt-row-${receipt.id}'),
@@ -855,26 +860,82 @@ class _BillReceiptTile extends StatelessWidget {
             ),
             const SizedBox(width: 14),
             ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 104),
+              constraints: const BoxConstraints(maxWidth: 128),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text(
-                    amountFormat.format(receipt.amountOwed),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.right,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w900,
-                    ),
+                  _ReceiptAmountMetric(
+                    label: 'Still owed',
+                    labelStyle: Theme.of(context).textTheme.labelLarge
+                        ?.copyWith(
+                          color: mutedForegroundColor(context, alpha: 0.8),
+                          fontWeight: FontWeight.w800,
+                        ),
+                    value: amountFormat.format(remainingAmount),
+                    valueStyle: Theme.of(context).textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w900),
+                  ),
+                  const SizedBox(height: 14),
+                  _ReceiptAmountMetric(
+                    label: 'Total',
+                    labelStyle: Theme.of(context).textTheme.labelLarge
+                        ?.copyWith(
+                          color: mutedForegroundColor(context, alpha: 0.8),
+                          fontWeight: FontWeight.w700,
+                        ),
+                    value: amountFormat.format(receipt.amountOwed),
+                    valueStyle: Theme.of(context).textTheme.titleMedium
+                        ?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: mutedForegroundColor(context, alpha: 0.8),
+                        ),
                   ),
                 ],
               ),
             ),
+            const SizedBox(width: 4),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _ReceiptAmountMetric extends StatelessWidget {
+  const _ReceiptAmountMetric({
+    required this.label,
+    required this.labelStyle,
+    required this.value,
+    required this.valueStyle,
+  });
+
+  final String label;
+  final TextStyle? labelStyle;
+  final String value;
+  final TextStyle? valueStyle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.right,
+          style: labelStyle,
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.right,
+          style: valueStyle,
+        ),
+      ],
     );
   }
 }

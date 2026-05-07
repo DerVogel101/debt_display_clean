@@ -399,6 +399,11 @@ class TestDataSeedTests(AsyncDatabaseTestCase):
                 .where(db.Receipt.title == "Demo team lunch reimbursement")
                 .options(selectinload(db.Receipt.recipient_shares))
             )
+            visible_receipts = await services.list_visible_receipts(
+                session,
+                first_user.id,
+                limit=20,
+            )
 
         self.assertEqual([user.email for user in users], ["alice.demo@example.com"])
         recipient = recipients.scalar_one_or_none()
@@ -418,6 +423,7 @@ class TestDataSeedTests(AsyncDatabaseTestCase):
         self.assertEqual(owner_zero_receipt.owner_share_percent, 0.0)
         self.assertEqual(owner_zero_receipt.owner_amount_paid, 0.0)
         self.assertEqual(len(owner_zero_receipt.recipient_shares), 2)
+        self.assertGreater(len(visible_receipts.receipts), 10)
 
 
 class SchemaCompatibilityTests(AsyncDatabaseTestCase):
@@ -1896,6 +1902,25 @@ class ReceiptListOrderingAndFilterTests(AsyncDatabaseTestCase):
             ],
         )
 
+    async def test_receipts_list_page_token_paginates_remaining_for_user_sort(self) -> None:
+        ids = await self._collect_page_token_ids(
+            "member-a-token",
+            limit=2,
+            order_by=debt_pb2.RECEIPT_ORDER_BY_REMAINING_FOR_USER,
+            order_direction=debt_pb2.RECEIPT_ORDER_DIRECTION_ASC,
+        )
+        self.assertEqual(
+            ids,
+            [
+                self.shared_without_member_share.id,
+                self.member_owned_paid.id,
+                self.shared_with_split.id,
+                self.tie_low_id.id,
+                self.tie_high_id.id,
+                self.member_owned_large.id,
+            ],
+        )
+
     async def test_receipts_list_rejects_malformed_page_token(self) -> None:
         response = await self._post_protobuf(
             "/api/receipts/list",
@@ -1926,6 +1951,30 @@ class ReceiptListOrderingAndFilterTests(AsyncDatabaseTestCase):
                 limit=2,
                 page_token=first_page.next_page_token,
                 order_by=debt_pb2.RECEIPT_ORDER_BY_DUE_DATE,
+                order_direction=debt_pb2.RECEIPT_ORDER_DIRECTION_ASC,
+            ),
+            "member-a-token",
+        )
+        parsed = self._parse_message(debt_pb2.ReceiptsResponse, response)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(parsed.success)
+        self.assertIn("Page token does not match", parsed.message)
+
+    async def test_receipts_list_rejects_page_token_when_remaining_sort_changes(self) -> None:
+        first_page = await self._list_receipts_response(
+            "member-a-token",
+            limit=2,
+            order_by=debt_pb2.RECEIPT_ORDER_BY_REMAINING_FOR_USER,
+            order_direction=debt_pb2.RECEIPT_ORDER_DIRECTION_ASC,
+        )
+
+        response = await self._post_protobuf(
+            "/api/receipts/list",
+            debt_pb2.ReceiptListRequest(
+                limit=2,
+                page_token=first_page.next_page_token,
+                order_by=debt_pb2.RECEIPT_ORDER_BY_COST_FOR_USER,
                 order_direction=debt_pb2.RECEIPT_ORDER_DIRECTION_ASC,
             ),
             "member-a-token",
@@ -2026,6 +2075,50 @@ class ReceiptListOrderingAndFilterTests(AsyncDatabaseTestCase):
             order_direction=debt_pb2.RECEIPT_ORDER_DIRECTION_ASC,
         )
         self.assertEqual(ids[0], self.shared_without_member_share.id)
+
+    async def test_receipts_list_orders_by_remaining_for_user_for_owner(self) -> None:
+        ids = await self._list_receipts(
+            "owner-token",
+            order_by=debt_pb2.RECEIPT_ORDER_BY_REMAINING_FOR_USER,
+            order_direction=debt_pb2.RECEIPT_ORDER_DIRECTION_ASC,
+        )
+        self.assertEqual(
+            ids,
+            [
+                self.shared_with_split.id,
+                self.owner_unpaid.id,
+                self.shared_without_member_share.id,
+            ],
+        )
+
+    async def test_receipts_list_orders_by_remaining_for_user_for_member(self) -> None:
+        ids = await self._list_receipts(
+            "member-a-token",
+            order_by=debt_pb2.RECEIPT_ORDER_BY_REMAINING_FOR_USER,
+            order_direction=debt_pb2.RECEIPT_ORDER_DIRECTION_ASC,
+        )
+        self.assertEqual(
+            ids,
+            [
+                self.shared_without_member_share.id,
+                self.member_owned_paid.id,
+                self.shared_with_split.id,
+                self.tie_low_id.id,
+                self.tie_high_id.id,
+                self.member_owned_large.id,
+            ],
+        )
+
+    async def test_receipts_list_remaining_sort_treats_paid_receipts_as_zero(self) -> None:
+        ids = await self._list_receipts(
+            "member-a-token",
+            order_by=debt_pb2.RECEIPT_ORDER_BY_REMAINING_FOR_USER,
+            order_direction=debt_pb2.RECEIPT_ORDER_DIRECTION_ASC,
+        )
+        self.assertLess(
+            ids.index(self.member_owned_paid.id),
+            ids.index(self.shared_with_split.id),
+        )
 
     async def test_receipts_list_uses_id_tiebreaker_for_equal_primary_sort(self) -> None:
         ids = await self._list_receipts(

@@ -127,6 +127,47 @@ def _receipt_cost_for_user_expr(actor_user_id: int):
     )
 
 
+def _receipt_remaining_for_user_expr(actor_user_id: int):
+    actor_share_percent = (
+        select(ReceiptRecipientShare.share_percent)
+        .where(
+            ReceiptRecipientShare.receipt_id == Receipt.id,
+            ReceiptRecipientShare.user_id == actor_user_id,
+        )
+        .correlate(Receipt)
+        .scalar_subquery()
+    )
+    actor_amount_paid = (
+        select(ReceiptRecipientShare.amount_paid)
+        .where(
+            ReceiptRecipientShare.receipt_id == Receipt.id,
+            ReceiptRecipientShare.user_id == actor_user_id,
+        )
+        .correlate(Receipt)
+        .scalar_subquery()
+    )
+    owner_share_amount = case(
+        (
+            Receipt.owner_share_percent.is_not(None),
+            Receipt.amount_owed * Receipt.owner_share_percent / 100.0,
+        ),
+        else_=Receipt.amount_owed,
+    )
+    owner_remaining = owner_share_amount - func.coalesce(
+        Receipt.owner_amount_paid,
+        0.0,
+    )
+    member_share_amount = (
+        Receipt.amount_owed * func.coalesce(actor_share_percent, 0.0) / 100.0
+    )
+    member_remaining = member_share_amount - func.coalesce(actor_amount_paid, 0.0)
+    remaining = case(
+        (Receipt.owner_id == actor_user_id, owner_remaining),
+        else_=member_remaining,
+    )
+    return case((remaining < 0.0, 0.0), else_=remaining)
+
+
 def _receipt_sort_spec(
     actor_user_id: int,
     order_by: str,
@@ -144,6 +185,13 @@ def _receipt_sort_spec(
             order_by=order_by,
             order_direction=order_direction,
             primary_expr=_receipt_cost_for_user_expr(actor_user_id),
+        )
+
+    if order_by == "remaining_for_user":
+        return _ReceiptSortSpec(
+            order_by=order_by,
+            order_direction=order_direction,
+            primary_expr=_receipt_remaining_for_user_expr(actor_user_id),
         )
 
     if order_by == "due_date":

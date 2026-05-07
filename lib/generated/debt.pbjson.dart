@@ -24,6 +24,7 @@ const ReceiptOrderBy$json = {
     {'1': 'RECEIPT_ORDER_BY_COST_TOTAL', '2': 2},
     {'1': 'RECEIPT_ORDER_BY_COST_FOR_USER', '2': 3},
     {'1': 'RECEIPT_ORDER_BY_DUE_DATE', '2': 4},
+    {'1': 'RECEIPT_ORDER_BY_REMAINING_FOR_USER', '2': 5},
   ],
 };
 
@@ -32,7 +33,7 @@ final $typed_data.Uint8List receiptOrderByDescriptor = $convert.base64Decode(
     'Cg5SZWNlaXB0T3JkZXJCeRIgChxSRUNFSVBUX09SREVSX0JZX1VOU1BFQ0lGSUVEEAASFwoTUk'
     'VDRUlQVF9PUkRFUl9CWV9JRBABEh8KG1JFQ0VJUFRfT1JERVJfQllfQ09TVF9UT1RBTBACEiIK'
     'HlJFQ0VJUFRfT1JERVJfQllfQ09TVF9GT1JfVVNFUhADEh0KGVJFQ0VJUFRfT1JERVJfQllfRF'
-    'VFX0RBVEUQBA==');
+    'VFX0RBVEUQBBInCiNSRUNFSVBUX09SREVSX0JZX1JFTUFJTklOR19GT1JfVVNFUhAF');
 
 @$core.Deprecated('Use receiptOrderDirectionDescriptor instead')
 const ReceiptOrderDirection$json = {

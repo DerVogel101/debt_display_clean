@@ -106,6 +106,8 @@ def _receipt_list_order_by(value: int) -> str:
         return "cost_for_user"
     if value == 4:
         return "due_date"
+    if value == 5:
+        return "remaining_for_user"
     raise ValueError("Unsupported receipt list order_by")
 
 

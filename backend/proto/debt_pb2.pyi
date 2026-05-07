@@ -14,6 +14,7 @@ class ReceiptOrderBy(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     RECEIPT_ORDER_BY_COST_TOTAL: _ClassVar[ReceiptOrderBy]
     RECEIPT_ORDER_BY_COST_FOR_USER: _ClassVar[ReceiptOrderBy]
     RECEIPT_ORDER_BY_DUE_DATE: _ClassVar[ReceiptOrderBy]
+    RECEIPT_ORDER_BY_REMAINING_FOR_USER: _ClassVar[ReceiptOrderBy]
 
 class ReceiptOrderDirection(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -32,6 +33,7 @@ RECEIPT_ORDER_BY_ID: ReceiptOrderBy
 RECEIPT_ORDER_BY_COST_TOTAL: ReceiptOrderBy
 RECEIPT_ORDER_BY_COST_FOR_USER: ReceiptOrderBy
 RECEIPT_ORDER_BY_DUE_DATE: ReceiptOrderBy
+RECEIPT_ORDER_BY_REMAINING_FOR_USER: ReceiptOrderBy
 RECEIPT_ORDER_DIRECTION_UNSPECIFIED: ReceiptOrderDirection
 RECEIPT_ORDER_DIRECTION_ASC: ReceiptOrderDirection
 RECEIPT_ORDER_DIRECTION_DESC: ReceiptOrderDirection

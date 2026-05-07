@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
 from backend.db import Base, Receipt, ReceiptRecipientShare, Recipient, User
-from backend.services import summarize_visible_unpaid_receipts
+from backend.services import list_visible_receipts, summarize_visible_unpaid_receipts
 
 
 class UnpaidReceiptSummaryTest(unittest.IsolatedAsyncioTestCase):
@@ -102,6 +102,18 @@ class UnpaidReceiptSummaryTest(unittest.IsolatedAsyncioTestCase):
                 currency="EUR",
                 is_paid=False,
             )
+            visible_paid_mocks = [
+                Receipt(
+                    owner_id=actor.id,
+                    title=f"Visible paid mock {index}",
+                    amount_owed=10 + index,
+                    amount_paid=10 + index,
+                    owner_amount_paid=10 + index,
+                    currency="EUR",
+                    is_paid=True,
+                )
+                for index in range(1, 6)
+            ]
             session.add_all(
                 [
                     owned_personal,
@@ -111,6 +123,7 @@ class UnpaidReceiptSummaryTest(unittest.IsolatedAsyncioTestCase):
                     zero_owner_share,
                     paid_receipt,
                     unrelated,
+                    *visible_paid_mocks,
                 ]
             )
             await session.flush()
@@ -144,6 +157,17 @@ class UnpaidReceiptSummaryTest(unittest.IsolatedAsyncioTestCase):
 
         self.assertNotEqual(summary.unpaid_share_total, 140.0 + 50 + 75 + 999)
         self.assertEqual(summary.unpaid_bill_count, 3)
+
+    async def test_seed_data_creates_more_than_ten_visible_mock_receipts_for_first_user(self):
+        actor_id = await self._seed_summary_data()
+
+        async with self.session_maker() as session:
+            first_user = await session.get(User, actor_id)
+            receipt_page = await list_visible_receipts(session, actor_id, limit=20)
+
+        self.assertIsNotNone(first_user)
+        self.assertEqual(first_user.sub, "actor")
+        self.assertGreater(len(receipt_page.receipts), 10)
 
 
 if __name__ == "__main__":
