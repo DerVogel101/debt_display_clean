@@ -5,7 +5,9 @@ class PendingFileWindow {
     required Uint8List bytes,
     required String contentType,
     required String filename,
-  }) async {}
+  }) async {
+    throw UnsupportedError('Opening files is not supported on this platform.');
+  }
 }
 
 PendingFileWindow openPendingFileWindow() => PendingFileWindow();

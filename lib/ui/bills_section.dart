@@ -955,7 +955,7 @@ class _BillDetailPanel extends StatelessWidget {
       decimalDigits: 2,
     );
     final isOwner = receipt.ownerId.toInt() == state.currentUserId;
-    final amountPaid = receipt.hasAmountPaid() ? receipt.amountPaid : 0.0;
+    final amountPaid = state.amountPaidForCurrentUser(receipt);
 
     return GlassPanel.secondary(
       width: double.infinity,
@@ -1554,21 +1554,29 @@ Future<void> _openReceiptFile(
   BillListState state,
   ReceiptFile file,
 ) async {
-  final pendingWindow = openPendingFileWindow();
-  final download = await state.downloadReceiptFile(file);
-  if (download == null) {
+  try {
+    final pendingWindow = openPendingFileWindow();
+    final download = await state.downloadReceiptFile(file);
+    if (download == null) {
+      if (context.mounted) {
+        ScaffoldMessenger.maybeOf(
+          context,
+        )?.showSnackBar(const SnackBar(content: Text('Could not open file.')));
+      }
+      return;
+    }
+    await pendingWindow.showBytes(
+      bytes: download.bytes,
+      contentType: download.contentType,
+      filename: download.file.originalFilename,
+    );
+  } catch (_) {
     if (context.mounted) {
       ScaffoldMessenger.maybeOf(
         context,
       )?.showSnackBar(const SnackBar(content: Text('Could not open file.')));
     }
-    return;
   }
-  await pendingWindow.showBytes(
-    bytes: download.bytes,
-    contentType: download.contentType,
-    filename: download.file.originalFilename,
-  );
 }
 
 String _shareUserLabel(ReceiptRecipientShare share) {

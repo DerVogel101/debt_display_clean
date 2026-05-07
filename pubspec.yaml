@@ -49,6 +49,7 @@ dependencies:
   protobuf: ^6.0.0
   fixnum: ^1.1.1
   dio: ^5.9.2
+  open_file: ^3.5.11
   shared_preferences: ^2.5.3
   web: ^1.1.1
 

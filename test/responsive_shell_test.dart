@@ -15,6 +15,7 @@ import 'package:debt_display/ui/app_sections.dart';
 import 'package:debt_display/ui/bills_section.dart';
 import 'package:debt_display/ui/app_shell.dart';
 import 'package:debt_display/services/debt_backend_service.dart';
+import 'package:debt_display/services/file_viewer_io.dart';
 import 'package:dio/dio.dart';
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter/material.dart';
@@ -27,6 +28,10 @@ const _supportedLocales = [Locale('en'), Locale('de')];
 final _fixedReferenceDate = DateTime(2026, 4, 25);
 
 void main() {
+  tearDown(() {
+    debugSetPendingFileWindowFactory(null);
+  });
+
   testWidgets('home dashboard formats amounts and dates for en_US locale', (
     tester,
   ) async {
@@ -858,6 +863,170 @@ void main() {
     expect(fakeService.createReceiptRequests, isEmpty);
   });
 
+  test('bill creation rolls back when tag creation fails', () async {
+    final fakeService = _FakeDebtBackendService(
+      onListReceipts: (_) => ReceiptsResponse(success: true),
+      onGetOrCreateTag: (_) =>
+          TagResponse(success: false, message: 'Tag create failed'),
+    );
+    final state = BillCreationState(debtBackendService: fakeService);
+    state.updateAuthSession(
+      _TestAuthSessionState(
+        isAuthenticatedValue: true,
+        accessTokenValue: 'token-1',
+        userIdValue: 10,
+      ),
+    );
+
+    final saved = await state.saveBill(
+      title: 'Power',
+      description: '',
+      amountOwed: 42,
+      currency: 'EUR',
+      recipientId: null,
+      notes: '',
+      ownerSharePercent: null,
+      recipientShares: const [],
+      tags: const [
+        BillDraftTag(text: 'Utilities', icon: '⚡', color: '#FFD54F'),
+      ],
+      attachments: const [],
+    );
+
+    expect(saved, isNull);
+    expect(state.errorMessage, 'Tag create failed');
+    expect(fakeService.deleteReceiptRequests, hasLength(1));
+    expect(fakeService.deleteReceiptRequests.single.receiptId.toInt(), 901);
+  });
+
+  test('bill creation rolls back when file upload fails', () async {
+    final fakeService = _FakeDebtBackendService(
+      onListReceipts: (_) => ReceiptsResponse(success: true),
+      onUploadReceiptFile: (_) =>
+          FileResponse(success: false, message: 'Upload failed'),
+    );
+    final state = BillCreationState(debtBackendService: fakeService);
+    state.updateAuthSession(
+      _TestAuthSessionState(
+        isAuthenticatedValue: true,
+        accessTokenValue: 'token-1',
+        userIdValue: 10,
+      ),
+    );
+
+    final saved = await state.saveBill(
+      title: 'Power',
+      description: '',
+      amountOwed: 42,
+      currency: 'EUR',
+      recipientId: null,
+      notes: '',
+      ownerSharePercent: null,
+      recipientShares: const [],
+      tags: const [],
+      attachments: [
+        BillDraftAttachment(
+          filename: 'receipt.pdf',
+          bytes: Uint8List.fromList([1, 2, 3]),
+          contentType: 'application/pdf',
+        ),
+      ],
+    );
+
+    expect(saved, isNull);
+    expect(state.errorMessage, 'Upload failed');
+    expect(fakeService.deleteReceiptRequests, hasLength(1));
+    expect(fakeService.deleteReceiptRequests.single.receiptId.toInt(), 901);
+  });
+
+  test('bill creation reports when rollback fails', () async {
+    final fakeService = _FakeDebtBackendService(
+      onListReceipts: (_) => ReceiptsResponse(success: true),
+      onGetOrCreateTag: (_) =>
+          TagResponse(success: false, message: 'Tag create failed'),
+      onDeleteReceipt: (_) =>
+          ActionResponse(success: false, message: 'Delete failed'),
+    );
+    final state = BillCreationState(debtBackendService: fakeService);
+    state.updateAuthSession(
+      _TestAuthSessionState(
+        isAuthenticatedValue: true,
+        accessTokenValue: 'token-1',
+        userIdValue: 10,
+      ),
+    );
+
+    final saved = await state.saveBill(
+      title: 'Power',
+      description: '',
+      amountOwed: 42,
+      currency: 'EUR',
+      recipientId: null,
+      notes: '',
+      ownerSharePercent: null,
+      recipientShares: const [],
+      tags: const [
+        BillDraftTag(text: 'Utilities', icon: '⚡', color: '#FFD54F'),
+      ],
+      attachments: const [],
+    );
+
+    expect(saved, isNull);
+    expect(
+      state.errorMessage,
+      'Tag create failed Cleanup failed, so the bill may already exist: Delete failed',
+    );
+  });
+
+  testWidgets('bill creation stays on form when rollback path fails later', (
+    tester,
+  ) async {
+    final navigationState = NavigationState()
+      ..selectDestination(AppDestination.createBill);
+    _setTestSurfaceSize(tester, width: 430, height: 1200);
+    final fakeService = _FakeDebtBackendService(
+      onListReceipts: (_) => ReceiptsResponse(success: true),
+      onGetOrCreateTag: (_) =>
+          TagResponse(success: false, message: 'Tag create failed'),
+    );
+
+    await tester.pumpWidget(
+      _buildResponsiveShellTestApp(
+        authState: _TestAuthSessionState(
+          isAuthenticatedValue: true,
+          accessTokenValue: 'token-1',
+          userIdValue: 10,
+        ),
+        navigationState: navigationState,
+        billCreationState: BillCreationState(debtBackendService: fakeService),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('bill-create-title-field')),
+      'Electricity',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('bill-create-amount-field')),
+      '123.45',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('bill-create-tag-text-field')),
+      'Utilities',
+    );
+    await tester.tap(find.byKey(const ValueKey('bill-create-add-tag-button')));
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('bill-create-submit-button')),
+    );
+    await tester.tap(find.byKey(const ValueKey('bill-create-submit-button')));
+    await tester.pumpAndSettle();
+
+    expect(navigationState.selectedDestination, AppDestination.createBill);
+    expect(find.text('Tag create failed'), findsOneWidget);
+    expect(fakeService.deleteReceiptRequests, hasLength(1));
+  });
+
   testWidgets('bills view shows login prompt when unauthenticated', (
     tester,
   ) async {
@@ -989,7 +1158,7 @@ void main() {
 
       expect(find.text('Paid'), findsWidgets);
       expect(
-        find.text(_formatExpectedCurrency(55, const Locale('en', 'US'))),
+        find.text(_formatExpectedCurrency(25, const Locale('en', 'US'))),
         findsWidgets,
       );
       expect(find.textContaining('Alice'), findsOneWidget);
@@ -1183,13 +1352,203 @@ void main() {
     expect(fakeService.setPaymentRequests, hasLength(1));
     expect(fakeService.setPaymentRequests.single.receiptId.toInt(), 43);
     expect(
-      find.text(_formatExpectedCurrency(55, const Locale('en', 'US'))),
+      find.text(_formatExpectedCurrency(25, const Locale('en', 'US'))),
       findsWidgets,
     );
     expect(
       find.text(_formatExpectedCurrency(30, const Locale('en', 'US'))),
       findsWidgets,
     );
+  });
+
+  testWidgets('bill detail dialog shows current participant paid amount', (
+    tester,
+  ) async {
+    _setTestSurfaceSize(tester, width: 430, height: 1000);
+
+    final fakeService = _FakeDebtBackendService(
+      availableTags: const [],
+      onListReceipts: (_) {
+        final response = ReceiptsResponse(success: true);
+        response.receipts.add(
+          _testReceipt(
+            id: 46,
+            title: 'Participant split receipt',
+            amountOwed: 100,
+            amountPaid: 55,
+            split: ReceiptSplit(
+              ownerSharePercent: 40,
+              ownerAmount: 40,
+              ownerAmountPaid: 25,
+              recipientShares: [
+                ReceiptRecipientShare(
+                  userId: Int64(20),
+                  sharePercent: 60,
+                  amount: 60,
+                  amountPaid: 30,
+                  userName: 'Alice',
+                ),
+              ],
+            ),
+          ),
+        );
+        return response;
+      },
+    );
+
+    await tester.pumpWidget(
+      _buildBillsSectionTestApp(
+        authState: _TestAuthSessionState(
+          isAuthenticatedValue: true,
+          accessTokenValue: 'token-1',
+          userIdValue: 20,
+        ),
+        billListState: BillListState(debtBackendService: fakeService),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('receipt-row-46')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(_formatExpectedCurrency(30, const Locale('en', 'US'))),
+      findsWidgets,
+    );
+    expect(
+      find.text(_formatExpectedCurrency(55, const Locale('en', 'US'))),
+      findsNothing,
+    );
+  });
+
+  testWidgets('non-web receipt file open uses pending window bytes flow', (
+    tester,
+  ) async {
+    _setTestSurfaceSize(tester, width: 430, height: 1000);
+
+    final file = ReceiptFile(
+      id: Int64(81),
+      receiptId: Int64(47),
+      originalFilename: 'statement.pdf',
+      contentType: 'application/pdf',
+    );
+    final fakeService = _FakeDebtBackendService(
+      availableTags: const [],
+      onListReceipts: (_) {
+        final response = ReceiptsResponse(success: true);
+        response.receipts.add(
+          _testReceipt(
+            id: 47,
+            title: 'Receipt with file',
+            amountOwed: 10,
+            files: [file],
+          ),
+        );
+        return response;
+      },
+      onDownloadReceiptFile: (_) => ReceiptFileDownload(
+        file: file.deepCopy(),
+        bytes: Uint8List.fromList([7, 8, 9]),
+        contentType: 'application/pdf',
+      ),
+    );
+
+    Uint8List? openedBytes;
+    String? openedContentType;
+    String? openedFilename;
+    debugSetPendingFileWindowFactory(
+      () => PendingFileWindow(({
+        required bytes,
+        required contentType,
+        required filename,
+      }) async {
+        openedBytes = bytes;
+        openedContentType = contentType;
+        openedFilename = filename;
+      }),
+    );
+
+    await tester.pumpWidget(
+      _buildBillsSectionTestApp(
+        authState: _TestAuthSessionState(
+          isAuthenticatedValue: true,
+          accessTokenValue: 'token-1',
+          userIdValue: 10,
+        ),
+        billListState: BillListState(debtBackendService: fakeService),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('receipt-row-47')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('receipt-file-open-81')));
+    await tester.pumpAndSettle();
+
+    expect(openedBytes, Uint8List.fromList([7, 8, 9]));
+    expect(openedContentType, 'application/pdf');
+    expect(openedFilename, 'statement.pdf');
+  });
+
+  testWidgets('non-web receipt file open shows snackbar on open failure', (
+    tester,
+  ) async {
+    _setTestSurfaceSize(tester, width: 430, height: 1000);
+
+    final file = ReceiptFile(
+      id: Int64(82),
+      receiptId: Int64(48),
+      originalFilename: 'statement.pdf',
+      contentType: 'application/pdf',
+    );
+    final fakeService = _FakeDebtBackendService(
+      availableTags: const [],
+      onListReceipts: (_) {
+        final response = ReceiptsResponse(success: true);
+        response.receipts.add(
+          _testReceipt(
+            id: 48,
+            title: 'Receipt with file',
+            amountOwed: 10,
+            files: [file],
+          ),
+        );
+        return response;
+      },
+      onDownloadReceiptFile: (_) => ReceiptFileDownload(
+        file: file.deepCopy(),
+        bytes: Uint8List.fromList([7, 8, 9]),
+        contentType: 'application/pdf',
+      ),
+    );
+    debugSetPendingFileWindowFactory(
+      () => PendingFileWindow(({
+        required bytes,
+        required contentType,
+        required filename,
+      }) async {
+        throw StateError('Open failed');
+      }),
+    );
+
+    await tester.pumpWidget(
+      _buildBillsSectionTestApp(
+        authState: _TestAuthSessionState(
+          isAuthenticatedValue: true,
+          accessTokenValue: 'token-1',
+          userIdValue: 10,
+        ),
+        billListState: BillListState(debtBackendService: fakeService),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('receipt-row-48')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('receipt-file-open-82')));
+    await tester.pump();
+
+    expect(find.text('Could not open file.'), findsOneWidget);
   });
 
   testWidgets('bills filters are collapsed by default and toggle open/closed', (
@@ -2212,6 +2571,7 @@ Receipt _testReceipt({
   String? dueDate,
   String? description,
   List<TagIndex> tags = const [],
+  List<ReceiptFile> files = const [],
   ReceiptSplit? split,
 }) {
   final receipt = Receipt(
@@ -2224,6 +2584,7 @@ Receipt _testReceipt({
     recipientName: 'Shared group',
     dueDate: dueDate,
     tags: tags,
+    files: files,
   );
   if (description != null) {
     receipt.description = description;
@@ -2271,6 +2632,11 @@ class _FakeDebtBackendService extends DebtBackendService {
     List<Recipient>? recipients,
     this.onSearchUsers,
     this.onSetReceiptPayments,
+    this.onGetOrCreateTag,
+    this.onSetReceiptTags,
+    this.onUploadReceiptFile,
+    this.onDeleteReceipt,
+    this.onDownloadReceiptFile,
     this.createRecipientSucceeds = true,
     this.mutationErrorMessage = 'Mutation failed',
   }) : super(dio: Dio()) {
@@ -2289,6 +2655,18 @@ class _FakeDebtBackendService extends DebtBackendService {
   onSearchUsers;
   final ReceiptResponse Function(SetReceiptPaymentsRequest request)?
   onSetReceiptPayments;
+  final FutureOr<TagResponse> Function(TagUpsertRequest request)?
+  onGetOrCreateTag;
+  final FutureOr<ActionResponse> Function(SetReceiptTagsRequest request)?
+  onSetReceiptTags;
+  final FutureOr<FileResponse> Function(
+    ({int receiptId, String filename, Uint8List bytes, String? contentType}),
+  )?
+  onUploadReceiptFile;
+  final FutureOr<ActionResponse> Function(ReceiptLookupRequest request)?
+  onDeleteReceipt;
+  final FutureOr<ReceiptFileDownload> Function(ReceiptFile file)?
+  onDownloadReceiptFile;
   final bool createRecipientSucceeds;
   final String mutationErrorMessage;
   final List<Recipient> recipients = <Recipient>[];
@@ -2308,6 +2686,8 @@ class _FakeDebtBackendService extends DebtBackendService {
       <SetReceiptPaymentsRequest>[];
   final List<CreateReceiptRequest> createReceiptRequests =
       <CreateReceiptRequest>[];
+  final List<ReceiptLookupRequest> deleteReceiptRequests =
+      <ReceiptLookupRequest>[];
   final List<TagUpsertRequest> tagUpsertRequests = <TagUpsertRequest>[];
   final List<SetReceiptTagsRequest> setReceiptTagRequests =
       <SetReceiptTagsRequest>[];
@@ -2410,6 +2790,9 @@ class _FakeDebtBackendService extends DebtBackendService {
   ) async {
     final clonedRequest = request.deepCopy();
     tagUpsertRequests.add(clonedRequest);
+    if (onGetOrCreateTag != null) {
+      return await onGetOrCreateTag!(clonedRequest);
+    }
     return TagResponse(
       success: true,
       tag: TagIndex(
@@ -2426,7 +2809,11 @@ class _FakeDebtBackendService extends DebtBackendService {
     String accessToken,
     SetReceiptTagsRequest request,
   ) async {
-    setReceiptTagRequests.add(request.deepCopy());
+    final clonedRequest = request.deepCopy();
+    setReceiptTagRequests.add(clonedRequest);
+    if (onSetReceiptTags != null) {
+      return await onSetReceiptTags!(clonedRequest);
+    }
     return ActionResponse(success: true);
   }
 
@@ -2438,7 +2825,20 @@ class _FakeDebtBackendService extends DebtBackendService {
     required Uint8List bytes,
     String? contentType,
   }) async {
-    uploadedFiles.add((receiptId: receiptId, filename: filename, bytes: bytes));
+    final clonedBytes = Uint8List.fromList(bytes);
+    uploadedFiles.add((
+      receiptId: receiptId,
+      filename: filename,
+      bytes: clonedBytes,
+    ));
+    if (onUploadReceiptFile != null) {
+      return await onUploadReceiptFile!((
+        receiptId: receiptId,
+        filename: filename,
+        bytes: clonedBytes,
+        contentType: contentType,
+      ));
+    }
     return FileResponse(
       success: true,
       file: ReceiptFile(
@@ -2448,6 +2848,37 @@ class _FakeDebtBackendService extends DebtBackendService {
         contentType: contentType,
         sizeBytes: Int64(bytes.length),
       ),
+    );
+  }
+
+  @override
+  Future<ActionResponse> deleteReceipt(
+    String accessToken,
+    ReceiptLookupRequest request,
+  ) async {
+    final clonedRequest = request.deepCopy();
+    deleteReceiptRequests.add(clonedRequest);
+    if (onDeleteReceipt != null) {
+      return await onDeleteReceipt!(clonedRequest);
+    }
+    return ActionResponse(success: true);
+  }
+
+  @override
+  Future<ReceiptFileDownload> downloadReceiptFile(
+    String accessToken,
+    ReceiptFile file,
+  ) async {
+    final clonedFile = file.deepCopy();
+    if (onDownloadReceiptFile != null) {
+      return await onDownloadReceiptFile!(clonedFile);
+    }
+    return ReceiptFileDownload(
+      file: clonedFile,
+      bytes: Uint8List(0),
+      contentType: clonedFile.hasContentType()
+          ? clonedFile.contentType
+          : 'application/octet-stream',
     );
   }
 

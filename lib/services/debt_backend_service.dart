@@ -176,6 +176,18 @@ class DebtBackendService {
     return _parseProtobufResponse(response, ReceiptResponse.fromBuffer);
   }
 
+  Future<ActionResponse> deleteReceipt(
+    String accessToken,
+    ReceiptLookupRequest request,
+  ) async {
+    final response = await _dio.post(
+      '/api/receipts/delete',
+      data: request.writeToBuffer(),
+      options: _withAuthToken(accessToken),
+    );
+    return _parseProtobufResponse(response, ActionResponse.fromBuffer);
+  }
+
   Future<RecipientsResponse> listRecipients(String accessToken) async {
     final response = await _dio.post(
       '/api/recipients/list',

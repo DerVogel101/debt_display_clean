@@ -1047,26 +1047,6 @@ class _LoggedInProfileCard extends StatelessWidget {
         const SizedBox(height: 24),
         _ProfileInfoTable(credentials: credentials, displayName: displayName),
         const SizedBox(height: 24),
-        Text(
-          'Raw user object',
-          style: Theme.of(
-            context,
-          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 12),
-        GlassPanel.secondary(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          borderRadius: const BorderRadius.all(Radius.circular(20)),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: SelectableText(
-              credentials.user.toString(),
-              style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
-            ),
-          ),
-        ),
-        const SizedBox(height: 24),
         FilledButton.tonalIcon(
           onPressed: () {
             context.read<AuthSessionState>().logout();

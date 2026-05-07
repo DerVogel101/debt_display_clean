@@ -163,6 +163,7 @@ class BillCreationState extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
 
+    int? createdReceiptId;
     try {
       final request = CreateReceiptRequest(
         title: cleanTitle,
@@ -203,6 +204,7 @@ class BillCreationState extends ChangeNotifier {
       }
 
       final receiptId = receiptResponse.receipt.id.toInt();
+      createdReceiptId = receiptId;
       final tagIds = <int>{};
       for (final tag in tags) {
         final cleanTagText = tag.text.trim();
@@ -255,11 +257,23 @@ class BillCreationState extends ChangeNotifier {
         }
       }
 
+      createdReceiptId = null;
       _markReferenceDataStale();
       await ensureLoaded();
       return receiptResponse.receipt.deepCopy();
     } catch (error) {
-      _errorMessage = _formatError(error);
+      final mutationMessage = _formatError(error);
+      if (createdReceiptId != null) {
+        final rollbackError = await _rollbackCreatedReceipt(
+          accessToken,
+          createdReceiptId,
+        );
+        _errorMessage = rollbackError == null
+            ? mutationMessage
+            : '$mutationMessage Cleanup failed, so the bill may already exist: $rollbackError';
+      } else {
+        _errorMessage = mutationMessage;
+      }
       return null;
     } finally {
       _isMutating = false;
@@ -323,6 +337,27 @@ class BillCreationState extends ChangeNotifier {
     _markReferenceDataStale();
     _availableTags = const [];
     _errorMessage = null;
+  }
+
+  Future<String?> _rollbackCreatedReceipt(
+    String accessToken,
+    int receiptId,
+  ) async {
+    try {
+      final response = await _debtBackendService.deleteReceipt(
+        accessToken,
+        ReceiptLookupRequest(receiptId: Int64(receiptId)),
+      );
+      if (response.success) {
+        return null;
+      }
+      final message = response.message.trim();
+      return message.isEmpty
+          ? 'The partially created bill could not be deleted.'
+          : message;
+    } catch (error) {
+      return _formatError(error);
+    }
   }
 
   String _formatError(Object error) {
