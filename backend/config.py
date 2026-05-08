@@ -30,7 +30,7 @@ class Settings(BaseSettings):
 
     # Local/demo seed data is enabled by default while the app is not production-ready.
     # Disable with GENERATE_TEST_DATA_ON_STARTUP=false before using real data.
-    GENERATE_TEST_DATA_ON_STARTUP: bool = False
+    GENERATE_TEST_DATA_ON_STARTUP: bool = True
 
     # ── Server ports ──────────────────────────────────────────────────────────
     # Dev:  Flutter runs on :3000, backend on :3300
