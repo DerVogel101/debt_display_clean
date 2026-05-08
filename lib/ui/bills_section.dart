@@ -1516,16 +1516,38 @@ class _ReceiptFileDetailTile extends StatelessWidget {
   }
 }
 
-class _ReceiptFilePreview extends StatelessWidget {
+class _ReceiptFilePreview extends StatefulWidget {
   const _ReceiptFilePreview({required this.file, required this.state});
 
   final ReceiptFile file;
   final BillListState state;
 
   @override
+  State<_ReceiptFilePreview> createState() => _ReceiptFilePreviewState();
+}
+
+class _ReceiptFilePreviewState extends State<_ReceiptFilePreview> {
+  late Future<ReceiptFileDownload?> _downloadFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _downloadFuture = widget.state.downloadReceiptFile(widget.file);
+  }
+
+  @override
+  void didUpdateWidget(covariant _ReceiptFilePreview oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.state != widget.state ||
+        oldWidget.file.id != widget.file.id) {
+      _downloadFuture = widget.state.downloadReceiptFile(widget.file);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return FutureBuilder<ReceiptFileDownload?>(
-      future: state.downloadReceiptFile(file),
+      future: _downloadFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
           return const Center(child: CircularProgressIndicator(strokeWidth: 2));

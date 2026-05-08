@@ -37,6 +37,7 @@ class AsyncDatabaseTestCase(unittest.IsolatedAsyncioTestCase):
         self._original_engine = db.engine
         self._original_session_maker = db.async_session_maker
         self._original_upload_dir = settings.UPLOAD_DIR
+        self._original_file_upload_max_bytes = settings.FILE_UPLOAD_MAX_BYTES
 
         self._engine = create_async_engine(self._db_url, echo=False)
         db.engine = self._engine
@@ -51,6 +52,7 @@ class AsyncDatabaseTestCase(unittest.IsolatedAsyncioTestCase):
         db.engine = self._original_engine
         db.async_session_maker = self._original_session_maker
         settings.UPLOAD_DIR = self._original_upload_dir
+        settings.FILE_UPLOAD_MAX_BYTES = self._original_file_upload_max_bytes
         try:
             self._tmpdir.cleanup()
         except PermissionError:
@@ -1504,6 +1506,27 @@ class LiveApiRegressionTests(AsyncDatabaseTestCase):
         self.assertEqual(stored.sha256, hashlib.sha256(payload).hexdigest())
         stored_path = resolve_storage_path(stored.storage_key, self._tmpdir.name)
         self.assertEqual(stored_path.read_bytes(), payload)
+
+    async def test_files_upload_rejects_payloads_over_size_limit(self) -> None:
+        settings.FILE_UPLOAD_MAX_BYTES = 8
+        response = await self._upload_file(
+            token="owner-token",
+            receipt_id=self.shared_receipt.id,
+            filename="large.pdf",
+            content=b"123456789",
+            content_type="application/pdf",
+        )
+        parsed = self._parse_message(debt_pb2.FileResponse, response)
+
+        self.assertEqual(response.status_code, 413)
+        self.assertFalse(parsed.success)
+        self.assertIn("upload limit", parsed.message)
+
+        async with db.async_session_maker() as session:
+            result = await session.execute(select(db.ReceiptFile))
+            stored_files = result.scalars().all()
+
+        self.assertEqual([file.id for file in stored_files], [self.shared_file.id])
 
     async def test_files_upload_requires_receipt_owner(self) -> None:
         response = await self._upload_file(

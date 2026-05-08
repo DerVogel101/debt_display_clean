@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:auth0_flutter/auth0_flutter.dart';
@@ -1490,6 +1491,68 @@ void main() {
     expect(openedFilename, 'statement.pdf');
   });
 
+  testWidgets('receipt file preview keeps one download future across rebuilds', (
+    tester,
+  ) async {
+    _setTestSurfaceSize(tester, width: 430, height: 1000);
+
+    final file = ReceiptFile(
+      id: Int64(83),
+      receiptId: Int64(49),
+      originalFilename: 'receipt.png',
+      contentType: 'image/png',
+    );
+    final imageBytes = base64Decode(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=',
+    );
+    var downloadCount = 0;
+    final fakeService = _FakeDebtBackendService(
+      availableTags: const [],
+      onListReceipts: (_) {
+        final response = ReceiptsResponse(success: true);
+        response.receipts.add(
+          _testReceipt(
+            id: 49,
+            title: 'Receipt with preview',
+            amountOwed: 10,
+            files: [file],
+          ),
+        );
+        return response;
+      },
+      onDownloadReceiptFile: (_) {
+        downloadCount += 1;
+        return ReceiptFileDownload(
+          file: file.deepCopy(),
+          bytes: imageBytes,
+          contentType: 'image/png',
+        );
+      },
+    );
+    final billListState = BillListState(debtBackendService: fakeService);
+
+    await tester.pumpWidget(
+      _buildBillsSectionTestApp(
+        authState: _TestAuthSessionState(
+          isAuthenticatedValue: true,
+          accessTokenValue: 'token-1',
+          userIdValue: 10,
+        ),
+        billListState: billListState,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('receipt-row-49')));
+    await tester.pumpAndSettle();
+    expect(downloadCount, 1);
+
+    await billListState.refresh();
+    await tester.pumpAndSettle();
+
+    expect(downloadCount, 1);
+  });
+
   testWidgets('non-web receipt file open shows snackbar on open failure', (
     tester,
   ) async {
@@ -2633,6 +2696,7 @@ class _FakeDebtBackendService extends DebtBackendService {
     this.onSearchUsers,
     this.onSetReceiptPayments,
     this.onGetOrCreateTag,
+    // ignore: unused_element_parameter
     this.onSetReceiptTags,
     this.onUploadReceiptFile,
     this.onDeleteReceipt,

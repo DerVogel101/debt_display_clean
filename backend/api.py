@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 from datetime import datetime, timezone
 from pathlib import Path
+from uuid import uuid4
 
 import aiofiles
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
@@ -43,6 +44,8 @@ from backend.storage import resolve_storage_path
 
 api_app = FastAPI(title="api")
 
+_UPLOAD_CHUNK_SIZE_BYTES = 1024 * 1024
+
 
 class ProtobufResponse(Response):
     media_type = "application/x-protobuf"
@@ -80,6 +83,30 @@ def _dt_from_proto(value: str | None) -> datetime | None:
 
 def _upload_root() -> Path:
     return Path(settings.UPLOAD_DIR).resolve()
+
+
+async def _stream_upload_to_temp(
+    upload: UploadFile,
+    temp_path: Path,
+) -> tuple[int, str]:
+    digest = hashlib.sha256()
+    size_bytes = 0
+    max_bytes = settings.FILE_UPLOAD_MAX_BYTES
+
+    temp_path.parent.mkdir(parents=True, exist_ok=True)
+    async with aiofiles.open(temp_path, "wb") as handle:
+        while chunk := await upload.read(_UPLOAD_CHUNK_SIZE_BYTES):
+            size_bytes += len(chunk)
+            if size_bytes > max_bytes:
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"File exceeds {max_bytes} byte upload limit",
+                )
+            digest.update(chunk)
+            await handle.write(chunk)
+
+    return size_bytes, digest.hexdigest()
+
 
 def _delete_managed_file(storage_key: str) -> bool:
     try:
@@ -902,28 +929,34 @@ async def upload_file_route(
     file: UploadFile = File(...),
     session: AsyncSession = Depends(get_session),
 ) -> ProtobufResponse:
+    temp_path: Path | None = None
+    target_path: Path | None = None
     try:
         user = await _current_user(request, session)
-        payload = await file.read()
         filename = file.filename or "file"
         content_type = file.content_type or "application/octet-stream"
-        sha256 = hashlib.sha256(payload).hexdigest()
+        upload_root = _upload_root()
+        temp_path = upload_root / ".tmp" / uuid4().hex
+        await services.get_owned_receipt(session, user.id, receipt_id)
+        size_bytes, sha256 = await _stream_upload_to_temp(file, temp_path)
         file_record = await services.create_receipt_file_for_owner(
             session=session,
             actor_user_id=user.id,
             receipt_id=receipt_id,
             client_filename=filename,
             content_type=content_type,
-            size_bytes=len(payload),
+            size_bytes=size_bytes,
             sha256=sha256,
         )
-        target_path = resolve_storage_path(file_record.storage_key, _upload_root())
+        target_path = resolve_storage_path(file_record.storage_key, upload_root)
         target_path.parent.mkdir(parents=True, exist_ok=True)
         try:
-            async with aiofiles.open(target_path, "wb") as handle:
-                await handle.write(payload)
+            temp_path.replace(target_path)
+            temp_path = None
         except Exception:
             await session.rollback()
+            if temp_path is not None:
+                temp_path.unlink(missing_ok=True)
             target_path.unlink(missing_ok=True)
             raise
 
@@ -931,6 +964,10 @@ async def upload_file_route(
         return _pb_response(debt_pb2.FileResponse(success=True, file=_file_to_pb(file_record)))
     except Exception as exc:
         await session.rollback()
+        if temp_path is not None:
+            temp_path.unlink(missing_ok=True)
+        if target_path is not None:
+            target_path.unlink(missing_ok=True)
         return _error_response(debt_pb2.FileResponse, exc)
 
 
