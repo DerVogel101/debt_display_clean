@@ -568,9 +568,6 @@ String _homeDueLabel(
 }
 
 String _homeRecipientLabel(Receipt receipt) {
-  if (receipt.hasRecipientName() && receipt.recipientName.trim().isNotEmpty) {
-    return receipt.recipientName;
-  }
   if (receipt.hasRecipient() && receipt.recipient.name.trim().isNotEmpty) {
     return receipt.recipient.name;
   }
@@ -588,6 +585,9 @@ String _homeParticipantsLabel(Receipt receipt) {
 }
 
 String _homeUserLabel(User user) {
+  if (user.deleted) {
+    return 'Deleted User';
+  }
   if (user.hasName() && user.name.trim().isNotEmpty) {
     return user.name;
   }
@@ -598,11 +598,8 @@ String _homeUserLabel(User user) {
 }
 
 String _homeShareUserLabel(ReceiptRecipientShare share) {
-  if (share.hasUserName() && share.userName.trim().isNotEmpty) {
-    return share.userName;
-  }
-  if (share.hasUserEmail() && share.userEmail.trim().isNotEmpty) {
-    return share.userEmail;
+  if (share.hasUser()) {
+    return _homeUserLabel(share.user);
   }
   return 'User ${share.userId}';
 }
@@ -1412,7 +1409,7 @@ class _RecipientGroupTile extends StatelessWidget {
       builder: (dialogContext) => AlertDialog(
         title: const Text('Delete recipient group?'),
         content: Text(
-          'Delete ${group.name}? Existing receipt snapshots remain.',
+          'Delete ${group.name}? Existing bills will no longer point to it.',
         ),
         actions: [
           TextButton(
@@ -1712,6 +1709,9 @@ class _InlineError extends StatelessWidget {
 }
 
 String _userLabel(User user) {
+  if (user.deleted) {
+    return 'Deleted User';
+  }
   if (user.hasName() && user.name.trim().isNotEmpty) {
     return user.name;
   }
@@ -1722,6 +1722,9 @@ String _userLabel(User user) {
 }
 
 String _userSubtitle(User user) {
+  if (user.deleted) {
+    return 'Deleted account';
+  }
   if (user.hasEmail() && user.email.trim().isNotEmpty) {
     return user.email;
   }

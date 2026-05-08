@@ -134,7 +134,6 @@ class UnpaidReceiptSummaryTest(unittest.IsolatedAsyncioTestCase):
                     user_id=actor.id,
                     share_percent=50,
                     amount_paid=20,
-                    user_name_snapshot="Actor",
                 )
             )
             await session.commit()

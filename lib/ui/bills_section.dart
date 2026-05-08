@@ -762,9 +762,9 @@ class _BillReceiptTile extends StatelessWidget {
     final dueLabel = dueDate == null
         ? 'No due date'
         : 'Due ${materialLocalizations.formatShortDate(dueDate.toLocal())}';
-    final recipientLabel = receipt.hasRecipientName()
-        ? receipt.recipientName
-        : (receipt.hasRecipient() ? receipt.recipient.name : 'Personal bill');
+    final recipientLabel = receipt.hasRecipient()
+        ? receipt.recipient.name
+        : 'Personal bill';
     final roleLabel = state.roleLabelFor(receipt);
     final peopleLabel = _receiptPeopleLabel(receipt);
     final filesLabel = receipt.files.length == 1
@@ -1580,11 +1580,8 @@ Future<void> _openReceiptFile(
 }
 
 String _shareUserLabel(ReceiptRecipientShare share) {
-  if (share.hasUserName() && share.userName.trim().isNotEmpty) {
-    return share.userName;
-  }
-  if (share.hasUserEmail() && share.userEmail.trim().isNotEmpty) {
-    return share.userEmail;
+  if (share.hasUser()) {
+    return _recipientMemberLabel(share.user);
   }
   return 'User ${share.userId}';
 }
@@ -1596,9 +1593,6 @@ String _receiptPeopleLabel(Receipt receipt) {
   if (receipt.hasSplit() && receipt.split.recipientShares.isNotEmpty) {
     return receipt.split.recipientShares.map(_shareUserLabel).join(', ');
   }
-  if (receipt.hasRecipientName() && receipt.recipientName.trim().isNotEmpty) {
-    return receipt.recipientName;
-  }
   if (receipt.hasRecipient() && receipt.recipient.name.trim().isNotEmpty) {
     return receipt.recipient.name;
   }
@@ -1606,6 +1600,9 @@ String _receiptPeopleLabel(Receipt receipt) {
 }
 
 String _recipientMemberLabel(User user) {
+  if (user.deleted) {
+    return 'Deleted User';
+  }
   if (user.hasName() && user.name.trim().isNotEmpty) {
     return user.name;
   }

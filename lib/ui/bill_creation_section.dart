@@ -1381,6 +1381,9 @@ IconData _fileIcon(String? contentType) {
 }
 
 String _userLabel(User user) {
+  if (user.deleted) {
+    return 'Deleted User';
+  }
   if (user.hasName() && user.name.trim().isNotEmpty) {
     return user.name;
   }

@@ -424,7 +424,9 @@ async def get_visible_receipt(
         )
         .options(
             selectinload(Receipt.recipient),
-            selectinload(Receipt.recipient_shares),
+            selectinload(Receipt.recipient_shares).selectinload(
+                ReceiptRecipientShare.user
+            ),
             selectinload(Receipt.files),
             selectinload(Receipt.tags),
         )
@@ -489,7 +491,9 @@ async def get_owned_receipt(
         .where(Receipt.id == receipt_id)
         .options(
             selectinload(Receipt.recipient),
-            selectinload(Receipt.recipient_shares),
+            selectinload(Receipt.recipient_shares).selectinload(
+                ReceiptRecipientShare.user
+            ),
             selectinload(Receipt.files),
             selectinload(Receipt.tags),
         )
@@ -553,7 +557,9 @@ async def list_visible_receipts(
         *_receipt_order_by_clauses(spec)
     ).limit(limit + 1).options(
         selectinload(Receipt.recipient),
-        selectinload(Receipt.recipient_shares),
+        selectinload(Receipt.recipient_shares).selectinload(
+            ReceiptRecipientShare.user
+        ),
         selectinload(Receipt.files),
         selectinload(Receipt.tags),
     )
@@ -587,7 +593,11 @@ async def summarize_visible_unpaid_receipts(
         select(Receipt)
         .where(_receipt_actor_visibility_filter(actor_user_id, "owner_or_recipient_group"))
         .where(Receipt.is_paid.is_(False))
-        .options(selectinload(Receipt.recipient_shares))
+        .options(
+            selectinload(Receipt.recipient_shares).selectinload(
+                ReceiptRecipientShare.user
+            )
+        )
     )
     total = 0.0
     count = 0

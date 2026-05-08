@@ -366,6 +366,19 @@ void main() {
           ownerId: 10,
           members: [_testUser(id: 20, name: 'Alice', email: 'alice@test.dev')],
         ),
+        _testRecipient(
+          id: 78,
+          name: 'Former trip',
+          ownerId: 10,
+          members: [
+            _testUser(
+              id: 21,
+              name: '[DELETED]',
+              email: '[DELETED]',
+              deleted: true,
+            ),
+          ],
+        ),
       ],
     );
     final navigationState = NavigationState()
@@ -390,6 +403,7 @@ void main() {
     expect(fakeService.listRecipientsCalls, 1);
     expect(find.text('Roommates'), findsOneWidget);
     expect(find.text('Alice'), findsOneWidget);
+    expect(find.text('Deleted User'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('recipient-group-edit-77')),
       findsOneWidget,
@@ -1113,8 +1127,12 @@ void main() {
                     sharePercent: 60,
                     amount: 60,
                     amountPaid: 30,
-                    userName: 'Alice',
-                    userEmail: 'alice@test.dev',
+                    user: _testUser(
+                      id: 20,
+                      name: '[DELETED]',
+                      email: '[DELETED]',
+                      deleted: true,
+                    ),
                   ),
                 ],
               ),
@@ -1161,7 +1179,7 @@ void main() {
         find.text(_formatExpectedCurrency(25, const Locale('en', 'US'))),
         findsWidgets,
       );
-      expect(find.textContaining('Alice'), findsOneWidget);
+      expect(find.textContaining('Deleted User'), findsOneWidget);
       expect(find.textContaining('60%'), findsOneWidget);
       expect(
         find.text(_formatExpectedCurrency(30, const Locale('en', 'US'))),
@@ -1294,8 +1312,7 @@ void main() {
             sharePercent: 60,
             amount: 60,
             amountPaid: 0,
-            userName: 'Alice',
-            userEmail: 'alice@test.dev',
+            user: _testUser(id: 20, name: 'Alice', email: 'alice@test.dev'),
           ),
         ],
       ),
@@ -1386,7 +1403,11 @@ void main() {
                   sharePercent: 60,
                   amount: 60,
                   amountPaid: 30,
-                  userName: 'Alice',
+                  user: _testUser(
+                    id: 20,
+                    name: 'Alice',
+                    email: 'alice@test.dev',
+                  ),
                 ),
               ],
             ),
@@ -2581,7 +2602,12 @@ Receipt _testReceipt({
     isPaid: isPaid,
     currency: 'EUR',
     ownerId: Int64(ownerId),
-    recipientName: 'Shared group',
+    recipient: Recipient(
+      id: Int64(77),
+      name: 'Shared group',
+      ownerId: Int64(ownerId),
+      createdAt: '2026-05-05T00:00:00Z',
+    ),
     dueDate: dueDate,
     tags: tags,
     files: files,
@@ -2598,8 +2624,19 @@ Receipt _testReceipt({
   return receipt;
 }
 
-User _testUser({required int id, required String name, required String email}) {
-  return User(id: Int64(id), sub: 'auth0|$id', name: name, email: email);
+User _testUser({
+  required int id,
+  required String name,
+  required String email,
+  bool deleted = false,
+}) {
+  return User(
+    id: Int64(id),
+    sub: 'auth0|$id',
+    name: name,
+    email: email,
+    deleted: deleted,
+  );
 }
 
 Recipient _testRecipient({
@@ -2633,6 +2670,7 @@ class _FakeDebtBackendService extends DebtBackendService {
     this.onSearchUsers,
     this.onSetReceiptPayments,
     this.onGetOrCreateTag,
+    // ignore: unused_element_parameter
     this.onSetReceiptTags,
     this.onUploadReceiptFile,
     this.onDeleteReceipt,
