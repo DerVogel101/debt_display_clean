@@ -1,9 +1,6 @@
 """
 Auth0 JWT verification using PyJWT with RS256 + JWKS.
 """
-from collections.abc import Awaitable, Callable
-from functools import wraps
-from inspect import Parameter, Signature, signature
 from typing import Any
 
 from fastapi import Depends, HTTPException, Request, status
@@ -131,42 +128,3 @@ def get_auth_claims(request: Request) -> dict[str, Any]:
             detail="Authentication required",
         )
     return claims
-
-
-def auth_required(
-    route_handler: Callable[..., Awaitable[Any]],
-) -> Callable[..., Awaitable[Any]]:
-    """
-    Decorator for FastAPI routes with Request param.
-    Verifies bearer token before route logic runs.
-    """
-    route_signature = signature(route_handler)
-
-    @wraps(route_handler)
-    async def wrapper(*args: Any, **kwargs: Any) -> Any:
-        request = kwargs.get("request")
-        if not isinstance(request, Request):
-            request = next((arg for arg in args if isinstance(arg, Request)), None)
-
-        if not isinstance(request, Request):
-            raise RuntimeError("auth_required needs route Request parameter")
-
-        await require_auth(request)
-        return await route_handler(*args, **kwargs)
-
-    wrapper.__signature__ = _ensure_request_in_signature(route_signature)
-    return wrapper
-
-
-def _ensure_request_in_signature(route_signature: Signature) -> Signature:
-    if "request" in route_signature.parameters:
-        return route_signature
-
-    request_param = Parameter(
-        "request",
-        kind=Parameter.POSITIONAL_OR_KEYWORD,
-        annotation=Request,
-    )
-    return route_signature.replace(
-        parameters=[request_param, *route_signature.parameters.values()],
-    )
