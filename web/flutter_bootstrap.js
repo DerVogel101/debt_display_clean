@@ -3,6 +3,7 @@
 
 _flutter.loader.load({
   config: {
-    fontFallbackBaseUrl: '',
+    useLocalCanvasKit: true,
+    fontFallbackBaseUrl: 'font-fallbacks/',
   },
 });

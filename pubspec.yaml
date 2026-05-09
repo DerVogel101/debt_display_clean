@@ -92,7 +92,7 @@ flutter:
   # https://flutter.dev/to/asset-from-package
 
   fonts:
-    - family: RobotoLocal
+    - family: Roboto
       fonts:
         - asset: "assets/fonts/roboto/Roboto[wdth,wght].ttf"
         - asset: "assets/fonts/roboto/Roboto-Italic[wdth,wght].ttf"
