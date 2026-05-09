@@ -1,0 +1,11 @@
+# Self-hosted Flutter web runtime and font assets are vendored/generated.
+# Keep them tracked for deployment, but exclude them from GitHub language stats.
+/web/canvaskit/** linguist-generated=true -diff
+/web/font-fallbacks/** linguist-generated=true -diff
+/assets/fonts/roboto/** linguist-vendored=true -diff
+/tests/fixtures/frontend_static/** linguist-vendored=true -diff
+
+# Binary web/font artifacts should never be treated as text diffs.
+*.ttf binary
+*.wasm binary
+*.woff2 binary

@@ -23,6 +23,12 @@ _APP_SHELL_FILES: Final[frozenset[str]] = frozenset(
     }
 )
 
+_WEB_RESOURCE_CONTENT_TYPES: Final[dict[str, str]] = {
+    ".js": "text/javascript",
+    ".mjs": "text/javascript",
+    ".wasm": "application/wasm",
+}
+
 
 def build_revalidating_cache_control(max_age_seconds: int) -> str:
     if max_age_seconds <= 0:
@@ -59,7 +65,15 @@ class FrontendStaticFiles(StaticFiles):
         cache_control = self._cache_control_for(Path(full_path), stat_result)
         if cache_control is not None:
             response.headers["Cache-Control"] = cache_control
+        content_type = self._content_type_for(Path(full_path), stat_result)
+        if content_type is not None:
+            response.headers["Content-Type"] = content_type
         return response
+
+    def _content_type_for(self, full_path: Path, stat_result) -> str | None:
+        if not S_ISREG(stat_result.st_mode):
+            return None
+        return _WEB_RESOURCE_CONTENT_TYPES.get(full_path.suffix.lower())
 
     def _cache_control_for(self, full_path: Path, stat_result) -> str | None:
         if not S_ISREG(stat_result.st_mode):
