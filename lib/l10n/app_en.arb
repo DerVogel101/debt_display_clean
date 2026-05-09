@@ -1,0 +1,247 @@
+{
+  "@@locale": "en",
+  "appTitle": "debt_display",
+  "brandTitle": "Debt Display",
+  "brandSubtitle": "Shared debt and receipts",
+  "destinationHome": "Home",
+  "destinationBills": "Bills",
+  "destinationCreateBill": "Create Bill",
+  "destinationRecipientGroups": "Recipient groups",
+  "destinationProfile": "Profile",
+  "destinationMenu": "Menu",
+  "openNavigationTooltip": "Open navigation",
+  "login": "Log in",
+  "logout": "Log out",
+  "user": "User",
+  "hiThere": "Hi there",
+  "hiName": "Hi, {name}",
+  "@hiName": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "loadingSession": "Restoring session...",
+  "backendAuthFailed": "Backend authentication failed: {message}",
+  "@backendAuthFailed": {
+    "placeholders": {
+      "message": {}
+    }
+  },
+  "themeLight": "Light",
+  "themeAuto": "Auto",
+  "themeDark": "Dark",
+  "appearanceTitle": "Appearance",
+  "appearanceDescription": "Choose a light, auto, or dark theme mode. Dark mode uses your saved palette, with Dracula as the default fallback.",
+  "darkPalette": "Dark palette",
+  "languageTitle": "Language",
+  "languageDescription": "Use your device language automatically, or save a manual English or German override.",
+  "languageAuto": "Auto",
+  "languageEnglish": "English",
+  "languageGerman": "Deutsch",
+  "recentOutstandingBills": "Recent outstanding bills",
+  "viewBills": "View Bills",
+  "view": "View",
+  "create": "Create",
+  "createBill": "Create Bill",
+  "homeAuthenticatedDescription": "The newest unpaid bills you own or take part in.",
+  "homeLoggedOutDescription": "Log in to load the bills you own or share with other participants.",
+  "loginToViewBills": "Log in to view bills",
+  "noUnpaidBills": "No unpaid bills right now.",
+  "totalStillOwed": "Total still owed",
+  "totalStillOwedDescription": "Combined balance across all unpaid bills you take part in.",
+  "unpaidBillsNeedShare": "{count} unpaid bills need your share",
+  "@unpaidBillsNeedShare": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "noDueDate": "No due date",
+  "dueDateLabel": "Due {date}",
+  "@dueDateLabel": {
+    "placeholders": {
+      "date": {}
+    }
+  },
+  "personalBill": "Personal bill",
+  "deletedUser": "Deleted User",
+  "deletedAccount": "Deleted account",
+  "menuDescription": "Use this overflow area for profile access and appearance settings, especially on mobile where the bottom bar stays compact.",
+  "menuHomeDescription": "Return to the unpaid bill dashboard and overview.",
+  "menuBillsDescription": "Open the full bills view with filters, sorting, and pagination controls.",
+  "menuCreateBillDescription": "Create a bill with tags, splits, notes, and uploaded receipt files.",
+  "menuRecipientGroupsDescription": "Create shared recipient groups and manage who can receive split bills.",
+  "menuProfileLoggedOutDescription": "Open your account details to sign in and inspect your user data.",
+  "menuProfileLoggedInDescription": "Review the synced account profile and active session details.",
+  "loginToContinue": "Log in to continue",
+  "profileLoggedOutTitle": "Your profile",
+  "profileLoggedOutDescription": "Log in to inspect your synced profile and active session details.",
+  "accountProfileTitle": "Account profile",
+  "signedInAs": "Signed in as",
+  "emailLabel": "Email",
+  "displayNameLabel": "Display name",
+  "nicknameLabel": "Nickname",
+  "userIdLabel": "User ID",
+  "notAvailable": "N/A",
+  "sessionDetailsTitle": "Session details",
+  "billsDescription": "Browse every receipt you can access as owner, participant, or both.",
+  "refresh": "Refresh",
+  "filters": "Filters",
+  "filtersCount": "Filters ({count})",
+  "@filtersCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "role": "Role",
+  "both": "Both",
+  "owner": "Owner",
+  "member": "Member",
+  "participant": "Participant",
+  "paymentStatus": "Payment status",
+  "all": "All",
+  "paid": "Paid",
+  "unpaid": "Unpaid",
+  "tags": "Tags",
+  "tagsFilterHelper": "Each selected tag must be present on a receipt.",
+  "noTagsAvailable": "No tags available yet.",
+  "sortBy": "Sort by",
+  "direction": "Direction",
+  "pageSize": "Page size",
+  "reset": "Reset",
+  "apply": "Apply",
+  "id": "ID",
+  "total": "Total",
+  "myShare": "My share",
+  "stillOwed": "Still owed",
+  "dueDate": "Due date",
+  "ascending": "Ascending",
+  "descending": "Descending",
+  "previous": "Previous",
+  "next": "Next",
+  "visibleReceipts": "Visible receipts",
+  "pageNumber": "Page {page}",
+  "@pageNumber": {
+    "placeholders": {
+      "page": {
+        "type": "int"
+      }
+    }
+  },
+  "noBillsMatch": "No bills match the current filters.",
+  "participants": "Participants",
+  "couldNotLoadBills": "Could not load bills. {message}",
+  "@couldNotLoadBills": {
+    "placeholders": {
+      "message": {}
+    }
+  },
+  "payments": "Payments",
+  "ownerPaid": "Owner paid",
+  "shareAmount": "Share {amount}",
+  "@shareAmount": {
+    "placeholders": {
+      "amount": {}
+    }
+  },
+  "userPaid": "{user} paid",
+  "@userPaid": {
+    "placeholders": {
+      "user": {}
+    }
+  },
+  "cancel": "Cancel",
+  "save": "Save",
+  "open": "Open",
+  "previewUnavailable": "Preview unavailable",
+  "couldNotOpenFile": "Could not open file.",
+  "paymentOwnerExceeded": "Owner paid amount cannot exceed owner share.",
+  "paymentInvalidOwner": "Enter a valid owner paid amount.",
+  "paymentInvalidRecipient": "Enter valid recipient paid amounts.",
+  "paymentRecipientExceeded": "Recipient paid amounts cannot exceed their shares.",
+  "couldNotSavePayments": "Could not save payments.",
+  "participantHeader": "Participant",
+  "shareHeader": "Share",
+  "paidHeader": "Paid",
+  "leftHeader": "Left",
+  "oneFileIncluded": "1 file included",
+  "filesIncluded": "{count} files included",
+  "@filesIncluded": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "createBillDescription": "Create a shared bill, split it by group member, and attach receipts.",
+  "refreshBillFormData": "Refresh bill form data",
+  "notes": "Notes",
+  "pickEmoji": "Pick emoji",
+  "pickTagColor": "Pick tag color",
+  "sharesMustAddTo100": "Shares must add up to 100%.",
+  "billCreated": "Bill created.",
+  "loginToCreateBills": "Log in to create bills",
+  "basics": "Basics",
+  "details": "Details",
+  "title": "Title",
+  "titleRequired": "Title is required.",
+  "titleTooLong": "Title must be 256 characters or fewer.",
+  "shortDescription": "Short description",
+  "descriptionTooLong": "Description must be 256 characters or fewer.",
+  "amount": "Amount",
+  "validAmountRequired": "Enter a valid amount.",
+  "currency": "Currency",
+  "searchRecommendedTags": "Search recommended tags",
+  "noRecommendedTags": "No recommended tags yet.",
+  "noTagsMatch": "No tags match.",
+  "pickTagEmoji": "Pick tag emoji",
+  "newTag": "New tag",
+  "add": "Add",
+  "groupAndShares": "Group and shares",
+  "group": "Group",
+  "complete100": "100% complete",
+  "needPercent": "Need +{percent}%",
+  "@needPercent": {
+    "placeholders": {
+      "percent": {}
+    }
+  },
+  "reducePercent": "Reduce {percent}%",
+  "@reducePercent": {
+    "placeholders": {
+      "percent": {}
+    }
+  },
+  "files": "Files",
+  "upload": "Upload",
+  "takePicture": "Take picture",
+  "takePictureMobileOnly": "Take picture is available on mobile browsers so iOS can open the native camera flow.",
+  "filename": "Filename",
+  "removeFile": "Remove file",
+  "recipientGroupsDescription": "Create shared recipient groups and manage who can receive split bills.",
+  "loginToManageGroups": "Log in to manage groups",
+  "noRecipientGroups": "No recipient groups yet.",
+  "editGroup": "Edit group",
+  "deleteGroup": "Delete group",
+  "deleteRecipientGroupQuestion": "Delete recipient group?",
+  "deleteRecipientGroupContent": "Delete {name}? Existing bills will no longer point to it.",
+  "@deleteRecipientGroupContent": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "delete": "Delete",
+  "createRecipientGroup": "Create recipient group",
+  "editRecipientGroup": "Edit recipient group",
+  "groupName": "Group name",
+  "description": "Description",
+  "members": "Members",
+  "noMembersSelected": "No members selected",
+  "findUser": "Find user",
+  "findUserHelper": "Type at least 3 characters from name or email.",
+  "addMember": "Add member",
+  "noMembers": "No members"
+}

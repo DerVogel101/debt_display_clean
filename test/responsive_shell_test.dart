@@ -4,10 +4,12 @@ import 'dart:typed_data';
 
 import 'package:auth0_flutter/auth0_flutter.dart';
 import 'package:debt_display/generated/debt.pb.dart';
+import 'package:debt_display/l10n/generated/app_localizations.dart';
 import 'package:debt_display/state/auth_session_state.dart';
 import 'package:debt_display/state/bill_creation_state.dart';
 import 'package:debt_display/state/bill_list_state.dart';
 import 'package:debt_display/state/home_bill_state.dart';
+import 'package:debt_display/state/language_state.dart';
 import 'package:debt_display/state/navigation_state.dart';
 import 'package:debt_display/state/recipient_group_state.dart';
 import 'package:debt_display/state/theme_state.dart';
@@ -20,10 +22,10 @@ import 'package:debt_display/services/file_viewer_io.dart';
 import 'package:dio/dio.dart';
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 const _supportedLocales = [Locale('en'), Locale('de')];
 final _fixedReferenceDate = DateTime(2026, 4, 25);
@@ -31,6 +33,92 @@ final _fixedReferenceDate = DateTime(2026, 4, 25);
 void main() {
   tearDown(() {
     debugSetPendingFileWindowFactory(null);
+  });
+
+  test('language state loads auto by default and persists overrides', () async {
+    SharedPreferences.setMockInitialValues({});
+    final state = LanguageState();
+    await state.load();
+
+    expect(state.languageMode, AppLanguageMode.auto);
+    expect(state.locale, isNull);
+
+    await state.setLanguageMode(AppLanguageMode.german);
+    expect(state.locale, const Locale('de'));
+
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getString('language.mode'), 'german');
+  });
+
+  test('language state restores saved English override', () async {
+    SharedPreferences.setMockInitialValues({'language.mode': 'english'});
+    final state = LanguageState();
+    await state.load();
+
+    expect(state.languageMode, AppLanguageMode.english);
+    expect(state.locale, const Locale('en'));
+  });
+
+  testWidgets('home dashboard renders localized English and German labels', (
+    tester,
+  ) async {
+    _setTestSurfaceSize(tester, width: 430, height: 1000);
+
+    await tester.pumpWidget(
+      _buildHomeSectionTestApp(
+        authState: _TestAuthSessionState(
+          isAuthenticatedValue: true,
+          accessTokenValue: 'token-1',
+          userIdValue: 10,
+        ),
+        locale: const Locale('en', 'US'),
+        referenceDate: _fixedReferenceDate,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Recent outstanding bills'), findsOneWidget);
+
+    await tester.pumpWidget(
+      _buildHomeSectionTestApp(
+        authState: _TestAuthSessionState(
+          isAuthenticatedValue: true,
+          accessTokenValue: 'token-1',
+          userIdValue: 10,
+        ),
+        locale: const Locale('de', 'DE'),
+        referenceDate: _fixedReferenceDate,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Aktuelle offene Rechnungen'), findsOneWidget);
+  });
+
+  testWidgets('language setting changes state and persists selection', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    final languageState = LanguageState();
+    final navigationState = NavigationState()
+      ..selectDestination(AppDestination.menu);
+    _setTestSurfaceSize(tester, width: 430, height: 900);
+
+    await tester.pumpWidget(
+      _buildResponsiveShellTestApp(
+        authState: _TestAuthSessionState(),
+        navigationState: navigationState,
+        languageState: languageState,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _tapVisible(tester, find.text('Deutsch'));
+
+    expect(languageState.languageMode, AppLanguageMode.german);
+    expect(languageState.locale, const Locale('de'));
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getString('language.mode'), 'german');
   });
 
   testWidgets('home dashboard formats amounts and dates for en_US locale', (
@@ -101,7 +189,7 @@ void main() {
       const Locale('de', 'DE'),
     );
 
-    expect(find.text('Due $expectedDue'), findsOneWidget);
+    expect(find.text('Fällig $expectedDue'), findsOneWidget);
     expect(find.text(expectedAmount), findsOneWidget);
   });
 
@@ -2399,6 +2487,7 @@ Widget _buildResponsiveShellTestApp({
   BillListState? billListState,
   BillCreationState? billCreationState,
   HomeBillState? homeBillState,
+  LanguageState? languageState,
   RecipientGroupState? recipientGroupState,
   Locale locale = const Locale('en', 'US'),
 }) {
@@ -2433,7 +2522,7 @@ Widget _buildResponsiveShellTestApp({
 
   return MaterialApp(
     locale: locale,
-    localizationsDelegates: GlobalMaterialLocalizations.delegates,
+    localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: _supportedLocales,
     theme: buildLightTheme(),
     home: MultiProvider(
@@ -2441,6 +2530,9 @@ Widget _buildResponsiveShellTestApp({
         ChangeNotifierProvider<AuthSessionState>.value(value: authState),
         ChangeNotifierProvider<NavigationState>.value(value: navigationState),
         ChangeNotifierProvider<ThemeState>(create: (_) => ThemeState()),
+        ChangeNotifierProvider<LanguageState>.value(
+          value: languageState ?? LanguageState(),
+        ),
         ChangeNotifierProxyProvider<AuthSessionState, BillListState>(
           create: (_) => resolvedBillListState,
           update: (_, authSessionState, billListState) =>
@@ -2494,7 +2586,7 @@ Widget _buildHomeSectionTestApp({
   );
   return MaterialApp(
     locale: locale,
-    localizationsDelegates: GlobalMaterialLocalizations.delegates,
+    localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: _supportedLocales,
     theme: buildLightTheme(),
     home: MultiProvider(
@@ -2530,7 +2622,7 @@ Widget _buildBillsSectionTestApp({
 }) {
   return MaterialApp(
     locale: locale,
-    localizationsDelegates: GlobalMaterialLocalizations.delegates,
+    localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: _supportedLocales,
     theme: buildLightTheme(),
     home: MultiProvider(

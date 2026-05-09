@@ -1,6 +1,7 @@
 import 'dart:ui' show ImageFilter;
 
 import 'package:auth0_flutter/auth0_flutter.dart';
+import 'package:debt_display/l10n/generated/app_localizations.dart';
 import 'package:debt_display/state/auth_session_state.dart';
 import 'package:debt_display/state/navigation_state.dart';
 import 'package:debt_display/theme/app_themes.dart';
@@ -92,6 +93,7 @@ class _DesktopAppBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final selectedDestination = context.select<NavigationState, AppDestination>(
       (state) => state.selectedDestination,
     );
@@ -137,13 +139,13 @@ class _DesktopAppBar extends StatelessWidget {
                                         .read<NavigationState>()
                                         .selectDestination(destination);
                                   },
-                                  child: Text(destination.label),
+                                  child: Text(destination.label(l10n)),
                                 ),
                               )
                               .toList(),
                           builder: (context, controller, child) {
                             return _TopBarIconButton(
-                              tooltip: 'Open navigation',
+                              tooltip: l10n.openNavigationTooltip,
                               icon: Icons.menu_rounded,
                               onPressed: () {
                                 if (controller.isOpen) {
@@ -173,12 +175,16 @@ class _MobileTopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final selectedDestination = context.select<NavigationState, AppDestination>(
       (state) => state.selectedDestination,
     );
-    final greeting = context.select<AuthSessionState, String>(
-      (state) => state.greeting,
+    final displayName = context.select<AuthSessionState, String?>(
+      (state) => state.displayName,
     );
+    final greeting = displayName == null || displayName.isEmpty
+        ? l10n.hiThere
+        : l10n.hiName(displayName);
 
     return GlassPanel.chrome(
       padding: EdgeInsets.zero,
@@ -215,7 +221,7 @@ class _MobileTopBar extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              'Shared debt and receipts',
+              l10n.brandSubtitle,
               maxLines: 1,
               softWrap: false,
               overflow: TextOverflow.fade,
@@ -241,6 +247,7 @@ class _TopBarDestinationChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return LayoutBuilder(
       builder: (context, constraints) {
         final labelStyle = compact
@@ -274,7 +281,7 @@ class _TopBarDestinationChip extends StatelessWidget {
                 const SizedBox(width: 8),
                 Flexible(
                   child: Text(
-                    destination.label,
+                    destination.label(l10n),
                     maxLines: 1,
                     softWrap: false,
                     overflow: TextOverflow.fade,
@@ -330,6 +337,7 @@ class _DesktopAccountControl extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final authView = context
         .select<
           AuthSessionState,
@@ -366,7 +374,7 @@ class _DesktopAccountControl extends StatelessWidget {
           context.read<AuthSessionState>().login();
         },
         icon: const Icon(Icons.login_rounded),
-        label: const Text('Log in'),
+        label: Text(l10n.login),
       );
     }
 
@@ -410,7 +418,7 @@ class _DesktopAccountControl extends StatelessWidget {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
-                                authView.name ?? 'User',
+                                authView.name ?? l10n.user,
                                 maxLines: 1,
                                 softWrap: false,
                                 style: Theme.of(context).textTheme.titleMedium
@@ -442,7 +450,7 @@ class _DesktopAccountControl extends StatelessWidget {
           const SizedBox(width: 6),
           IconButton(
             key: const ValueKey('desktop-logout-button'),
-            tooltip: 'Log out',
+            tooltip: l10n.logout,
             onPressed: () {
               context.read<AuthSessionState>().logout();
             },
@@ -462,6 +470,7 @@ class _BrandLockup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -487,7 +496,7 @@ class _BrandLockup extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'Debt Display',
+                l10n.brandTitle,
                 maxLines: 1,
                 softWrap: false,
                 overflow: TextOverflow.fade,
@@ -498,7 +507,7 @@ class _BrandLockup extends StatelessWidget {
               ),
               if (showSubtitle)
                 Text(
-                  'Shared debt and receipts',
+                  l10n.brandSubtitle,
                   maxLines: 1,
                   softWrap: false,
                   overflow: TextOverflow.fade,
@@ -527,6 +536,7 @@ class _MobileBottomNavigation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final currentDestination = context.select<NavigationState, AppDestination>(
       (state) => state.selectedDestination,
     );
@@ -580,9 +590,9 @@ class _MobileBottomNavigation extends StatelessWidget {
                         (destination) => NavigationDestination(
                           icon: Icon(destination.icon),
                           label: switch (destination) {
-                            AppDestination.bills => 'View',
-                            AppDestination.createBill => 'Create',
-                            _ => destination.label,
+                            AppDestination.bills => l10n.view,
+                            AppDestination.createBill => l10n.create,
+                            _ => destination.label(l10n),
                           },
                         ),
                       )

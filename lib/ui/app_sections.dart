@@ -1,8 +1,10 @@
 import 'package:auth0_flutter/auth0_flutter.dart';
 import 'package:debt_display/generated/debt.pb.dart';
+import 'package:debt_display/l10n/generated/app_localizations.dart';
 import 'package:debt_display/state/auth_session_state.dart';
 import 'package:debt_display/state/bill_list_state.dart';
 import 'package:debt_display/state/home_bill_state.dart';
+import 'package:debt_display/state/language_state.dart';
 import 'package:debt_display/state/navigation_state.dart';
 import 'package:debt_display/state/recipient_group_state.dart';
 import 'package:debt_display/state/theme_state.dart';
@@ -197,6 +199,7 @@ class _HomeSectionState extends State<HomeSection> {
     final isAuthenticated = context.select<AuthSessionState, bool>(
       (state) => state.isAuthenticated,
     );
+    final l10n = AppLocalizations.of(context);
     final backendError = context.select<AuthSessionState, String?>(
       (state) => state.backendError,
     );
@@ -226,7 +229,7 @@ class _HomeSectionState extends State<HomeSection> {
                 alignment: WrapAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Recent outstanding bills',
+                    l10n.recentOutstandingBills,
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.w900,
                     ),
@@ -243,7 +246,9 @@ class _HomeSectionState extends State<HomeSection> {
                           );
                         },
                         icon: const Icon(Icons.receipt_long_rounded),
-                        label: Text(widget.isDesktop ? 'View Bills' : 'View'),
+                        label: Text(
+                          widget.isDesktop ? l10n.viewBills : l10n.view,
+                        ),
                       ),
                       FilledButton.icon(
                         key: const ValueKey('open-bill-create-button'),
@@ -254,7 +259,7 @@ class _HomeSectionState extends State<HomeSection> {
                         },
                         icon: const Icon(Icons.add_rounded),
                         label: Text(
-                          widget.isDesktop ? 'Create Bill' : 'Create',
+                          widget.isDesktop ? l10n.createBill : l10n.create,
                         ),
                       ),
                     ],
@@ -264,8 +269,8 @@ class _HomeSectionState extends State<HomeSection> {
               const SizedBox(height: 10),
               Text(
                 isAuthenticated
-                    ? 'The newest unpaid bills you own or take part in.'
-                    : 'Log in to load the bills you own or share with other participants.',
+                    ? l10n.homeAuthenticatedDescription
+                    : l10n.homeLoggedOutDescription,
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   color: mutedForegroundColor(context, alpha: 0.88),
                   height: 1.45,
@@ -277,7 +282,7 @@ class _HomeSectionState extends State<HomeSection> {
                   key: const ValueKey('home-login-button'),
                   onPressed: context.read<AuthSessionState>().login,
                   icon: const Icon(Icons.login_rounded),
-                  label: const Text('Log in to view bills'),
+                  label: Text(l10n.loginToViewBills),
                 )
               else if (homeState.isLoading && homeState.receipts.isEmpty)
                 const Center(
@@ -288,7 +293,7 @@ class _HomeSectionState extends State<HomeSection> {
                 )
               else if (homeState.receipts.isEmpty)
                 Text(
-                  'No unpaid bills right now.',
+                  l10n.noUnpaidBills,
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     color: mutedForegroundColor(context, alpha: 0.88),
                   ),
@@ -303,7 +308,12 @@ class _HomeSectionState extends State<HomeSection> {
                     ),
                     child: _HomeBillTile(
                       receipt: entry.value,
-                      roleLabel: billListState.roleLabelFor(entry.value),
+                      roleLabel: _homeRoleLabel(
+                        entry.value,
+                        billListState,
+                        l10n,
+                      ),
+                      isOwner: _homeIsOwner(entry.value, billListState),
                       amountLabel: _homeAmountLabel(
                         entry.value,
                         locale,
@@ -312,6 +322,7 @@ class _HomeSectionState extends State<HomeSection> {
                       dueLabel: _homeDueLabel(
                         entry.value,
                         materialLocalizations,
+                        l10n,
                       ),
                       onTap: () => showBillDetailModal(
                         context,
@@ -336,14 +347,14 @@ class _HomeSectionState extends State<HomeSection> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Total still owed',
+                l10n.totalStillOwed,
                 style: Theme.of(
                   context,
                 ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 10),
               Text(
-                'Combined balance across all unpaid bills you take part in.',
+                l10n.totalStillOwedDescription,
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   color: mutedForegroundColor(context, alpha: 0.88),
                   height: 1.45,
@@ -367,7 +378,7 @@ class _HomeSectionState extends State<HomeSection> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '${homeState.unpaidBillCount} unpaid bills need your share',
+                      l10n.unpaidBillsNeedShare(homeState.unpaidBillCount),
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         color: mutedForegroundColor(context, alpha: 0.8),
                         fontWeight: FontWeight.w700,
@@ -413,7 +424,8 @@ class ProfileSection extends StatelessWidget {
               ? const _LoggedOutProfileCard()
               : _LoggedInProfileCard(
                   credentials: authView.credentials!,
-                  displayName: authView.displayName ?? 'User',
+                  displayName:
+                      authView.displayName ?? AppLocalizations.of(context).user,
                 ),
         ),
         if (authView.backendError != null) ...[
@@ -439,6 +451,7 @@ class MenuSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final authView = context
         .select<
           AuthSessionState,
@@ -451,37 +464,34 @@ class MenuSection extends StatelessWidget {
         );
     final items = [
       (
-        title: 'Home',
-        body: 'Return to the unpaid bill dashboard and overview.',
+        title: l10n.destinationHome,
+        body: l10n.menuHomeDescription,
         icon: Icons.home_rounded,
         destination: AppDestination.home,
       ),
       (
-        title: 'Bills',
-        body:
-            'Open the full bills view with filters, sorting, and pagination controls.',
+        title: l10n.destinationBills,
+        body: l10n.menuBillsDescription,
         icon: Icons.receipt_long_rounded,
         destination: AppDestination.bills,
       ),
       (
-        title: 'Create Bill',
-        body:
-            'Create a bill with tags, splits, notes, and uploaded receipt files.',
+        title: l10n.destinationCreateBill,
+        body: l10n.menuCreateBillDescription,
         icon: Icons.add_circle_rounded,
         destination: AppDestination.createBill,
       ),
       (
-        title: 'Recipient groups',
-        body:
-            'Create shared recipient groups and manage who can receive split bills.',
+        title: l10n.destinationRecipientGroups,
+        body: l10n.menuRecipientGroupsDescription,
         icon: Icons.groups_rounded,
         destination: AppDestination.recipientGroups,
       ),
       (
-        title: 'Profile',
+        title: l10n.destinationProfile,
         body: authView.credentials == null
-            ? 'Open your account details to sign in and inspect your user data.'
-            : 'Review the synced account profile and active session details.',
+            ? l10n.menuProfileLoggedOutDescription
+            : l10n.menuProfileLoggedInDescription,
         icon: Icons.person_rounded,
         destination: AppDestination.profile,
       ),
@@ -495,14 +505,14 @@ class MenuSection extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Menu',
+                l10n.destinationMenu,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.w900,
                 ),
               ),
               const SizedBox(height: 10),
               Text(
-                'Use this overflow area for profile access and appearance settings, especially on mobile where the bottom bar stays compact.',
+                l10n.menuDescription,
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   color: mutedForegroundColor(context, alpha: 0.88),
                   height: 1.45,
@@ -526,6 +536,8 @@ class MenuSection extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               const _ThemeSettingsCard(),
+              const SizedBox(height: 12),
+              const _LanguageSettingsCard(),
             ],
           ),
         ),
@@ -556,37 +568,44 @@ String _homeAmountLabel(
 String _homeDueLabel(
   Receipt receipt,
   MaterialLocalizations materialLocalizations,
+  AppLocalizations l10n,
 ) {
   if (!receipt.hasDueDate()) {
-    return 'No due date';
+    return l10n.noDueDate;
   }
   final dueDate = DateTime.tryParse(receipt.dueDate);
   if (dueDate == null) {
-    return 'No due date';
+    return l10n.noDueDate;
   }
-  return 'Due ${materialLocalizations.formatShortDate(dueDate.toLocal())}';
+  return l10n.dueDateLabel(
+    materialLocalizations.formatShortDate(dueDate.toLocal()),
+  );
 }
 
-String _homeRecipientLabel(Receipt receipt) {
+String _homeRecipientLabel(Receipt receipt, AppLocalizations l10n) {
   if (receipt.hasRecipient() && receipt.recipient.name.trim().isNotEmpty) {
     return receipt.recipient.name;
   }
-  return 'Personal bill';
+  return l10n.personalBill;
 }
 
-String _homeParticipantsLabel(Receipt receipt) {
+String _homeParticipantsLabel(Receipt receipt, AppLocalizations l10n) {
   if (receipt.hasRecipient() && receipt.recipient.members.isNotEmpty) {
-    return receipt.recipient.members.map(_homeUserLabel).join(', ');
+    return receipt.recipient.members
+        .map((user) => _homeUserLabel(user, l10n))
+        .join(', ');
   }
   if (receipt.hasSplit() && receipt.split.recipientShares.isNotEmpty) {
-    return receipt.split.recipientShares.map(_homeShareUserLabel).join(', ');
+    return receipt.split.recipientShares
+        .map((share) => _homeShareUserLabel(share, l10n))
+        .join(', ');
   }
-  return _homeRecipientLabel(receipt);
+  return _homeRecipientLabel(receipt, l10n);
 }
 
-String _homeUserLabel(User user) {
+String _homeUserLabel(User user, AppLocalizations l10n) {
   if (user.deleted) {
-    return 'Deleted User';
+    return l10n.deletedUser;
   }
   if (user.hasName() && user.name.trim().isNotEmpty) {
     return user.name;
@@ -594,20 +613,34 @@ String _homeUserLabel(User user) {
   if (user.hasEmail() && user.email.trim().isNotEmpty) {
     return user.email;
   }
-  return 'User ${user.id}';
+  return '${l10n.user} ${user.id}';
 }
 
-String _homeShareUserLabel(ReceiptRecipientShare share) {
+String _homeShareUserLabel(ReceiptRecipientShare share, AppLocalizations l10n) {
   if (share.hasUser()) {
-    return _homeUserLabel(share.user);
+    return _homeUserLabel(share.user, l10n);
   }
-  return 'User ${share.userId}';
+  return '${l10n.user} ${share.userId}';
+}
+
+bool _homeIsOwner(Receipt receipt, BillListState state) {
+  return state.currentUserId != null &&
+      receipt.ownerId.toInt() == state.currentUserId;
+}
+
+String _homeRoleLabel(
+  Receipt receipt,
+  BillListState state,
+  AppLocalizations l10n,
+) {
+  return _homeIsOwner(receipt, state) ? l10n.owner : l10n.participant;
 }
 
 class _HomeBillTile extends StatelessWidget {
   const _HomeBillTile({
     required this.receipt,
     required this.roleLabel,
+    required this.isOwner,
     required this.dueLabel,
     required this.amountLabel,
     required this.onTap,
@@ -615,17 +648,19 @@ class _HomeBillTile extends StatelessWidget {
 
   final Receipt receipt;
   final String roleLabel;
+  final bool isOwner;
   final String dueLabel;
   final String amountLabel;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final groupLabel = _homeRecipientLabel(receipt);
-    final participantsLabel = _homeParticipantsLabel(receipt);
+    final l10n = AppLocalizations.of(context);
+    final groupLabel = _homeRecipientLabel(receipt, l10n);
+    final participantsLabel = _homeParticipantsLabel(receipt, l10n);
     final filesLabel = receipt.files.length == 1
-        ? '1 file included'
-        : '${receipt.files.length} files included';
+        ? l10n.oneFileIncluded
+        : l10n.filesIncluded(receipt.files.length);
     final panel = GlassPanel.secondary(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
@@ -677,12 +712,12 @@ class _HomeBillTile extends StatelessWidget {
                   children: [
                     _HomeMetaChip(
                       label: roleLabel,
-                      icon: roleLabel == 'Owner'
+                      icon: isOwner
                           ? Icons.badge_rounded
                           : Icons.people_alt_rounded,
                     ),
                     _HomeMetaChip(
-                      label: receipt.isPaid ? 'Paid' : 'Unpaid',
+                      label: receipt.isPaid ? l10n.paid : l10n.unpaid,
                       icon: receipt.isPaid
                           ? Icons.check_circle_rounded
                           : Icons.schedule_rounded,
@@ -976,18 +1011,19 @@ class _LoggedOutProfileCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Profile',
+          l10n.profileLoggedOutTitle,
           style: Theme.of(
             context,
           ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
         ),
         const SizedBox(height: 12),
         Text(
-          'Sign in to load your Auth0 identity, sync it with the backend, and expose the account controls in this section.',
+          l10n.profileLoggedOutDescription,
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
             color: mutedForegroundColor(context, alpha: 0.88),
             height: 1.5,
@@ -999,7 +1035,7 @@ class _LoggedOutProfileCard extends StatelessWidget {
             context.read<AuthSessionState>().login();
           },
           icon: const Icon(Icons.login_rounded),
-          label: const Text('Log in to continue'),
+          label: Text(l10n.loginToContinue),
         ),
       ],
     );
@@ -1017,6 +1053,7 @@ class _LoggedInProfileCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1049,7 +1086,7 @@ class _LoggedInProfileCard extends StatelessWidget {
             context.read<AuthSessionState>().logout();
           },
           icon: const Icon(Icons.logout_rounded),
-          label: const Text('Log out'),
+          label: Text(l10n.logout),
         ),
       ],
     );
@@ -1067,11 +1104,12 @@ class _ProfileInfoTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final rows = [
-      ('Email', credentials.user.email ?? 'N/A'),
-      ('Display name', displayName),
-      ('Nickname', credentials.user.nickname ?? 'N/A'),
-      ('User ID', credentials.user.sub),
+      (l10n.emailLabel, credentials.user.email ?? l10n.notAvailable),
+      (l10n.displayNameLabel, displayName),
+      (l10n.nicknameLabel, credentials.user.nickname ?? l10n.notAvailable),
+      (l10n.userIdLabel, credentials.user.sub),
     ];
 
     return Column(
@@ -1201,6 +1239,7 @@ class _RecipientGroupsCardState extends State<_RecipientGroupsCard> {
   @override
   Widget build(BuildContext context) {
     final state = context.watch<RecipientGroupState>();
+    final l10n = AppLocalizations.of(context);
 
     return GlassPanel.secondary(
       width: double.infinity,
@@ -1216,7 +1255,7 @@ class _RecipientGroupsCardState extends State<_RecipientGroupsCard> {
             alignment: WrapAlignment.spaceBetween,
             children: [
               Text(
-                'Recipient groups',
+                l10n.destinationRecipientGroups,
                 style: Theme.of(
                   context,
                 ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
@@ -1232,7 +1271,7 @@ class _RecipientGroupsCardState extends State<_RecipientGroupsCard> {
                           ? null
                           : state.refresh,
                       icon: const Icon(Icons.refresh_rounded),
-                      label: const Text('Refresh'),
+                      label: Text(l10n.refresh),
                     ),
                     FilledButton.icon(
                       key: const ValueKey('recipient-groups-create-button'),
@@ -1240,7 +1279,7 @@ class _RecipientGroupsCardState extends State<_RecipientGroupsCard> {
                           ? null
                           : () => _showRecipientGroupDialog(context),
                       icon: const Icon(Icons.group_add_rounded),
-                      label: const Text('Create'),
+                      label: Text(l10n.create),
                     ),
                   ],
                 ),
@@ -1248,7 +1287,7 @@ class _RecipientGroupsCardState extends State<_RecipientGroupsCard> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Create shared recipient groups and manage who can receive split bills.',
+            l10n.recipientGroupsDescription,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: mutedForegroundColor(context, alpha: 0.88),
             ),
@@ -1261,7 +1300,7 @@ class _RecipientGroupsCardState extends State<_RecipientGroupsCard> {
                 context.read<AuthSessionState>().login();
               },
               icon: const Icon(Icons.login_rounded),
-              label: const Text('Log in to manage groups'),
+              label: Text(l10n.loginToManageGroups),
             )
           else ...[
             if (state.isLoadingGroups)
@@ -1279,7 +1318,7 @@ class _RecipientGroupsCardState extends State<_RecipientGroupsCard> {
             ],
             if (!state.isLoadingGroups && state.groups.isEmpty)
               Text(
-                'No recipient groups yet.',
+                l10n.noRecipientGroups,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: mutedForegroundColor(context, alpha: 0.82),
                 ),
@@ -1322,6 +1361,7 @@ class _RecipientGroupTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = context.watch<RecipientGroupState>();
+    final l10n = AppLocalizations.of(context);
     final isOwner = group.ownerId.toInt() == state.currentUserId;
 
     return DecoratedBox(
@@ -1347,12 +1387,12 @@ class _RecipientGroupTile extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                _RoleBadge(label: isOwner ? 'Owner' : 'Member'),
+                _RoleBadge(label: isOwner ? l10n.owner : l10n.member),
                 if (isOwner) ...[
                   const SizedBox(width: 4),
                   IconButton(
                     key: ValueKey('recipient-group-edit-${group.id}'),
-                    tooltip: 'Edit group',
+                    tooltip: l10n.editGroup,
                     onPressed: state.isMutating
                         ? null
                         : () =>
@@ -1361,7 +1401,7 @@ class _RecipientGroupTile extends StatelessWidget {
                   ),
                   IconButton(
                     key: ValueKey('recipient-group-delete-${group.id}'),
-                    tooltip: 'Delete group',
+                    tooltip: l10n.deleteGroup,
                     onPressed: state.isMutating
                         ? null
                         : () => _confirmDelete(context, group),
@@ -1383,7 +1423,7 @@ class _RecipientGroupTile extends StatelessWidget {
             const SizedBox(height: 10),
             if (group.members.isEmpty)
               Text(
-                'No members',
+                l10n.noMembers,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: mutedForegroundColor(context, alpha: 0.78),
                   fontWeight: FontWeight.w700,
@@ -1404,22 +1444,21 @@ class _RecipientGroupTile extends StatelessWidget {
   }
 
   Future<void> _confirmDelete(BuildContext context, Recipient group) async {
+    final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Delete recipient group?'),
-        content: Text(
-          'Delete ${group.name}? Existing bills will no longer point to it.',
-        ),
+        title: Text(l10n.deleteRecipientGroupQuestion),
+        content: Text(l10n.deleteRecipientGroupContent(group.name)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             key: const ValueKey('recipient-group-confirm-delete-button'),
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Delete'),
+            child: Text(l10n.delete),
           ),
         ],
       ),
@@ -1474,9 +1513,10 @@ class _RecipientGroupEditorDialogState
   @override
   Widget build(BuildContext context) {
     final state = context.watch<RecipientGroupState>();
+    final l10n = AppLocalizations.of(context);
     final title = widget.group == null
-        ? 'Create recipient group'
-        : 'Edit recipient group';
+        ? l10n.createRecipientGroup
+        : l10n.editRecipientGroup;
 
     return AlertDialog(
       title: Text(title),
@@ -1490,19 +1530,19 @@ class _RecipientGroupEditorDialogState
               TextField(
                 key: const ValueKey('recipient-group-name-field'),
                 controller: _nameController,
-                decoration: const InputDecoration(labelText: 'Group name'),
+                decoration: InputDecoration(labelText: l10n.groupName),
                 textInputAction: TextInputAction.next,
               ),
               const SizedBox(height: 12),
               TextField(
                 key: const ValueKey('recipient-group-description-field'),
                 controller: _descriptionController,
-                decoration: const InputDecoration(labelText: 'Description'),
+                decoration: InputDecoration(labelText: l10n.description),
                 maxLines: 2,
               ),
               const SizedBox(height: 18),
               Text(
-                'Members',
+                l10n.members,
                 style: Theme.of(
                   context,
                 ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
@@ -1510,7 +1550,7 @@ class _RecipientGroupEditorDialogState
               const SizedBox(height: 8),
               if (_selectedMembers.isEmpty)
                 Text(
-                  'No members selected',
+                  l10n.noMembersSelected,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: mutedForegroundColor(context, alpha: 0.82),
                   ),
@@ -1523,7 +1563,7 @@ class _RecipientGroupEditorDialogState
                       .map(
                         (user) => InputChip(
                           key: ValueKey('recipient-selected-member-${user.id}'),
-                          label: Text(_userLabel(user)),
+                          label: Text(_userLabel(user, l10n)),
                           deleteIcon: Icon(
                             Icons.close_rounded,
                             key: ValueKey(
@@ -1544,8 +1584,8 @@ class _RecipientGroupEditorDialogState
                 key: const ValueKey('recipient-user-search-field'),
                 controller: _searchController,
                 decoration: InputDecoration(
-                  labelText: 'Find user',
-                  helperText: 'Type at least 3 characters from name or email.',
+                  labelText: l10n.findUser,
+                  helperText: l10n.findUserHelper,
                   suffixIcon: state.isSearchingUsers
                       ? const Padding(
                           padding: EdgeInsets.all(14),
@@ -1590,7 +1630,7 @@ class _RecipientGroupEditorDialogState
           onPressed: state.isMutating
               ? null
               : () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(l10n.cancel),
         ),
         FilledButton(
           key: const ValueKey('recipient-group-save-button'),
@@ -1601,7 +1641,7 @@ class _RecipientGroupEditorDialogState
                   height: 18,
                   child: CircularProgressIndicator(strokeWidth: 2.4),
                 )
-              : const Text('Save'),
+              : Text(l10n.save),
         ),
       ],
     );
@@ -1633,17 +1673,18 @@ class _UserSearchResultTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return ListTile(
       key: ValueKey('recipient-user-search-result-${user.id}'),
       contentPadding: EdgeInsets.zero,
       leading: const Icon(Icons.person_add_alt_1_rounded),
-      title: Text(_userLabel(user)),
-      subtitle: Text(_userSubtitle(user)),
+      title: Text(_userLabel(user, l10n)),
+      subtitle: Text(_userSubtitle(user, l10n)),
       trailing: isSelected
           ? const Icon(Icons.check_circle_rounded, color: brandPrimary)
           : IconButton(
               key: ValueKey('recipient-user-add-${user.id}'),
-              tooltip: 'Add member',
+              tooltip: l10n.addMember,
               onPressed: onAdd,
               icon: const Icon(Icons.add_circle_outline_rounded),
             ),
@@ -1659,9 +1700,10 @@ class _UserChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Chip(
       avatar: const Icon(Icons.person_rounded, size: 18),
-      label: Text(_userLabel(user)),
+      label: Text(_userLabel(user, l10n)),
     );
   }
 }
@@ -1708,9 +1750,9 @@ class _InlineError extends StatelessWidget {
   }
 }
 
-String _userLabel(User user) {
+String _userLabel(User user, AppLocalizations l10n) {
   if (user.deleted) {
-    return 'Deleted User';
+    return l10n.deletedUser;
   }
   if (user.hasName() && user.name.trim().isNotEmpty) {
     return user.name;
@@ -1718,17 +1760,17 @@ String _userLabel(User user) {
   if (user.hasEmail() && user.email.trim().isNotEmpty) {
     return user.email;
   }
-  return 'User ${user.id}';
+  return '${l10n.user} ${user.id}';
 }
 
-String _userSubtitle(User user) {
+String _userSubtitle(User user, AppLocalizations l10n) {
   if (user.deleted) {
-    return 'Deleted account';
+    return l10n.deletedAccount;
   }
   if (user.hasEmail() && user.email.trim().isNotEmpty) {
     return user.email;
   }
-  return 'ID ${user.id}';
+  return '${l10n.id} ${user.id}';
 }
 
 class _ThemeSettingsCard extends StatelessWidget {
@@ -1736,6 +1778,7 @@ class _ThemeSettingsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final themeView = context
         .select<
           ThemeState,
@@ -1760,14 +1803,14 @@ class _ThemeSettingsCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Appearance',
+            l10n.appearanceTitle,
             style: Theme.of(
               context,
             ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 8),
           Text(
-            'Choose a light, auto, or dark theme mode. Dark mode uses your saved palette, with Dracula as the default fallback.',
+            l10n.appearanceDescription,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: mutedForegroundColor(context, alpha: 0.88),
             ),
@@ -1779,7 +1822,7 @@ class _ThemeSettingsCard extends StatelessWidget {
                 .map(
                   (mode) => ButtonSegment<AppThemeMode>(
                     value: mode,
-                    label: Text(mode.label),
+                    label: Text(_themeModeLabel(mode, l10n)),
                   ),
                 )
                 .toList(),
@@ -1791,7 +1834,7 @@ class _ThemeSettingsCard extends StatelessWidget {
           if (themeView.showDarkPalettePicker) ...[
             const SizedBox(height: 18),
             Text(
-              'Dark palette',
+              l10n.darkPalette,
               style: Theme.of(
                 context,
               ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
@@ -1817,4 +1860,72 @@ class _ThemeSettingsCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _LanguageSettingsCard extends StatelessWidget {
+  const _LanguageSettingsCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final languageMode = context.select<LanguageState, AppLanguageMode>(
+      (state) => state.languageMode,
+    );
+
+    return GlassPanel.secondary(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      borderRadius: const BorderRadius.all(Radius.circular(24)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            l10n.languageTitle,
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            l10n.languageDescription,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: mutedForegroundColor(context, alpha: 0.88),
+            ),
+          ),
+          const SizedBox(height: 18),
+          SegmentedButton<AppLanguageMode>(
+            showSelectedIcon: false,
+            segments: AppLanguageMode.values
+                .map(
+                  (mode) => ButtonSegment<AppLanguageMode>(
+                    value: mode,
+                    label: Text(_languageModeLabel(mode, l10n)),
+                  ),
+                )
+                .toList(),
+            selected: {languageMode},
+            onSelectionChanged: (selection) {
+              context.read<LanguageState>().setLanguageMode(selection.first);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _themeModeLabel(AppThemeMode mode, AppLocalizations l10n) {
+  return switch (mode) {
+    AppThemeMode.light => l10n.themeLight,
+    AppThemeMode.auto => l10n.themeAuto,
+    AppThemeMode.dark => l10n.themeDark,
+  };
+}
+
+String _languageModeLabel(AppLanguageMode mode, AppLocalizations l10n) {
+  return switch (mode) {
+    AppLanguageMode.auto => l10n.languageAuto,
+    AppLanguageMode.english => l10n.languageEnglish,
+    AppLanguageMode.german => l10n.languageGerman,
+  };
 }

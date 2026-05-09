@@ -12,10 +12,12 @@ import 'package:debt_display/state/auth_session_state.dart';
 import 'package:debt_display/state/bill_creation_state.dart';
 import 'package:debt_display/state/bill_list_state.dart';
 import 'package:debt_display/state/home_bill_state.dart';
+import 'package:debt_display/state/language_state.dart';
 import 'package:debt_display/state/navigation_state.dart';
 import 'package:debt_display/state/recipient_group_state.dart';
 import 'package:debt_display/state/theme_state.dart';
 import 'package:debt_display/ui/app_shell.dart';
+import 'package:debt_display/l10n/generated/app_localizations.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -33,6 +35,7 @@ class MyApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => NavigationState()),
         ChangeNotifierProvider(create: (_) => ThemeState()..load()),
+        ChangeNotifierProvider(create: (_) => LanguageState()..load()),
         ChangeNotifierProvider(
           create: (_) => AuthSessionState(
             auth0Service: Auth0Service(),
@@ -136,6 +139,9 @@ class _AppRootState extends State<_AppRoot> {
     final darkTheme = context.select<ThemeState, ThemeData>(
       (state) => state.darkTheme,
     );
+    final locale = context.select<LanguageState, Locale?>(
+      (state) => state.locale,
+    );
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -145,9 +151,14 @@ class _AppRootState extends State<_AppRoot> {
 
     return MaterialApp(
       title: 'debt_display',
+      onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
       debugShowCheckedModeBanner: false,
-      localizationsDelegates: GlobalMaterialLocalizations.delegates,
-      supportedLocales: const [Locale('en'), Locale('de')],
+      locale: locale,
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        ...GlobalMaterialLocalizations.delegates,
+      ],
+      supportedLocales: AppLocalizations.supportedLocales,
       themeMode: themeMode,
       theme: lightTheme,
       darkTheme: darkTheme,
