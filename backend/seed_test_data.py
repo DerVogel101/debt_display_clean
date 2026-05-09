@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from backend import db
 
@@ -357,17 +358,50 @@ async def _get_or_create_recipient(
         select(db.Recipient)
         .where(db.Recipient.owner_id == owner_id)
         .where(db.Recipient.name == name)
+        .options(selectinload(db.Recipient.members))
     )
     recipient = result.scalar_one_or_none()
+    members = await _active_users_for_member_ids(session, member_ids)
     if recipient is None:
-        recipient = await db.create_recipient(
-            session=session,
+        recipient = db.Recipient(
             owner_id=owner_id,
             name=name,
             description=description,
-            member_ids=member_ids,
         )
+        recipient.members = members
+        session.add(recipient)
+        await session.flush()
+    else:
+        recipient.description = description
+        recipient.members = members
+        await session.flush()
     return recipient
+
+
+async def _active_users_for_member_ids(
+    session: AsyncSession,
+    member_ids: list[int],
+) -> list[db.User]:
+    if not member_ids:
+        return []
+
+    result = await session.execute(select(db.User).where(db.User.id.in_(member_ids)))
+    users_by_id = {user.id: user for user in result.scalars().all()}
+    missing_user_ids = [
+        member_id for member_id in member_ids if member_id not in users_by_id
+    ]
+    if missing_user_ids:
+        raise ValueError(f"Seed recipient member users not found: {missing_user_ids}")
+
+    deleted_user_ids = [
+        member_id for member_id in member_ids if users_by_id[member_id].deleted
+    ]
+    if deleted_user_ids:
+        raise ValueError(
+            f"Deleted users cannot be added to demo recipient groups: {deleted_user_ids}"
+        )
+
+    return [users_by_id[member_id] for member_id in member_ids]
 
 
 async def _get_or_create_receipt(

@@ -427,6 +427,63 @@ class TestDataSeedTests(AsyncDatabaseTestCase):
         self.assertEqual(len(owner_zero_receipt.recipient_shares), 2)
         self.assertGreater(len(visible_receipts.receipts), 10)
 
+    async def test_seed_test_data_reconciles_members_after_demo_user_delete(self) -> None:
+        first_user = await self._create_user(
+            "auth0|first",
+            "first@example.com",
+            "First User",
+        )
+
+        await seed_test_data.seed_test_data()
+
+        async with db.async_session_maker() as session:
+            deleted_result = await db.delete_user_by_sub(session, "test|alice")
+            await session.commit()
+
+        await seed_test_data.seed_test_data()
+
+        async with db.async_session_maker() as session:
+            active_alice = (
+                await session.execute(
+                    select(db.User).where(db.User.sub == "test|alice")
+                )
+            ).scalar_one()
+            deleted_alice = await db.get_user_by_id(session, deleted_result.user_id)
+            household = (
+                await session.execute(
+                    select(db.Recipient)
+                    .where(db.Recipient.owner_id == first_user.id)
+                    .where(db.Recipient.name == "Demo household")
+                    .options(selectinload(db.Recipient.members))
+                )
+            ).scalar_one()
+            rent_receipt = (
+                await session.execute(
+                    select(db.Receipt)
+                    .where(db.Receipt.owner_id == first_user.id)
+                    .where(db.Receipt.title == "Demo rent top-up")
+                    .options(selectinload(db.Receipt.recipient_shares))
+                )
+            ).scalar_one()
+
+        self.assertIsNotNone(deleted_alice)
+        self.assertTrue(deleted_alice.deleted)
+        self.assertFalse(active_alice.deleted)
+        self.assertEqual(active_alice.email, "alice.demo@example.com")
+        self.assertIn(active_alice.id, [member.id for member in household.members])
+        self.assertNotIn(
+            deleted_result.user_id,
+            [member.id for member in household.members],
+        )
+        self.assertIn(
+            active_alice.id,
+            [share.user_id for share in rent_receipt.recipient_shares],
+        )
+        self.assertNotIn(
+            deleted_result.user_id,
+            [share.user_id for share in rent_receipt.recipient_shares],
+        )
+
 
 class SchemaCompatibilityTests(AsyncDatabaseTestCase):
     async def test_schema_migration_backfills_participant_payments(self) -> None:
