@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:debt_display/generated/debt.pb.dart';
+import 'package:debt_display/l10n/generated/app_localizations.dart';
 import 'package:debt_display/state/auth_session_state.dart';
 import 'package:debt_display/state/bill_creation_state.dart';
 import 'package:debt_display/state/bill_list_state.dart';
@@ -104,6 +105,7 @@ class _BillCreationSectionState extends State<BillCreationSection> {
     final isAuthenticated = context.select<AuthSessionState, bool>(
       (state) => state.isAuthenticated,
     );
+    final l10n = AppLocalizations.of(context);
     final state = context.watch<BillCreationState>();
     final groupState = context.watch<RecipientGroupState>();
 
@@ -122,17 +124,17 @@ class _BillCreationSectionState extends State<BillCreationSection> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _HeaderRow(
-              title: 'Create Bill',
+              title: l10n.createBill,
               trailing: IconButton(
                 key: const ValueKey('bill-create-refresh-button'),
-                tooltip: 'Refresh bill form data',
+                tooltip: l10n.refreshBillFormData,
                 onPressed: state.isLoading ? null : state.ensureLoaded,
                 icon: const Icon(Icons.refresh_rounded),
               ),
             ),
             const SizedBox(height: 10),
             Text(
-              'Create a shared bill, split it by group member, and attach receipts.',
+              l10n.createBillDescription,
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                 color: mutedForegroundColor(context, alpha: 0.88),
                 height: 1.45,
@@ -203,8 +205,8 @@ class _BillCreationSectionState extends State<BillCreationSection> {
               controller: _notesController,
               minLines: 4,
               maxLines: 8,
-              decoration: const InputDecoration(
-                labelText: 'Notes',
+              decoration: InputDecoration(
+                labelText: l10n.notes,
                 alignLabelWithHint: true,
               ),
             ),
@@ -231,7 +233,7 @@ class _BillCreationSectionState extends State<BillCreationSection> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.check_rounded),
-                label: const Text('Create Bill'),
+                label: Text(l10n.createBill),
               ),
             ),
           ],
@@ -290,11 +292,12 @@ class _BillCreationSectionState extends State<BillCreationSection> {
   }
 
   Future<void> _pickEmoji() async {
+    final l10n = AppLocalizations.of(context);
     await showDialog<void>(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text('Pick emoji'),
+          title: Text(l10n.pickEmoji),
           content: SizedBox(
             width: 360,
             height: 380,
@@ -313,12 +316,13 @@ class _BillCreationSectionState extends State<BillCreationSection> {
   }
 
   Future<void> _pickColor() async {
+    final l10n = AppLocalizations.of(context);
     var nextColor = _tagColor;
     await showDialog<void>(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text('Pick tag color'),
+          title: Text(l10n.pickTagColor),
           content: SingleChildScrollView(
             child: ColorPicker(
               color: nextColor,
@@ -335,7 +339,7 @@ class _BillCreationSectionState extends State<BillCreationSection> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Cancel'),
+              child: Text(l10n.cancel),
             ),
             FilledButton(
               onPressed: () {
@@ -344,7 +348,7 @@ class _BillCreationSectionState extends State<BillCreationSection> {
                 });
                 Navigator.of(dialogContext).pop();
               },
-              child: const Text('Apply'),
+              child: Text(l10n.apply),
             ),
           ],
         );
@@ -538,6 +542,7 @@ class _BillCreationSectionState extends State<BillCreationSection> {
   }
 
   Future<void> _submit() async {
+    final l10n = AppLocalizations.of(context);
     final valid = _formKey.currentState?.validate() ?? false;
     if (!valid) {
       return;
@@ -547,9 +552,9 @@ class _BillCreationSectionState extends State<BillCreationSection> {
       return;
     }
     if (_selectedGroupId != null && _totalSharePercentDelta().abs() > 0.01) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Shares must add up to 100%.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.sharesMustAddTo100)));
       return;
     }
 
@@ -594,7 +599,7 @@ class _BillCreationSectionState extends State<BillCreationSection> {
     context.read<NavigationState>().selectDestination(AppDestination.bills);
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(const SnackBar(content: Text('Bill created.')));
+    ).showSnackBar(SnackBar(content: Text(l10n.billCreated)));
   }
 
   double _totalSharePercentDelta() {
@@ -651,20 +656,21 @@ class _LoggedOutBillCreationSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return PageSection(
       padding: EdgeInsets.all(isDesktop ? 28 : 22),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Create Bill',
+            l10n.createBill,
             style: Theme.of(
               context,
             ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
           ),
           const SizedBox(height: 10),
           Text(
-            'Log in to create bills and upload receipts.',
+            l10n.loginToCreateBills,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
               color: mutedForegroundColor(context, alpha: 0.88),
               height: 1.45,
@@ -675,7 +681,7 @@ class _LoggedOutBillCreationSection extends StatelessWidget {
             key: const ValueKey('bill-create-login-button'),
             onPressed: context.read<AuthSessionState>().login,
             icon: const Icon(Icons.login_rounded),
-            label: const Text('Log in to create bills'),
+            label: Text(l10n.loginToCreateBills),
           ),
         ],
       ),
@@ -702,22 +708,23 @@ class _BasicsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return _SectionBlock(
-      title: 'Details',
+      title: l10n.details,
       child: Column(
         children: [
           TextFormField(
             key: const ValueKey('bill-create-title-field'),
             controller: titleController,
             maxLength: BillCreationState.maxTitleLength,
-            decoration: const InputDecoration(labelText: 'Title'),
+            decoration: InputDecoration(labelText: l10n.title),
             validator: (value) {
               final text = value?.trim() ?? '';
               if (text.isEmpty) {
-                return 'Title is required.';
+                return l10n.titleRequired;
               }
               if (text.length > BillCreationState.maxTitleLength) {
-                return 'Title must be 256 characters or fewer.';
+                return l10n.titleTooLong;
               }
               return null;
             },
@@ -727,11 +734,11 @@ class _BasicsSection extends StatelessWidget {
             key: const ValueKey('bill-create-description-field'),
             controller: descriptionController,
             maxLength: BillCreationState.maxDescriptionLength,
-            decoration: const InputDecoration(labelText: 'Short description'),
+            decoration: InputDecoration(labelText: l10n.shortDescription),
             validator: (value) {
               final text = value?.trim() ?? '';
               if (text.length > BillCreationState.maxDescriptionLength) {
-                return 'Description must be 256 characters or fewer.';
+                return l10n.descriptionTooLong;
               }
               return null;
             },
@@ -747,7 +754,7 @@ class _BasicsSection extends StatelessWidget {
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),
-                  decoration: const InputDecoration(labelText: 'Amount'),
+                  decoration: InputDecoration(labelText: l10n.amount),
                   onChanged: onAmountChanged,
                   validator: (value) {
                     final amount = parseLocalizedDecimal(
@@ -755,7 +762,7 @@ class _BasicsSection extends StatelessWidget {
                       Localizations.localeOf(context),
                     );
                     if (amount == null || amount <= 0) {
-                      return 'Enter a valid amount.';
+                      return l10n.validAmountRequired;
                     }
                     return null;
                   },
@@ -766,7 +773,7 @@ class _BasicsSection extends StatelessWidget {
                 child: DropdownButtonFormField<String>(
                   key: const ValueKey('bill-create-currency-field'),
                   initialValue: currency,
-                  decoration: const InputDecoration(labelText: 'Currency'),
+                  decoration: InputDecoration(labelText: l10n.currency),
                   items: const ['EUR', 'USD', 'GBP', 'CHF', 'JPY', 'PLN']
                       .map(
                         (currency) => DropdownMenuItem(
@@ -821,17 +828,18 @@ class _TagsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return _SectionBlock(
-      title: 'Tags',
+      title: l10n.tags,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           TextField(
             key: const ValueKey('bill-create-tag-search-field'),
             controller: searchController,
-            decoration: const InputDecoration(
-              labelText: 'Search recommended tags',
-              prefixIcon: Icon(Icons.search_rounded),
+            decoration: InputDecoration(
+              labelText: l10n.searchRecommendedTags,
+              prefixIcon: const Icon(Icons.search_rounded),
             ),
           ),
           const SizedBox(height: 12),
@@ -853,7 +861,7 @@ class _TagsSection extends StatelessWidget {
                   .toList(growable: false);
               if (visibleExisting.isEmpty && visibleDrafts.isEmpty) {
                 return Text(
-                  query.isEmpty ? 'No recommended tags yet.' : 'No tags match.',
+                  query.isEmpty ? l10n.noRecommendedTags : l10n.noTagsMatch,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: mutedForegroundColor(context, alpha: 0.78),
                   ),
@@ -902,14 +910,14 @@ class _TagsSection extends StatelessWidget {
             children: [
               IconButton.filledTonal(
                 key: const ValueKey('bill-create-tag-emoji-button'),
-                tooltip: 'Pick tag emoji',
+                tooltip: l10n.pickTagEmoji,
                 onPressed: onEmojiTap,
                 icon: Text(tagEmoji),
               ),
               const SizedBox(width: 8),
               IconButton.filledTonal(
                 key: const ValueKey('bill-create-tag-color-button'),
-                tooltip: 'Pick tag color',
+                tooltip: l10n.pickTagColor,
                 onPressed: onColorTap,
                 icon: Icon(Icons.palette_rounded, color: tagColor),
               ),
@@ -919,18 +927,18 @@ class _TagsSection extends StatelessWidget {
                   key: const ValueKey('bill-create-tag-text-field'),
                   controller: tagTextController,
                   maxLength: 256,
-                  decoration: const InputDecoration(
-                    labelText: 'New tag',
+                  decoration: InputDecoration(
+                    labelText: l10n.newTag,
                     counterText: '',
                   ),
                 ),
               ),
               const SizedBox(width: 8),
-              FilledButton.icon(
+              IconButton.filled(
                 key: const ValueKey('bill-create-add-tag-button'),
                 onPressed: onAddTag,
+                tooltip: l10n.add,
                 icon: const Icon(Icons.add_rounded),
-                label: const Text('Add'),
               ),
             ],
           ),
@@ -995,19 +1003,21 @@ class _GroupAndSharesSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return _SectionBlock(
-      title: 'Group and shares',
+      title: l10n.groupAndShares,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           DropdownButtonFormField<int?>(
             key: const ValueKey('bill-create-group-field'),
             initialValue: selectedGroupId,
-            decoration: const InputDecoration(labelText: 'Group'),
+            isExpanded: true,
+            decoration: InputDecoration(labelText: l10n.group),
             items: [
-              const DropdownMenuItem<int?>(
+              DropdownMenuItem<int?>(
                 value: null,
-                child: Text('Personal bill'),
+                child: Text(l10n.personalBill),
               ),
               ...groups.map(
                 (group) => DropdownMenuItem<int?>(
@@ -1021,7 +1031,7 @@ class _GroupAndSharesSection extends StatelessWidget {
           const SizedBox(height: 16),
           _ShareRow(
             key: const ValueKey('bill-create-owner-share-row'),
-            label: 'Owner',
+            label: l10n.owner,
             amountFormat: amountFormat,
             percentController: ownerPercentController,
             amountController: ownerAmountController,
@@ -1034,7 +1044,7 @@ class _GroupAndSharesSection extends StatelessWidget {
                 padding: const EdgeInsets.only(top: 12),
                 child: _ShareRow(
                   key: ValueKey('bill-create-member-${member.id.toInt()}-row'),
-                  label: _userLabel(member),
+                  label: _userLabel(member, l10n),
                   amountFormat: amountFormat,
                   percentController:
                       percentControllers[member.id.toInt()] ??
@@ -1072,11 +1082,12 @@ class _ShareTotalIndicator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final complete = delta.abs() <= 0.01;
+    final l10n = AppLocalizations.of(context);
     final label = complete
-        ? '100% complete'
+        ? l10n.complete100
         : delta < 0
-        ? 'Need +${percentFormatter(-delta)}%'
-        : 'Reduce ${percentFormatter(delta)}%';
+        ? l10n.needPercent(percentFormatter(-delta))
+        : l10n.reducePercent(percentFormatter(delta));
     final color = complete ? Colors.green : Theme.of(context).colorScheme.error;
     return Row(
       key: const ValueKey('bill-create-share-total-indicator'),
@@ -1180,8 +1191,9 @@ class _AttachmentsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return _SectionBlock(
-      title: 'Files',
+      title: l10n.files,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1193,20 +1205,20 @@ class _AttachmentsSection extends StatelessWidget {
                 key: const ValueKey('bill-create-upload-file-button'),
                 onPressed: isPickingFile ? null : onUploadFiles,
                 icon: const Icon(Icons.upload_file_rounded),
-                label: const Text('Upload'),
+                label: Text(l10n.upload),
               ),
               OutlinedButton.icon(
                 key: const ValueKey('bill-create-camera-button'),
                 onPressed: isDesktop || isPickingCamera ? null : onTakePicture,
                 icon: const Icon(Icons.photo_camera_rounded),
-                label: const Text('Take picture'),
+                label: Text(l10n.takePicture),
               ),
             ],
           ),
           if (isDesktop) ...[
             const SizedBox(height: 8),
             Text(
-              'Take picture is available on mobile browsers so iOS can open the native camera flow.',
+              l10n.takePictureMobileOnly,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: mutedForegroundColor(context, alpha: 0.78),
                 fontWeight: FontWeight.w600,
@@ -1225,14 +1237,14 @@ class _AttachmentsSection extends StatelessWidget {
                     Expanded(
                       child: TextField(
                         controller: attachment.filenameController,
-                        decoration: const InputDecoration(
-                          labelText: 'Filename',
+                        decoration: InputDecoration(
+                          labelText: l10n.filename,
                           isDense: true,
                         ),
                       ),
                     ),
                     IconButton(
-                      tooltip: 'Remove file',
+                      tooltip: l10n.removeFile,
                       onPressed: () => onRemove(attachment),
                       icon: const Icon(Icons.close_rounded),
                     ),
@@ -1380,9 +1392,9 @@ IconData _fileIcon(String? contentType) {
   return Icons.insert_drive_file_rounded;
 }
 
-String _userLabel(User user) {
+String _userLabel(User user, AppLocalizations l10n) {
   if (user.deleted) {
-    return 'Deleted User';
+    return l10n.deletedUser;
   }
   if (user.hasName() && user.name.trim().isNotEmpty) {
     return user.name;
@@ -1390,7 +1402,7 @@ String _userLabel(User user) {
   if (user.hasEmail() && user.email.trim().isNotEmpty) {
     return user.email;
   }
-  return 'User ${user.id}';
+  return '${l10n.user} ${user.id}';
 }
 
 bool _sameTagText(String left, String right) {

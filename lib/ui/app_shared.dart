@@ -1,21 +1,32 @@
 import 'package:auth0_flutter/auth0_flutter.dart';
 import 'package:debt_display/config/app_config.dart';
+import 'package:debt_display/l10n/generated/app_localizations.dart';
 import 'package:debt_display/state/auth_session_state.dart';
 import 'package:debt_display/theme/app_themes.dart';
 import 'package:flutter/material.dart';
 
 enum AppDestination {
-  home('Home', Icons.home_rounded),
-  bills('Bills', Icons.receipt_long_rounded),
-  createBill('Create Bill', Icons.add_circle_rounded),
-  recipientGroups('Recipient groups', Icons.groups_rounded),
-  profile('Profile', Icons.person_rounded),
-  menu('Menu', Icons.menu_rounded);
+  home(Icons.home_rounded),
+  bills(Icons.receipt_long_rounded),
+  createBill(Icons.add_circle_rounded),
+  recipientGroups(Icons.groups_rounded),
+  profile(Icons.person_rounded),
+  menu(Icons.menu_rounded);
 
-  const AppDestination(this.label, this.icon);
+  const AppDestination(this.icon);
 
-  final String label;
   final IconData icon;
+}
+
+extension AppDestinationLocalizations on AppDestination {
+  String label(AppLocalizations l10n) => switch (this) {
+    AppDestination.home => l10n.destinationHome,
+    AppDestination.bills => l10n.destinationBills,
+    AppDestination.createBill => l10n.destinationCreateBill,
+    AppDestination.recipientGroups => l10n.destinationRecipientGroups,
+    AppDestination.profile => l10n.destinationProfile,
+    AppDestination.menu => l10n.destinationMenu,
+  };
 }
 
 class PageSection extends StatelessWidget {
@@ -124,7 +135,7 @@ class ErrorSection extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              'Backend authentication failed: $message',
+              AppLocalizations.of(context).backendAuthFailed(message),
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                 color: scheme.error,
                 fontWeight: FontWeight.w600,
@@ -156,7 +167,7 @@ class LoadingSection extends StatelessWidget {
           ),
           const SizedBox(height: 18),
           Text(
-            'Restoring session...',
+            AppLocalizations.of(context).loadingSession,
             style: Theme.of(
               context,
             ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),

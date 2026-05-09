@@ -1,4 +1,5 @@
 import 'package:debt_display/generated/debt.pb.dart';
+import 'package:debt_display/l10n/generated/app_localizations.dart';
 import 'package:debt_display/services/debt_backend_service.dart';
 import 'package:debt_display/services/file_preview.dart';
 import 'package:debt_display/services/file_viewer.dart';
@@ -168,20 +169,21 @@ class _LoggedOutBillsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return PageSection(
       padding: EdgeInsets.all(isDesktop ? 28 : 22),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Bills',
+            l10n.destinationBills,
             style: Theme.of(
               context,
             ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
           ),
           const SizedBox(height: 10),
           Text(
-            'Log in to load the bills you own or share with other participants.',
+            l10n.homeLoggedOutDescription,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
               color: mutedForegroundColor(context, alpha: 0.88),
               height: 1.45,
@@ -194,7 +196,7 @@ class _LoggedOutBillsSection extends StatelessWidget {
               context.read<AuthSessionState>().login();
             },
             icon: const Icon(Icons.login_rounded),
-            label: const Text('Log in to view bills'),
+            label: Text(l10n.loginToViewBills),
           ),
         ],
       ),
@@ -227,6 +229,7 @@ class _BillsFilterCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final activeFilterCount = state.appliedQuery.activeFilterCount;
 
     return PageSection(
@@ -241,7 +244,7 @@ class _BillsFilterCard extends StatelessWidget {
             alignment: WrapAlignment.spaceBetween,
             children: [
               Text(
-                'Bills',
+                l10n.destinationBills,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.w900,
                 ),
@@ -260,7 +263,7 @@ class _BillsFilterCard extends StatelessWidget {
                     key: const ValueKey('bills-refresh-button'),
                     onPressed: state.isLoading ? null : state.refresh,
                     icon: const Icon(Icons.refresh_rounded),
-                    label: const Text('Refresh'),
+                    label: Text(l10n.refresh),
                   ),
                   FilledButton.tonalIcon(
                     key: const ValueKey('bills-filters-toggle-button'),
@@ -272,8 +275,8 @@ class _BillsFilterCard extends StatelessWidget {
                     ),
                     label: Text(
                       activeFilterCount > 0
-                          ? 'Filters ($activeFilterCount)'
-                          : 'Filters',
+                          ? l10n.filtersCount(activeFilterCount)
+                          : l10n.filters,
                     ),
                   ),
                 ],
@@ -282,7 +285,7 @@ class _BillsFilterCard extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            'Browse every receipt you can access as owner, participant, or both.',
+            l10n.billsDescription,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
               color: mutedForegroundColor(context, alpha: 0.88),
               height: 1.45,
@@ -291,23 +294,23 @@ class _BillsFilterCard extends StatelessWidget {
           if (filtersExpanded) ...[
             const SizedBox(height: 22),
             _ControlBlock(
-              label: 'Role',
+              label: l10n.role,
               child: SegmentedButton<ReceiptActorFilter>(
                 showSelectedIcon: false,
-                segments: const [
+                segments: [
                   ButtonSegment(
                     value: ReceiptActorFilter
                         .RECEIPT_ACTOR_FILTER_OWNER_OR_RECIPIENT_GROUP,
-                    label: Text('Both'),
+                    label: Text(l10n.both),
                   ),
                   ButtonSegment(
                     value: ReceiptActorFilter.RECEIPT_ACTOR_FILTER_OWNER,
-                    label: Text('Owner'),
+                    label: Text(l10n.owner),
                   ),
                   ButtonSegment(
                     value:
                         ReceiptActorFilter.RECEIPT_ACTOR_FILTER_RECIPIENT_GROUP,
-                    label: Text('Participant'),
+                    label: Text(l10n.participant),
                   ),
                 ],
                 selected: {draftQuery.actorFilter},
@@ -322,7 +325,7 @@ class _BillsFilterCard extends StatelessWidget {
             ),
             const SizedBox(height: 18),
             _ControlBlock(
-              label: 'Payment status',
+              label: l10n.paymentStatus,
               child: SegmentedButton<BillPaymentFilter>(
                 key: const ValueKey('bills-payment-filter-control'),
                 showSelectedIcon: false,
@@ -330,7 +333,7 @@ class _BillsFilterCard extends StatelessWidget {
                     .map(
                       (filter) => ButtonSegment<BillPaymentFilter>(
                         value: filter,
-                        label: Text(filter.label),
+                        label: Text(_paymentFilterLabel(filter, l10n)),
                       ),
                     )
                     .toList(),
@@ -346,11 +349,11 @@ class _BillsFilterCard extends StatelessWidget {
             ),
             const SizedBox(height: 18),
             _ControlBlock(
-              label: 'Tags',
-              helper: 'Each selected tag must be present on a receipt.',
+              label: l10n.tags,
+              helper: l10n.tagsFilterHelper,
               child: state.availableTags.isEmpty
                   ? Text(
-                      'No tags available yet.',
+                      l10n.noTagsAvailable,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: mutedForegroundColor(context, alpha: 0.84),
                       ),
@@ -466,7 +469,7 @@ class _BillsFilterCard extends StatelessWidget {
                   key: const ValueKey('bills-draft-reset-button'),
                   onPressed: state.isLoading ? null : onResetDraft,
                   icon: const Icon(Icons.restart_alt_rounded),
-                  label: const Text('Reset'),
+                  label: Text(l10n.reset),
                 ),
                 FilledButton.icon(
                   key: const ValueKey('bills-apply-filters-button'),
@@ -476,7 +479,7 @@ class _BillsFilterCard extends StatelessWidget {
                           onApplyDraft();
                         },
                   icon: const Icon(Icons.check_rounded),
-                  label: const Text('Apply'),
+                  label: Text(l10n.apply),
                 ),
               ],
             ),
@@ -500,33 +503,34 @@ class _SortByControl extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return _ControlBlock(
-      label: 'Sort by',
+      label: l10n.sortBy,
       child: SizedBox(
         key: const ValueKey('bills-sort-dropdown'),
         child: DropdownButtonFormField<ReceiptOrderBy>(
           key: ValueKey(query.orderBy),
           initialValue: query.orderBy,
-          items: const [
+          items: [
             DropdownMenuItem(
               value: ReceiptOrderBy.RECEIPT_ORDER_BY_ID,
-              child: Text('ID'),
+              child: Text(l10n.id),
             ),
             DropdownMenuItem(
               value: ReceiptOrderBy.RECEIPT_ORDER_BY_COST_TOTAL,
-              child: Text('Total'),
+              child: Text(l10n.total),
             ),
             DropdownMenuItem(
               value: ReceiptOrderBy.RECEIPT_ORDER_BY_COST_FOR_USER,
-              child: Text('My share'),
+              child: Text(l10n.myShare),
             ),
             DropdownMenuItem(
               value: ReceiptOrderBy.RECEIPT_ORDER_BY_REMAINING_FOR_USER,
-              child: Text('Still owed'),
+              child: Text(l10n.stillOwed),
             ),
             DropdownMenuItem(
               value: ReceiptOrderBy.RECEIPT_ORDER_BY_DUE_DATE,
-              child: Text('Due date'),
+              child: Text(l10n.dueDate),
             ),
           ],
           onChanged: isLoading
@@ -555,18 +559,19 @@ class _DirectionControl extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return _ControlBlock(
-      label: 'Direction',
+      label: l10n.direction,
       child: SegmentedButton<ReceiptOrderDirection>(
         showSelectedIcon: false,
-        segments: const [
+        segments: [
           ButtonSegment(
             value: ReceiptOrderDirection.RECEIPT_ORDER_DIRECTION_ASC,
-            label: Text('Ascending'),
+            label: Text(l10n.ascending),
           ),
           ButtonSegment(
             value: ReceiptOrderDirection.RECEIPT_ORDER_DIRECTION_DESC,
-            label: Text('Descending'),
+            label: Text(l10n.descending),
           ),
         ],
         selected: {query.orderDirection},
@@ -594,7 +599,7 @@ class _PageSizeControl extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _ControlBlock(
-      label: 'Page size',
+      label: AppLocalizations.of(context).pageSize,
       child: SizedBox(
         key: const ValueKey('bills-page-size-dropdown'),
         child: DropdownButtonFormField<int>(
@@ -632,6 +637,7 @@ class _BillsListCardState extends State<_BillsListCard> {
   @override
   Widget build(BuildContext context) {
     final state = widget.state;
+    final l10n = AppLocalizations.of(context);
     return PageSection(
       padding: EdgeInsets.all(widget.isDesktop ? 28 : 22),
       child: Column(
@@ -647,14 +653,14 @@ class _BillsListCardState extends State<_BillsListCard> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Visible receipts',
+                    l10n.visibleReceipts,
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w800,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Page ${state.currentPage}',
+                    l10n.pageNumber(state.currentPage),
                     key: const ValueKey('bills-page-indicator'),
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: mutedForegroundColor(context, alpha: 0.84),
@@ -672,7 +678,7 @@ class _BillsListCardState extends State<_BillsListCard> {
                         ? null
                         : state.goToPreviousPage,
                     icon: const Icon(Icons.chevron_left_rounded),
-                    label: const Text('Previous'),
+                    label: Text(l10n.previous),
                   ),
                   FilledButton.tonalIcon(
                     key: const ValueKey('bills-page-next-button'),
@@ -680,7 +686,7 @@ class _BillsListCardState extends State<_BillsListCard> {
                         ? null
                         : state.goToNextPage,
                     icon: const Icon(Icons.chevron_right_rounded),
-                    label: const Text('Next'),
+                    label: Text(l10n.next),
                   ),
                 ],
               ),
@@ -696,7 +702,7 @@ class _BillsListCardState extends State<_BillsListCard> {
             )
           else if (state.receipts.isEmpty)
             Text(
-              'No bills match the current filters.',
+              l10n.noBillsMatch,
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                 color: mutedForegroundColor(context, alpha: 0.88),
               ),
@@ -750,6 +756,7 @@ class _BillReceiptTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final locale = Localizations.localeOf(context);
+    final l10n = AppLocalizations.of(context);
     final materialLocalizations = MaterialLocalizations.of(context);
     final amountFormat = NumberFormat.currency(
       locale: locale.toString(),
@@ -760,16 +767,21 @@ class _BillReceiptTile extends StatelessWidget {
         ? DateTime.tryParse(receipt.dueDate)
         : null;
     final dueLabel = dueDate == null
-        ? 'No due date'
-        : 'Due ${materialLocalizations.formatShortDate(dueDate.toLocal())}';
+        ? l10n.noDueDate
+        : l10n.dueDateLabel(
+            materialLocalizations.formatShortDate(dueDate.toLocal()),
+          );
     final recipientLabel = receipt.hasRecipient()
         ? receipt.recipient.name
-        : 'Personal bill';
-    final roleLabel = state.roleLabelFor(receipt);
-    final peopleLabel = _receiptPeopleLabel(receipt);
+        : l10n.personalBill;
+    final isOwner =
+        state.currentUserId != null &&
+        receipt.ownerId.toInt() == state.currentUserId;
+    final roleLabel = isOwner ? l10n.owner : l10n.participant;
+    final peopleLabel = _receiptPeopleLabel(receipt, l10n);
     final filesLabel = receipt.files.length == 1
-        ? '1 file included'
-        : '${receipt.files.length} files included';
+        ? l10n.oneFileIncluded
+        : l10n.filesIncluded(receipt.files.length);
     final remainingAmount = state.remainingForCurrentUser(receipt);
 
     return InkWell(
@@ -814,12 +826,12 @@ class _BillReceiptTile extends StatelessWidget {
                     children: [
                       _MetaChip(
                         label: roleLabel,
-                        icon: roleLabel == 'Owner'
+                        icon: isOwner
                             ? Icons.badge_rounded
                             : Icons.people_alt_rounded,
                       ),
                       _MetaChip(
-                        label: receipt.isPaid ? 'Paid' : 'Unpaid',
+                        label: receipt.isPaid ? l10n.paid : l10n.unpaid,
                         icon: receipt.isPaid
                             ? Icons.check_circle_rounded
                             : Icons.schedule_rounded,
@@ -866,7 +878,7 @@ class _BillReceiptTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   _ReceiptAmountMetric(
-                    label: 'Still owed',
+                    label: l10n.stillOwed,
                     labelStyle: Theme.of(context).textTheme.labelLarge
                         ?.copyWith(
                           color: mutedForegroundColor(context, alpha: 0.8),
@@ -878,7 +890,7 @@ class _BillReceiptTile extends StatelessWidget {
                   ),
                   const SizedBox(height: 14),
                   _ReceiptAmountMetric(
-                    label: 'Total',
+                    label: l10n.total,
                     labelStyle: Theme.of(context).textTheme.labelLarge
                         ?.copyWith(
                           color: mutedForegroundColor(context, alpha: 0.8),
@@ -949,6 +961,7 @@ class _BillDetailPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final locale = Localizations.localeOf(context);
+    final l10n = AppLocalizations.of(context);
     final amountFormat = NumberFormat.currency(
       locale: locale.toString(),
       symbol: receipt.currency == 'EUR' ? '€' : '${receipt.currency} ',
@@ -976,7 +989,7 @@ class _BillDetailPanel extends StatelessWidget {
                 ),
               ),
               _MetaChip(
-                label: state.roleLabelFor(receipt),
+                label: isOwner ? l10n.owner : l10n.participant,
                 icon: isOwner ? Icons.badge_rounded : Icons.people_alt_rounded,
               ),
             ],
@@ -997,15 +1010,15 @@ class _BillDetailPanel extends StatelessWidget {
             runSpacing: 8,
             children: [
               _MetricText(
-                label: 'Total',
+                label: l10n.total,
                 value: amountFormat.format(receipt.amountOwed),
               ),
               _MetricText(
-                label: 'My share',
+                label: l10n.myShare,
                 value: amountFormat.format(state.myShareFor(receipt)),
               ),
               _MetricText(
-                label: 'Paid',
+                label: l10n.paid,
                 value: amountFormat.format(amountPaid),
               ),
             ],
@@ -1023,13 +1036,13 @@ class _BillDetailPanel extends StatelessWidget {
                       amountFormat,
                     ),
               icon: const Icon(Icons.payments_rounded),
-              label: const Text('Payments'),
+              label: Text(l10n.payments),
             ),
           ],
           if (receipt.hasSplit()) ...[
             const SizedBox(height: 16),
             Text(
-              'Participants',
+              l10n.participants,
               style: Theme.of(
                 context,
               ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
@@ -1040,7 +1053,7 @@ class _BillDetailPanel extends StatelessWidget {
           if (receipt.hasNotes() && receipt.notes.trim().isNotEmpty) ...[
             const SizedBox(height: 16),
             Text(
-              'Notes',
+              l10n.notes,
               style: Theme.of(
                 context,
               ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
@@ -1056,7 +1069,7 @@ class _BillDetailPanel extends StatelessWidget {
           if (receipt.files.isNotEmpty) ...[
             const SizedBox(height: 16),
             Text(
-              'Files',
+              l10n.files,
               style: Theme.of(
                 context,
               ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
@@ -1165,16 +1178,17 @@ class _ReceiptPaymentsDialogState extends State<_ReceiptPaymentsDialog> {
   }
 
   Future<void> _save() async {
+    final l10n = AppLocalizations.of(context);
     final ownerAmountPaid = _parseAmount(_ownerController.text);
     if (ownerAmountPaid == null) {
       setState(() {
-        _errorText = 'Enter a valid owner paid amount.';
+        _errorText = l10n.paymentInvalidOwner;
       });
       return;
     }
     if (ownerAmountPaid < 0 || ownerAmountPaid - _ownerShareAmount() > 1e-6) {
       setState(() {
-        _errorText = 'Owner paid amount cannot exceed the owner share.';
+        _errorText = l10n.paymentOwnerExceeded;
       });
       return;
     }
@@ -1185,7 +1199,7 @@ class _ReceiptPaymentsDialogState extends State<_ReceiptPaymentsDialog> {
       final amount = _parseAmount(entry.value.text);
       if (amount == null) {
         setState(() {
-          _errorText = 'Enter valid recipient paid amounts.';
+          _errorText = l10n.paymentInvalidRecipient;
         });
         return;
       }
@@ -1197,7 +1211,7 @@ class _ReceiptPaymentsDialogState extends State<_ReceiptPaymentsDialog> {
           : share.first.amount;
       if (amount < 0 || amount - shareAmount > 1e-6) {
         setState(() {
-          _errorText = 'Recipient paid amounts cannot exceed their shares.';
+          _errorText = l10n.paymentRecipientExceeded;
         });
         return;
       }
@@ -1217,7 +1231,7 @@ class _ReceiptPaymentsDialogState extends State<_ReceiptPaymentsDialog> {
       return;
     }
     setState(() {
-      _errorText = widget.state.errorMessage ?? 'Could not save payments.';
+      _errorText = widget.state.errorMessage ?? l10n.couldNotSavePayments;
     });
   }
 
@@ -1249,9 +1263,10 @@ class _ReceiptPaymentsDialogState extends State<_ReceiptPaymentsDialog> {
   @override
   Widget build(BuildContext context) {
     final split = widget.receipt.hasSplit() ? widget.receipt.split : null;
+    final l10n = AppLocalizations.of(context);
 
     return AlertDialog(
-      title: const Text('Payments'),
+      title: Text(l10n.payments),
       content: SingleChildScrollView(
         child: SizedBox(
           width: 420,
@@ -1266,9 +1281,10 @@ class _ReceiptPaymentsDialogState extends State<_ReceiptPaymentsDialog> {
                   decimal: true,
                 ),
                 decoration: InputDecoration(
-                  labelText: 'Owner paid',
-                  helperText:
-                      'Share ${widget.amountFormat.format(_ownerShareAmount())}',
+                  labelText: l10n.ownerPaid,
+                  helperText: l10n.shareAmount(
+                    widget.amountFormat.format(_ownerShareAmount()),
+                  ),
                 ),
               ),
               if (split != null)
@@ -1283,9 +1299,10 @@ class _ReceiptPaymentsDialogState extends State<_ReceiptPaymentsDialog> {
                       decimal: true,
                     ),
                     decoration: InputDecoration(
-                      labelText: '${_shareUserLabel(share)} paid',
-                      helperText:
-                          'Share ${widget.amountFormat.format(share.amount)}',
+                      labelText: l10n.userPaid(_shareUserLabel(share, l10n)),
+                      helperText: l10n.shareAmount(
+                        widget.amountFormat.format(share.amount),
+                      ),
                     ),
                   ),
                 ],
@@ -1308,13 +1325,13 @@ class _ReceiptPaymentsDialogState extends State<_ReceiptPaymentsDialog> {
           onPressed: widget.state.isMutating
               ? null
               : () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(l10n.cancel),
         ),
         FilledButton.icon(
           key: const ValueKey('receipt-payment-save-button'),
           onPressed: widget.state.isMutating ? null : _save,
           icon: const Icon(Icons.check_rounded),
-          label: const Text('Save'),
+          label: Text(l10n.save),
         ),
       ],
     );
@@ -1332,17 +1349,18 @@ class _ReceiptSplitShareRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final split = receipt.split;
     final rows = [
       (
-        participant: 'Owner',
+        participant: l10n.owner,
         percent: split.ownerSharePercent,
         shareAmount: split.ownerAmount,
         paidAmount: split.ownerAmountPaid,
       ),
       for (final share in split.recipientShares)
         (
-          participant: _shareUserLabel(share),
+          participant: _shareUserLabel(share, l10n),
           percent: share.sharePercent,
           shareAmount: share.amount,
           paidAmount: share.amountPaid,
@@ -1370,7 +1388,13 @@ class _ReceiptSplitShareRow extends StatelessWidget {
           children: [
             _shareTableRow(
               context,
-              cells: const ['Participant', '%', 'Share', 'Paid', 'Left'],
+              cells: [
+                l10n.participantHeader,
+                '%',
+                l10n.shareHeader,
+                l10n.paidHeader,
+                l10n.leftHeader,
+              ],
               isHeader: true,
             ),
             for (final row in rows)
@@ -1463,6 +1487,7 @@ class _ReceiptFileDetailTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final contentType = file.hasContentType() ? file.contentType : null;
     return DecoratedBox(
       decoration: glassSurfaceDecoration(
@@ -1494,7 +1519,7 @@ class _ReceiptFileDetailTile extends StatelessWidget {
                   key: ValueKey('receipt-file-open-${file.id.toInt()}'),
                   onPressed: () => _openReceiptFile(context, state, file),
                   icon: const Icon(Icons.open_in_new_rounded, size: 18),
-                  label: const Text('Open'),
+                  label: Text(l10n.open),
                 ),
               ],
             ),
@@ -1554,7 +1579,9 @@ class _ReceiptFilePreviewState extends State<_ReceiptFilePreview> {
         }
         final download = snapshot.data;
         if (download == null) {
-          return const Center(child: Text('Preview unavailable'));
+          return Center(
+            child: Text(AppLocalizations.of(context).previewUnavailable),
+          );
         }
         if (download.contentType.startsWith('image/')) {
           return Image.memory(download.bytes, fit: BoxFit.contain);
@@ -1581,9 +1608,10 @@ Future<void> _openReceiptFile(
     final download = await state.downloadReceiptFile(file);
     if (download == null) {
       if (context.mounted) {
+        final l10n = AppLocalizations.of(context);
         ScaffoldMessenger.maybeOf(
           context,
-        )?.showSnackBar(const SnackBar(content: Text('Could not open file.')));
+        )?.showSnackBar(SnackBar(content: Text(l10n.couldNotOpenFile)));
       }
       return;
     }
@@ -1594,36 +1622,41 @@ Future<void> _openReceiptFile(
     );
   } catch (_) {
     if (context.mounted) {
+      final l10n = AppLocalizations.of(context);
       ScaffoldMessenger.maybeOf(
         context,
-      )?.showSnackBar(const SnackBar(content: Text('Could not open file.')));
+      )?.showSnackBar(SnackBar(content: Text(l10n.couldNotOpenFile)));
     }
   }
 }
 
-String _shareUserLabel(ReceiptRecipientShare share) {
+String _shareUserLabel(ReceiptRecipientShare share, AppLocalizations l10n) {
   if (share.hasUser()) {
-    return _recipientMemberLabel(share.user);
+    return _recipientMemberLabel(share.user, l10n);
   }
-  return 'User ${share.userId}';
+  return '${l10n.user} ${share.userId}';
 }
 
-String _receiptPeopleLabel(Receipt receipt) {
+String _receiptPeopleLabel(Receipt receipt, AppLocalizations l10n) {
   if (receipt.hasRecipient() && receipt.recipient.members.isNotEmpty) {
-    return receipt.recipient.members.map(_recipientMemberLabel).join(', ');
+    return receipt.recipient.members
+        .map((member) => _recipientMemberLabel(member, l10n))
+        .join(', ');
   }
   if (receipt.hasSplit() && receipt.split.recipientShares.isNotEmpty) {
-    return receipt.split.recipientShares.map(_shareUserLabel).join(', ');
+    return receipt.split.recipientShares
+        .map((share) => _shareUserLabel(share, l10n))
+        .join(', ');
   }
   if (receipt.hasRecipient() && receipt.recipient.name.trim().isNotEmpty) {
     return receipt.recipient.name;
   }
-  return 'Personal bill';
+  return l10n.personalBill;
 }
 
-String _recipientMemberLabel(User user) {
+String _recipientMemberLabel(User user, AppLocalizations l10n) {
   if (user.deleted) {
-    return 'Deleted User';
+    return l10n.deletedUser;
   }
   if (user.hasName() && user.name.trim().isNotEmpty) {
     return user.name;
@@ -1631,7 +1664,7 @@ String _recipientMemberLabel(User user) {
   if (user.hasEmail() && user.email.trim().isNotEmpty) {
     return user.email;
   }
-  return 'User ${user.id}';
+  return '${l10n.user} ${user.id}';
 }
 
 bool _canPreviewInline(String? contentType) {
@@ -1693,7 +1726,7 @@ class _BillsErrorCard extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              'Could not load bills. $message',
+              AppLocalizations.of(context).couldNotLoadBills(message),
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                 color: scheme.error,
                 fontWeight: FontWeight.w600,
@@ -1704,6 +1737,14 @@ class _BillsErrorCard extends StatelessWidget {
       ),
     );
   }
+}
+
+String _paymentFilterLabel(BillPaymentFilter filter, AppLocalizations l10n) {
+  return switch (filter) {
+    BillPaymentFilter.all => l10n.all,
+    BillPaymentFilter.unpaid => l10n.unpaid,
+    BillPaymentFilter.paid => l10n.paid,
+  };
 }
 
 class _MetaChip extends StatelessWidget {
