@@ -8,6 +8,7 @@ import 'package:debt_display/l10n/generated/app_localizations.dart';
 import 'package:debt_display/state/auth_session_state.dart';
 import 'package:debt_display/state/bill_creation_state.dart';
 import 'package:debt_display/state/bill_list_state.dart';
+import 'package:debt_display/state/chart_state.dart';
 import 'package:debt_display/state/home_bill_state.dart';
 import 'package:debt_display/state/language_state.dart';
 import 'package:debt_display/state/navigation_state.dart';
@@ -16,6 +17,7 @@ import 'package:debt_display/state/theme_state.dart';
 import 'package:debt_display/theme/app_themes.dart';
 import 'package:debt_display/ui/app_sections.dart';
 import 'package:debt_display/ui/bills_section.dart';
+import 'package:debt_display/ui/charts_section.dart';
 import 'package:debt_display/ui/app_shell.dart';
 import 'package:debt_display/services/debt_backend_service.dart';
 import 'package:debt_display/services/file_viewer_io.dart';
@@ -147,6 +149,14 @@ void main() {
       411.45,
       const Locale('en', 'US'),
     );
+    final expectedFirstRemaining = _formatExpectedCurrency(
+      55,
+      const Locale('en', 'US'),
+    );
+    final expectedFirstTotal = _formatExpectedCurrency(
+      120,
+      const Locale('en', 'US'),
+    );
 
     expect(find.text('Recent outstanding bills'), findsOneWidget);
     expect(find.textContaining('Due '), findsNWidgets(3));
@@ -160,6 +170,10 @@ void main() {
     expect(find.text('Create'), findsOneWidget);
     expect(find.text('Total still owed'), findsOneWidget);
     expect(find.text(expectedAmount), findsOneWidget);
+    expect(find.text('Still owed'), findsNWidgets(3));
+    expect(find.text('Total'), findsNWidgets(3));
+    expect(find.text(expectedFirstRemaining), findsOneWidget);
+    expect(find.text(expectedFirstTotal), findsOneWidget);
   });
 
   testWidgets('home dashboard formats amounts and dates for de_DE locale', (
@@ -324,6 +338,29 @@ void main() {
       find.descendant(of: navigationBar, matching: find.text('Menu')),
       findsOneWidget,
     );
+  });
+
+  testWidgets('menu section includes charts navigation action', (tester) async {
+    final navigationState = NavigationState()
+      ..selectDestination(AppDestination.menu);
+    _setTestSurfaceSize(tester, width: 430, height: 1000);
+
+    await tester.pumpWidget(
+      _buildResponsiveShellTestApp(
+        authState: _TestAuthSessionState(),
+        navigationState: navigationState,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Review paid, open, and overdue shares by date and tag.'),
+      findsOneWidget,
+    );
+
+    await _tapVisible(tester, find.text('Charts'));
+
+    expect(navigationState.selectedDestination, AppDestination.charts);
   });
 
   testWidgets('menu section includes bills navigation action', (tester) async {
@@ -2377,6 +2414,235 @@ void main() {
     expect(find.text('Broken color'), findsOneWidget);
   });
 
+  testWidgets('charts view loads default tag selection and renders charts', (
+    tester,
+  ) async {
+    _setTestSurfaceSize(tester, width: 430, height: 1200);
+    final fakeService = _FakeDebtBackendService(
+      onListReceipts: (_) => ReceiptsResponse(success: true),
+      chartSummary: _chartSummary(),
+    );
+    final chartState = ChartState(debtBackendService: fakeService);
+
+    await tester.pumpWidget(
+      _buildChartsSectionTestApp(
+        authState: _TestAuthSessionState(
+          isAuthenticatedValue: true,
+          accessTokenValue: 'token-1',
+        ),
+        chartState: chartState,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(fakeService.chartRequests, hasLength(1));
+    expect(chartState.selectedTagIds, {1, 2});
+    expect(find.byKey(const ValueKey('charts-pie-chart')), findsOneWidget);
+    expect(find.byKey(const ValueKey('charts-bar-chart')), findsOneWidget);
+  });
+
+  testWidgets('charts date preset changes summary request', (tester) async {
+    _setTestSurfaceSize(tester, width: 430, height: 1200);
+    final fakeService = _FakeDebtBackendService(
+      onListReceipts: (_) => ReceiptsResponse(success: true),
+      chartSummary: _chartSummary(),
+    );
+
+    await tester.pumpWidget(
+      _buildChartsSectionTestApp(
+        authState: _TestAuthSessionState(
+          isAuthenticatedValue: true,
+          accessTokenValue: 'token-1',
+        ),
+        chartState: ChartState(debtBackendService: fakeService),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Last 30 days'));
+    await tester.pumpAndSettle();
+
+    expect(fakeService.chartRequests, hasLength(2));
+    expect(fakeService.chartRequests.last.hasCreatedAtFrom(), isTrue);
+    expect(fakeService.chartRequests.last.hasCreatedAtTo(), isTrue);
+  });
+
+  testWidgets('charts custom date controls fit on narrow mobile screens', (
+    tester,
+  ) async {
+    _setTestSurfaceSize(tester, width: 320, height: 1000);
+    final fakeService = _FakeDebtBackendService(
+      onListReceipts: (_) => ReceiptsResponse(success: true),
+      chartSummary: _chartSummary(),
+    );
+
+    await tester.pumpWidget(
+      _buildChartsSectionTestApp(
+        authState: _TestAuthSessionState(
+          isAuthenticatedValue: true,
+          accessTokenValue: 'token-1',
+        ),
+        chartState: ChartState(debtBackendService: fakeService),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Custom'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Custom'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('charts-from-date-button')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('charts-to-date-button')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('charts cancelled custom date pick keeps existing range', (
+    tester,
+  ) async {
+    _setTestSurfaceSize(tester, width: 430, height: 1200);
+    final fakeService = _FakeDebtBackendService(
+      onListReceipts: (_) => ReceiptsResponse(success: true),
+      chartSummary: _chartSummary(),
+    );
+    final chartState = ChartState(debtBackendService: fakeService);
+    final existingFrom = DateTime(2026, 5, 1);
+
+    await tester.pumpWidget(
+      _buildChartsSectionTestApp(
+        authState: _TestAuthSessionState(
+          isAuthenticatedValue: true,
+          accessTokenValue: 'token-1',
+        ),
+        chartState: chartState,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await chartState.setCustomDateRange(from: existingFrom);
+    await tester.pumpAndSettle();
+    final requestCount = fakeService.chartRequests.length;
+
+    await tester.tap(find.byKey(const ValueKey('charts-from-date-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    expect(chartState.customFrom, existingFrom);
+    expect(fakeService.chartRequests, hasLength(requestCount));
+  });
+
+  testWidgets('charts keep the final selected tag active', (tester) async {
+    _setTestSurfaceSize(tester, width: 430, height: 1200);
+    final rentTag = _chartTag(1, 'Rent');
+    final fakeService = _FakeDebtBackendService(
+      onListReceipts: (_) => ReceiptsResponse(success: true),
+      chartSummary: ReceiptChartSummaryResponse(
+        success: true,
+        totals: ReceiptChartStatusTotals(paidShare: 30, openShare: 15),
+        availableTags: [rentTag],
+        defaultTagIds: [rentTag.id],
+        tagBuckets: [
+          ReceiptChartTagBucket(
+            tag: rentTag,
+            paidShare: 30,
+            openShare: 15,
+            receiptCount: 2,
+          ),
+        ],
+      ),
+    );
+    final chartState = ChartState(debtBackendService: fakeService);
+
+    await tester.pumpWidget(
+      _buildChartsSectionTestApp(
+        authState: _TestAuthSessionState(
+          isAuthenticatedValue: true,
+          accessTokenValue: 'token-1',
+        ),
+        chartState: chartState,
+      ),
+    );
+    await tester.pumpAndSettle();
+    final requestCount = fakeService.chartRequests.length;
+
+    await tester.tap(find.byKey(const ValueKey('charts-tag-chip-1')));
+    await tester.pumpAndSettle();
+
+    expect(chartState.selectedTagIds, {1});
+    expect(fakeService.chartRequests, hasLength(requestCount));
+  });
+
+  testWidgets('charts view shows empty state without chart data', (
+    tester,
+  ) async {
+    _setTestSurfaceSize(tester, width: 430, height: 1000);
+    final fakeService = _FakeDebtBackendService(
+      onListReceipts: (_) => ReceiptsResponse(success: true),
+      chartSummary: ReceiptChartSummaryResponse(success: true),
+    );
+
+    await tester.pumpWidget(
+      _buildChartsSectionTestApp(
+        authState: _TestAuthSessionState(
+          isAuthenticatedValue: true,
+          accessTokenValue: 'token-1',
+        ),
+        chartState: ChartState(debtBackendService: fakeService),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('No chart data for this range.'), findsNWidgets(2));
+  });
+
+  testWidgets(
+    'charts tag summary uses theme error color for overdue severity',
+    (tester) async {
+      _setTestSurfaceSize(tester, width: 430, height: 1200);
+      final fakeService = _FakeDebtBackendService(
+        onListReceipts: (_) => ReceiptsResponse(success: true),
+        chartSummary: _chartSummary(
+          buckets: [
+            ReceiptChartTagBucket(
+              tag: _chartTag(1, 'Rent'),
+              paidShare: 10,
+              openShare: 0,
+              overdueOpenShare: 25,
+              receiptCount: 1,
+            ),
+          ],
+        ),
+      );
+
+      await tester.pumpWidget(
+        _buildChartsSectionTestApp(
+          authState: _TestAuthSessionState(
+            isAuthenticatedValue: true,
+            accessTokenValue: 'token-1',
+          ),
+          chartState: ChartState(debtBackendService: fakeService),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final severityAvatar = tester.widget<CircleAvatar>(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is CircleAvatar &&
+              widget.foregroundColor == buildLightTheme().colorScheme.error,
+        ),
+      );
+
+      expect(
+        severityAvatar.foregroundColor,
+        buildLightTheme().colorScheme.error,
+      );
+    },
+  );
+
   testWidgets('mobile profile state maps to the menu bottom-nav selection', (
     tester,
   ) async {
@@ -2486,6 +2752,7 @@ Widget _buildResponsiveShellTestApp({
   required NavigationState navigationState,
   BillListState? billListState,
   BillCreationState? billCreationState,
+  ChartState? chartState,
   HomeBillState? homeBillState,
   LanguageState? languageState,
   RecipientGroupState? recipientGroupState,
@@ -2519,6 +2786,14 @@ Widget _buildResponsiveShellTestApp({
           onListReceipts: (_) => ReceiptsResponse(success: true),
         ),
       );
+  final resolvedChartState =
+      chartState ??
+      ChartState(
+        debtBackendService: _FakeDebtBackendService(
+          onListReceipts: (_) => ReceiptsResponse(success: true),
+          chartSummary: ReceiptChartSummaryResponse(success: true),
+        ),
+      );
 
   return MaterialApp(
     locale: locale,
@@ -2549,6 +2824,12 @@ Widget _buildResponsiveShellTestApp({
           create: (_) => resolvedHomeBillState,
           update: (_, authSessionState, homeBillState) =>
               (homeBillState ?? resolvedHomeBillState)
+                ..updateAuthSession(authSessionState),
+        ),
+        ChangeNotifierProxyProvider<AuthSessionState, ChartState>(
+          create: (_) => resolvedChartState,
+          update: (_, authSessionState, chartState) =>
+              (chartState ?? resolvedChartState)
                 ..updateAuthSession(authSessionState),
         ),
         ChangeNotifierProxyProvider<AuthSessionState, RecipientGroupState>(
@@ -2641,6 +2922,32 @@ Widget _buildBillsSectionTestApp({
   );
 }
 
+Widget _buildChartsSectionTestApp({
+  required _TestAuthSessionState authState,
+  required ChartState chartState,
+  Locale locale = const Locale('en', 'US'),
+}) {
+  return MaterialApp(
+    locale: locale,
+    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    supportedLocales: _supportedLocales,
+    theme: buildLightTheme(),
+    home: MultiProvider(
+      providers: [
+        ChangeNotifierProvider<AuthSessionState>.value(value: authState),
+        ChangeNotifierProxyProvider<AuthSessionState, ChartState>(
+          create: (_) => chartState,
+          update: (_, authSessionState, state) =>
+              (state ?? chartState)..updateAuthSession(authSessionState),
+        ),
+      ],
+      child: const Scaffold(
+        body: SingleChildScrollView(child: ChartsSection(isDesktop: false)),
+      ),
+    ),
+  );
+}
+
 MaterialLocalizations _homeMaterialLocalizations(WidgetTester tester) {
   return MaterialLocalizations.of(tester.element(find.byType(HomeSection)));
 }
@@ -2663,6 +2970,26 @@ List<Receipt> _homeTestReceipts(DateTime referenceDate) {
           referenceDate,
           index + 1,
         ).toIso8601String(),
+        split: index == 0
+            ? ReceiptSplit(
+                ownerSharePercent: 66.67,
+                ownerAmount: 80,
+                ownerAmountPaid: 25,
+                recipientShares: [
+                  ReceiptRecipientShare(
+                    userId: Int64(20),
+                    sharePercent: 33.33,
+                    amount: 40,
+                    amountPaid: 0,
+                    user: _testUser(
+                      id: 20,
+                      name: 'Alice',
+                      email: 'alice@test.dev',
+                    ),
+                  ),
+                ],
+              )
+            : null,
         tags: [
           TagIndex(
             id: Int64(10 + index),
@@ -2711,6 +3038,45 @@ String _formatExpectedCurrency(double amount, Locale locale) {
     symbol: '€',
     decimalDigits: 2,
   ).format(amount);
+}
+
+TagIndex _chartTag(int id, String text) {
+  return TagIndex(id: Int64(id), icon: '#', text: text, color: '#667EEA');
+}
+
+ReceiptChartSummaryResponse _chartSummary({
+  List<ReceiptChartTagBucket>? buckets,
+}) {
+  final tags = [_chartTag(1, 'Rent'), _chartTag(2, 'Utilities')];
+  final resolvedBuckets =
+      buckets ??
+      [
+        ReceiptChartTagBucket(
+          tag: tags[0],
+          paidShare: 30,
+          openShare: 15,
+          overdueOpenShare: 0,
+          receiptCount: 2,
+        ),
+        ReceiptChartTagBucket(
+          tag: tags[1],
+          paidShare: 10,
+          openShare: 20,
+          overdueOpenShare: 5,
+          receiptCount: 1,
+        ),
+      ];
+  return ReceiptChartSummaryResponse(
+    success: true,
+    totals: ReceiptChartStatusTotals(
+      paidShare: 40,
+      openShare: 35,
+      overdueOpenShare: 5,
+    ),
+    tagBuckets: resolvedBuckets,
+    availableTags: tags,
+    defaultTagIds: tags.map((tag) => tag.id),
+  );
 }
 
 void _setTestSurfaceSize(
@@ -2819,6 +3185,7 @@ class _FakeDebtBackendService extends DebtBackendService {
   _FakeDebtBackendService({
     required this.onListReceipts,
     this.availableTags = const [],
+    this.chartSummary,
     this.unpaidSummaryTotal = 0,
     this.unpaidSummaryCount = 0,
     List<Recipient>? recipients,
@@ -2841,6 +3208,7 @@ class _FakeDebtBackendService extends DebtBackendService {
   }
 
   final List<TagIndex> availableTags;
+  final ReceiptChartSummaryResponse? chartSummary;
   final double unpaidSummaryTotal;
   final int unpaidSummaryCount;
   final ReceiptsResponse Function(ReceiptListRequest request) onListReceipts;
@@ -2864,6 +3232,8 @@ class _FakeDebtBackendService extends DebtBackendService {
   final String mutationErrorMessage;
   final List<Recipient> recipients = <Recipient>[];
   final List<ReceiptListRequest> requests = <ReceiptListRequest>[];
+  final List<ReceiptChartSummaryRequest> chartRequests =
+      <ReceiptChartSummaryRequest>[];
   final List<UserSearchRequest> searchRequests = <UserSearchRequest>[];
   final List<CreateRecipientRequest> createRecipientRequests =
       <CreateRecipientRequest>[];
@@ -2907,6 +3277,17 @@ class _FakeDebtBackendService extends DebtBackendService {
       unpaidShareTotal: unpaidSummaryTotal,
       unpaidBillCount: unpaidSummaryCount,
     );
+  }
+
+  @override
+  Future<ReceiptChartSummaryResponse> getReceiptChartSummary(
+    String accessToken,
+    ReceiptChartSummaryRequest request,
+  ) async {
+    final clonedRequest = request.deepCopy();
+    chartRequests.add(clonedRequest);
+    return chartSummary?.deepCopy() ??
+        ReceiptChartSummaryResponse(success: true);
   }
 
   @override

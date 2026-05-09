@@ -110,6 +110,21 @@ class DebtBackendService {
     );
   }
 
+  Future<ReceiptChartSummaryResponse> getReceiptChartSummary(
+    String accessToken,
+    ReceiptChartSummaryRequest request,
+  ) async {
+    final response = await _dio.post(
+      '/api/receipts/chart-summary',
+      data: request.writeToBuffer(),
+      options: _withAuthToken(accessToken),
+    );
+    return _parseProtobufResponse(
+      response,
+      ReceiptChartSummaryResponse.fromBuffer,
+    );
+  }
+
   Future<TagsResponse> listTags(String accessToken) async {
     final response = await _dio.post(
       '/api/tags/list',

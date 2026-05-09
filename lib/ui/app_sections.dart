@@ -11,6 +11,7 @@ import 'package:debt_display/state/theme_state.dart';
 import 'package:debt_display/theme/app_themes.dart';
 import 'package:debt_display/ui/bill_creation_section.dart';
 import 'package:debt_display/ui/bills_section.dart';
+import 'package:debt_display/ui/charts_section.dart';
 import 'package:debt_display/ui/app_shared.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -155,6 +156,11 @@ class _AppSectionsState extends State<AppSections> {
       case AppDestination.bills:
         return BillsSection(
           key: const ValueKey('bills'),
+          isDesktop: widget.isDesktop,
+        );
+      case AppDestination.charts:
+        return ChartsSection(
+          key: const ValueKey('charts'),
           isDesktop: widget.isDesktop,
         );
       case AppDestination.createBill:
@@ -306,30 +312,41 @@ class _HomeSectionState extends State<HomeSection> {
                           ? 0
                           : 12,
                     ),
-                    child: _HomeBillTile(
-                      receipt: entry.value,
-                      roleLabel: _homeRoleLabel(
-                        entry.value,
-                        billListState,
-                        l10n,
-                      ),
-                      isOwner: _homeIsOwner(entry.value, billListState),
-                      amountLabel: _homeAmountLabel(
-                        entry.value,
-                        locale,
-                        currencyFormat,
-                      ),
-                      dueLabel: _homeDueLabel(
-                        entry.value,
-                        materialLocalizations,
-                        l10n,
-                      ),
-                      onTap: () => showBillDetailModal(
-                        context,
-                        receipt: entry.value,
-                        state: billListState,
-                        isDesktop: widget.isDesktop,
-                      ),
+                    child: Builder(
+                      builder: (context) {
+                        final receipt = entry.value;
+                        final amountFormat = _homeAmountFormat(
+                          receipt,
+                          locale,
+                          currencyFormat,
+                        );
+                        return _HomeBillTile(
+                          receipt: receipt,
+                          roleLabel: _homeRoleLabel(
+                            receipt,
+                            billListState,
+                            l10n,
+                          ),
+                          isOwner: _homeIsOwner(receipt, billListState),
+                          remainingAmountLabel: amountFormat.format(
+                            billListState.remainingForCurrentUser(receipt),
+                          ),
+                          totalAmountLabel: amountFormat.format(
+                            receipt.amountOwed,
+                          ),
+                          dueLabel: _homeDueLabel(
+                            receipt,
+                            materialLocalizations,
+                            l10n,
+                          ),
+                          onTap: () => showBillDetailModal(
+                            context,
+                            receipt: receipt,
+                            state: billListState,
+                            isDesktop: widget.isDesktop,
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ),
@@ -476,6 +493,12 @@ class MenuSection extends StatelessWidget {
         destination: AppDestination.bills,
       ),
       (
+        title: l10n.destinationCharts,
+        body: l10n.menuChartsDescription,
+        icon: Icons.insert_chart_rounded,
+        destination: AppDestination.charts,
+      ),
+      (
         title: l10n.destinationCreateBill,
         body: l10n.menuCreateBillDescription,
         icon: Icons.add_circle_rounded,
@@ -550,19 +573,19 @@ class MenuSection extends StatelessWidget {
   }
 }
 
-String _homeAmountLabel(
+NumberFormat _homeAmountFormat(
   Receipt receipt,
   Locale locale,
   NumberFormat fallbackFormat,
 ) {
   if (receipt.currency == 'EUR') {
-    return fallbackFormat.format(receipt.amountOwed);
+    return fallbackFormat;
   }
   return NumberFormat.currency(
     locale: locale.toString(),
     symbol: '${receipt.currency} ',
     decimalDigits: 2,
-  ).format(receipt.amountOwed);
+  );
 }
 
 String _homeDueLabel(
@@ -642,7 +665,8 @@ class _HomeBillTile extends StatelessWidget {
     required this.roleLabel,
     required this.isOwner,
     required this.dueLabel,
-    required this.amountLabel,
+    required this.remainingAmountLabel,
+    required this.totalAmountLabel,
     required this.onTap,
   });
 
@@ -650,7 +674,8 @@ class _HomeBillTile extends StatelessWidget {
   final String roleLabel;
   final bool isOwner;
   final String dueLabel;
-  final String amountLabel;
+  final String remainingAmountLabel;
+  final String totalAmountLabel;
   final VoidCallback onTap;
 
   @override
@@ -749,11 +774,38 @@ class _HomeBillTile extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-          Text(
-            amountLabel,
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 128),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                _HomeAmountMetric(
+                  label: l10n.stillOwed,
+                  labelStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: mutedForegroundColor(context, alpha: 0.8),
+                    fontWeight: FontWeight.w800,
+                  ),
+                  value: remainingAmountLabel,
+                  valueStyle: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                _HomeAmountMetric(
+                  label: l10n.total,
+                  labelStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: mutedForegroundColor(context, alpha: 0.8),
+                    fontWeight: FontWeight.w700,
+                  ),
+                  value: totalAmountLabel,
+                  valueStyle: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: mutedForegroundColor(context, alpha: 0.8),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -767,8 +819,48 @@ class _HomeBillTile extends StatelessWidget {
   }
 }
 
+class _HomeAmountMetric extends StatelessWidget {
+  const _HomeAmountMetric({
+    required this.label,
+    required this.labelStyle,
+    required this.value,
+    required this.valueStyle,
+  });
+
+  final String label;
+  final TextStyle? labelStyle;
+  final String value;
+  final TextStyle? valueStyle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.right,
+          style: labelStyle,
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.right,
+          style: valueStyle,
+        ),
+      ],
+    );
+  }
+}
+
 class _HomeMetaChip extends StatelessWidget {
   const _HomeMetaChip({required this.label, required this.icon, this.tooltip});
+
+  static const _iconOnlyWidth = 18.0;
 
   final String label;
   final IconData icon;
@@ -785,23 +877,31 @@ class _HomeMetaChip extends StatelessWidget {
         borderRadius: const BorderRadius.all(Radius.circular(999)),
         includeShadows: false,
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: brandPrimary),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              softWrap: false,
-              style: Theme.of(
-                context,
-              ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700),
-            ),
-          ),
-        ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.hasBoundedWidth &&
+              constraints.maxWidth <= _iconOnlyWidth) {
+            return Icon(icon, size: 16, color: brandPrimary);
+          }
+          return Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 16, color: brandPrimary),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  softWrap: false,
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
     final message = tooltip?.trim();

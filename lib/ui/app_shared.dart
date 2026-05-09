@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 enum AppDestination {
   home(Icons.home_rounded),
   bills(Icons.receipt_long_rounded),
+  charts(Icons.insert_chart_rounded),
   createBill(Icons.add_circle_rounded),
   recipientGroups(Icons.groups_rounded),
   profile(Icons.person_rounded),
@@ -22,6 +23,7 @@ extension AppDestinationLocalizations on AppDestination {
   String label(AppLocalizations l10n) => switch (this) {
     AppDestination.home => l10n.destinationHome,
     AppDestination.bills => l10n.destinationBills,
+    AppDestination.charts => l10n.destinationCharts,
     AppDestination.createBill => l10n.destinationCreateBill,
     AppDestination.recipientGroups => l10n.destinationRecipientGroups,
     AppDestination.profile => l10n.destinationProfile,

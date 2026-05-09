@@ -646,6 +646,144 @@ final $typed_data.Uint8List receiptUnpaidSummaryResponseDescriptor = $convert.ba
     'EHVucGFpZFNoYXJlVG90YWwSKgoRdW5wYWlkX2JpbGxfY291bnQYBCABKAVSD3VucGFpZEJpbG'
     'xDb3VudA==');
 
+@$core.Deprecated('Use receiptChartSummaryRequestDescriptor instead')
+const ReceiptChartSummaryRequest$json = {
+  '1': 'ReceiptChartSummaryRequest',
+  '2': [
+    {
+      '1': 'created_at_from',
+      '3': 1,
+      '4': 1,
+      '5': 9,
+      '9': 0,
+      '10': 'createdAtFrom',
+      '17': true
+    },
+    {
+      '1': 'created_at_to',
+      '3': 2,
+      '4': 1,
+      '5': 9,
+      '9': 1,
+      '10': 'createdAtTo',
+      '17': true
+    },
+    {'1': 'tag_ids', '3': 3, '4': 3, '5': 3, '10': 'tagIds'},
+    {
+      '1': 'tag_limit',
+      '3': 4,
+      '4': 1,
+      '5': 5,
+      '9': 2,
+      '10': 'tagLimit',
+      '17': true
+    },
+  ],
+  '8': [
+    {'1': '_created_at_from'},
+    {'1': '_created_at_to'},
+    {'1': '_tag_limit'},
+  ],
+};
+
+/// Descriptor for `ReceiptChartSummaryRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List receiptChartSummaryRequestDescriptor = $convert.base64Decode(
+    'ChpSZWNlaXB0Q2hhcnRTdW1tYXJ5UmVxdWVzdBIrCg9jcmVhdGVkX2F0X2Zyb20YASABKAlIAF'
+    'INY3JlYXRlZEF0RnJvbYgBARInCg1jcmVhdGVkX2F0X3RvGAIgASgJSAFSC2NyZWF0ZWRBdFRv'
+    'iAEBEhcKB3RhZ19pZHMYAyADKANSBnRhZ0lkcxIgCgl0YWdfbGltaXQYBCABKAVIAlIIdGFnTG'
+    'ltaXSIAQFCEgoQX2NyZWF0ZWRfYXRfZnJvbUIQCg5fY3JlYXRlZF9hdF90b0IMCgpfdGFnX2xp'
+    'bWl0');
+
+@$core.Deprecated('Use receiptChartStatusTotalsDescriptor instead')
+const ReceiptChartStatusTotals$json = {
+  '1': 'ReceiptChartStatusTotals',
+  '2': [
+    {'1': 'paid_share', '3': 1, '4': 1, '5': 1, '10': 'paidShare'},
+    {'1': 'open_share', '3': 2, '4': 1, '5': 1, '10': 'openShare'},
+    {
+      '1': 'overdue_open_share',
+      '3': 3,
+      '4': 1,
+      '5': 1,
+      '10': 'overdueOpenShare'
+    },
+  ],
+};
+
+/// Descriptor for `ReceiptChartStatusTotals`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List receiptChartStatusTotalsDescriptor = $convert.base64Decode(
+    'ChhSZWNlaXB0Q2hhcnRTdGF0dXNUb3RhbHMSHQoKcGFpZF9zaGFyZRgBIAEoAVIJcGFpZFNoYX'
+    'JlEh0KCm9wZW5fc2hhcmUYAiABKAFSCW9wZW5TaGFyZRIsChJvdmVyZHVlX29wZW5fc2hhcmUY'
+    'AyABKAFSEG92ZXJkdWVPcGVuU2hhcmU=');
+
+@$core.Deprecated('Use receiptChartTagBucketDescriptor instead')
+const ReceiptChartTagBucket$json = {
+  '1': 'ReceiptChartTagBucket',
+  '2': [
+    {'1': 'tag', '3': 1, '4': 1, '5': 11, '6': '.debt.TagIndex', '10': 'tag'},
+    {'1': 'paid_share', '3': 2, '4': 1, '5': 1, '10': 'paidShare'},
+    {'1': 'open_share', '3': 3, '4': 1, '5': 1, '10': 'openShare'},
+    {
+      '1': 'overdue_open_share',
+      '3': 4,
+      '4': 1,
+      '5': 1,
+      '10': 'overdueOpenShare'
+    },
+    {'1': 'receipt_count', '3': 5, '4': 1, '5': 5, '10': 'receiptCount'},
+  ],
+};
+
+/// Descriptor for `ReceiptChartTagBucket`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List receiptChartTagBucketDescriptor = $convert.base64Decode(
+    'ChVSZWNlaXB0Q2hhcnRUYWdCdWNrZXQSIAoDdGFnGAEgASgLMg4uZGVidC5UYWdJbmRleFIDdG'
+    'FnEh0KCnBhaWRfc2hhcmUYAiABKAFSCXBhaWRTaGFyZRIdCgpvcGVuX3NoYXJlGAMgASgBUglv'
+    'cGVuU2hhcmUSLAoSb3ZlcmR1ZV9vcGVuX3NoYXJlGAQgASgBUhBvdmVyZHVlT3BlblNoYXJlEi'
+    'MKDXJlY2VpcHRfY291bnQYBSABKAVSDHJlY2VpcHRDb3VudA==');
+
+@$core.Deprecated('Use receiptChartSummaryResponseDescriptor instead')
+const ReceiptChartSummaryResponse$json = {
+  '1': 'ReceiptChartSummaryResponse',
+  '2': [
+    {'1': 'success', '3': 1, '4': 1, '5': 8, '10': 'success'},
+    {'1': 'message', '3': 2, '4': 1, '5': 9, '10': 'message'},
+    {
+      '1': 'totals',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.debt.ReceiptChartStatusTotals',
+      '10': 'totals'
+    },
+    {
+      '1': 'tag_buckets',
+      '3': 4,
+      '4': 3,
+      '5': 11,
+      '6': '.debt.ReceiptChartTagBucket',
+      '10': 'tagBuckets'
+    },
+    {
+      '1': 'available_tags',
+      '3': 5,
+      '4': 3,
+      '5': 11,
+      '6': '.debt.TagIndex',
+      '10': 'availableTags'
+    },
+    {'1': 'default_tag_ids', '3': 6, '4': 3, '5': 3, '10': 'defaultTagIds'},
+  ],
+};
+
+/// Descriptor for `ReceiptChartSummaryResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List receiptChartSummaryResponseDescriptor = $convert.base64Decode(
+    'ChtSZWNlaXB0Q2hhcnRTdW1tYXJ5UmVzcG9uc2USGAoHc3VjY2VzcxgBIAEoCFIHc3VjY2Vzcx'
+    'IYCgdtZXNzYWdlGAIgASgJUgdtZXNzYWdlEjYKBnRvdGFscxgDIAEoCzIeLmRlYnQuUmVjZWlw'
+    'dENoYXJ0U3RhdHVzVG90YWxzUgZ0b3RhbHMSPAoLdGFnX2J1Y2tldHMYBCADKAsyGy5kZWJ0Ll'
+    'JlY2VpcHRDaGFydFRhZ0J1Y2tldFIKdGFnQnVja2V0cxI1Cg5hdmFpbGFibGVfdGFncxgFIAMo'
+    'CzIOLmRlYnQuVGFnSW5kZXhSDWF2YWlsYWJsZVRhZ3MSJgoPZGVmYXVsdF90YWdfaWRzGAYgAy'
+    'gDUg1kZWZhdWx0VGFnSWRz');
+
 @$core.Deprecated('Use fileResponseDescriptor instead')
 const FileResponse$json = {
   '1': 'FileResponse',
