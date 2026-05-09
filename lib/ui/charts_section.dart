@@ -281,7 +281,7 @@ class _DateRangeButton extends StatelessWidget {
             firstDate: DateTime(now.year - 10),
             lastDate: DateTime(now.year + 5),
           );
-          if (context.mounted) {
+          if (context.mounted && picked != null) {
             onPicked(picked);
           }
         },

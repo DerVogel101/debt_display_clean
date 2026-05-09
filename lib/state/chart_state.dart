@@ -154,9 +154,19 @@ class ChartState extends ChangeNotifier {
 
   Future<void> toggleTag(int tagId) async {
     final next = Set<int>.of(_selectedTagIds);
-    if (!next.add(tagId)) {
+    if (next.contains(tagId)) {
+      if (next.length == 1) {
+        return;
+      }
       next.remove(tagId);
+    } else {
+      next.add(tagId);
     }
+
+    if (next.isEmpty) {
+      return;
+    }
+
     _selectedTagIds = Set<int>.unmodifiable(next);
     _usesDefaultTags = false;
     _hasLoaded = false;

@@ -2500,6 +2500,81 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('charts cancelled custom date pick keeps existing range', (
+    tester,
+  ) async {
+    _setTestSurfaceSize(tester, width: 430, height: 1200);
+    final fakeService = _FakeDebtBackendService(
+      onListReceipts: (_) => ReceiptsResponse(success: true),
+      chartSummary: _chartSummary(),
+    );
+    final chartState = ChartState(debtBackendService: fakeService);
+    final existingFrom = DateTime(2026, 5, 1);
+
+    await tester.pumpWidget(
+      _buildChartsSectionTestApp(
+        authState: _TestAuthSessionState(
+          isAuthenticatedValue: true,
+          accessTokenValue: 'token-1',
+        ),
+        chartState: chartState,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await chartState.setCustomDateRange(from: existingFrom);
+    await tester.pumpAndSettle();
+    final requestCount = fakeService.chartRequests.length;
+
+    await tester.tap(find.byKey(const ValueKey('charts-from-date-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    expect(chartState.customFrom, existingFrom);
+    expect(fakeService.chartRequests, hasLength(requestCount));
+  });
+
+  testWidgets('charts keep the final selected tag active', (tester) async {
+    _setTestSurfaceSize(tester, width: 430, height: 1200);
+    final rentTag = _chartTag(1, 'Rent');
+    final fakeService = _FakeDebtBackendService(
+      onListReceipts: (_) => ReceiptsResponse(success: true),
+      chartSummary: ReceiptChartSummaryResponse(
+        success: true,
+        totals: ReceiptChartStatusTotals(paidShare: 30, openShare: 15),
+        availableTags: [rentTag],
+        defaultTagIds: [rentTag.id],
+        tagBuckets: [
+          ReceiptChartTagBucket(
+            tag: rentTag,
+            paidShare: 30,
+            openShare: 15,
+            receiptCount: 2,
+          ),
+        ],
+      ),
+    );
+    final chartState = ChartState(debtBackendService: fakeService);
+
+    await tester.pumpWidget(
+      _buildChartsSectionTestApp(
+        authState: _TestAuthSessionState(
+          isAuthenticatedValue: true,
+          accessTokenValue: 'token-1',
+        ),
+        chartState: chartState,
+      ),
+    );
+    await tester.pumpAndSettle();
+    final requestCount = fakeService.chartRequests.length;
+
+    await tester.tap(find.byKey(const ValueKey('charts-tag-chip-1')));
+    await tester.pumpAndSettle();
+
+    expect(chartState.selectedTagIds, {1});
+    expect(fakeService.chartRequests, hasLength(requestCount));
+  });
+
   testWidgets('charts view shows empty state without chart data', (
     tester,
   ) async {
