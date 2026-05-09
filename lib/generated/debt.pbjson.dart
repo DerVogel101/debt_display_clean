@@ -95,6 +95,7 @@ const User$json = {
       '10': 'avatarUrl',
       '17': true
     },
+    {'1': 'deleted', '3': 6, '4': 1, '5': 8, '10': 'deleted'},
   ],
   '8': [
     {'1': '_email'},
@@ -107,7 +108,8 @@ const User$json = {
 final $typed_data.Uint8List userDescriptor = $convert.base64Decode(
     'CgRVc2VyEg4KAmlkGAEgASgDUgJpZBIQCgNzdWIYAiABKAlSA3N1YhIZCgVlbWFpbBgDIAEoCU'
     'gAUgVlbWFpbIgBARIXCgRuYW1lGAQgASgJSAFSBG5hbWWIAQESIgoKYXZhdGFyX3VybBgFIAEo'
-    'CUgCUglhdmF0YXJVcmyIAQFCCAoGX2VtYWlsQgcKBV9uYW1lQg0KC19hdmF0YXJfdXJs');
+    'CUgCUglhdmF0YXJVcmyIAQESGAoHZGVsZXRlZBgGIAEoCFIHZGVsZXRlZEIICgZfZW1haWxCBw'
+    'oFX25hbWVCDQoLX2F2YXRhcl91cmw=');
 
 @$core.Deprecated('Use recipientDescriptor instead')
 const Recipient$json = {
@@ -265,39 +267,35 @@ const ReceiptRecipientShare$json = {
     {'1': 'user_id', '3': 1, '4': 1, '5': 3, '10': 'userId'},
     {'1': 'share_percent', '3': 2, '4': 1, '5': 1, '10': 'sharePercent'},
     {'1': 'amount', '3': 3, '4': 1, '5': 1, '10': 'amount'},
-    {
-      '1': 'user_name',
-      '3': 4,
-      '4': 1,
-      '5': 9,
-      '9': 0,
-      '10': 'userName',
-      '17': true
-    },
-    {
-      '1': 'user_email',
-      '3': 5,
-      '4': 1,
-      '5': 9,
-      '9': 1,
-      '10': 'userEmail',
-      '17': true
-    },
     {'1': 'amount_paid', '3': 6, '4': 1, '5': 1, '10': 'amountPaid'},
+    {
+      '1': 'user',
+      '3': 7,
+      '4': 1,
+      '5': 11,
+      '6': '.debt.User',
+      '9': 0,
+      '10': 'user',
+      '17': true
+    },
   ],
   '8': [
-    {'1': '_user_name'},
-    {'1': '_user_email'},
+    {'1': '_user'},
   ],
+  '9': [
+    {'1': 4, '2': 5},
+    {'1': 5, '2': 6},
+  ],
+  '10': ['user_name', 'user_email'],
 };
 
 /// Descriptor for `ReceiptRecipientShare`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List receiptRecipientShareDescriptor = $convert.base64Decode(
     'ChVSZWNlaXB0UmVjaXBpZW50U2hhcmUSFwoHdXNlcl9pZBgBIAEoA1IGdXNlcklkEiMKDXNoYX'
-    'JlX3BlcmNlbnQYAiABKAFSDHNoYXJlUGVyY2VudBIWCgZhbW91bnQYAyABKAFSBmFtb3VudBIg'
-    'Cgl1c2VyX25hbWUYBCABKAlIAFIIdXNlck5hbWWIAQESIgoKdXNlcl9lbWFpbBgFIAEoCUgBUg'
-    'l1c2VyRW1haWyIAQESHwoLYW1vdW50X3BhaWQYBiABKAFSCmFtb3VudFBhaWRCDAoKX3VzZXJf'
-    'bmFtZUINCgtfdXNlcl9lbWFpbA==');
+    'JlX3BlcmNlbnQYAiABKAFSDHNoYXJlUGVyY2VudBIWCgZhbW91bnQYAyABKAFSBmFtb3VudBIf'
+    'CgthbW91bnRfcGFpZBgGIAEoAVIKYW1vdW50UGFpZBIjCgR1c2VyGAcgASgLMgouZGVidC5Vc2'
+    'VySABSBHVzZXKIAQFCBwoFX3VzZXJKBAgEEAVKBAgFEAZSCXVzZXJfbmFtZVIKdXNlcl9lbWFp'
+    'bA==');
 
 @$core.Deprecated('Use receiptSplitDescriptor instead')
 const ReceiptSplit$json = {
@@ -397,21 +395,12 @@ const Receipt$json = {
       '17': true
     },
     {
-      '1': 'recipient_name',
-      '3': 15,
-      '4': 1,
-      '5': 9,
-      '9': 7,
-      '10': 'recipientName',
-      '17': true
-    },
-    {
       '1': 'recipient',
       '3': 16,
       '4': 1,
       '5': 11,
       '6': '.debt.Recipient',
-      '9': 8,
+      '9': 7,
       '10': 'recipient',
       '17': true
     },
@@ -437,7 +426,7 @@ const Receipt$json = {
       '4': 1,
       '5': 11,
       '6': '.debt.ReceiptSplit',
-      '9': 9,
+      '9': 8,
       '10': 'split',
       '17': true
     },
@@ -450,10 +439,13 @@ const Receipt$json = {
     {'1': '_notes'},
     {'1': '_updated_at'},
     {'1': '_recipient_id'},
-    {'1': '_recipient_name'},
     {'1': '_recipient'},
     {'1': '_split'},
   ],
+  '9': [
+    {'1': 15, '2': 16},
+  ],
+  '10': ['recipient_name'],
 };
 
 /// Descriptor for `Receipt`. Decode as a `google.protobuf.DescriptorProto`.
@@ -465,14 +457,13 @@ final $typed_data.Uint8List receiptDescriptor = $convert.base64Decode(
     'ZW5jeRgIIAEoCVIIY3VycmVuY3kSHAoHcGFpZF9hdBgJIAEoCUgDUgZwYWlkQXSIAQESGQoFbm'
     '90ZXMYCiABKAlIBFIFbm90ZXOIAQESHQoKY3JlYXRlZF9hdBgLIAEoCVIJY3JlYXRlZEF0EiIK'
     'CnVwZGF0ZWRfYXQYDCABKAlIBVIJdXBkYXRlZEF0iAEBEhkKCG93bmVyX2lkGA0gASgDUgdvd2'
-    '5lcklkEiYKDHJlY2lwaWVudF9pZBgOIAEoA0gGUgtyZWNpcGllbnRJZIgBARIqCg5yZWNpcGll'
-    'bnRfbmFtZRgPIAEoCUgHUg1yZWNpcGllbnROYW1liAEBEjIKCXJlY2lwaWVudBgQIAEoCzIPLm'
-    'RlYnQuUmVjaXBpZW50SAhSCXJlY2lwaWVudIgBARInCgVmaWxlcxgRIAMoCzIRLmRlYnQuUmVj'
-    'ZWlwdEZpbGVSBWZpbGVzEiIKBHRhZ3MYEiADKAsyDi5kZWJ0LlRhZ0luZGV4UgR0YWdzEi0KBX'
-    'NwbGl0GBMgASgLMhIuZGVidC5SZWNlaXB0U3BsaXRICVIFc3BsaXSIAQFCDgoMX2Rlc2NyaXB0'
-    'aW9uQg4KDF9hbW91bnRfcGFpZEILCglfZHVlX2RhdGVCCgoIX3BhaWRfYXRCCAoGX25vdGVzQg'
-    '0KC191cGRhdGVkX2F0Qg8KDV9yZWNpcGllbnRfaWRCEQoPX3JlY2lwaWVudF9uYW1lQgwKCl9y'
-    'ZWNpcGllbnRCCAoGX3NwbGl0');
+    '5lcklkEiYKDHJlY2lwaWVudF9pZBgOIAEoA0gGUgtyZWNpcGllbnRJZIgBARIyCglyZWNpcGll'
+    'bnQYECABKAsyDy5kZWJ0LlJlY2lwaWVudEgHUglyZWNpcGllbnSIAQESJwoFZmlsZXMYESADKA'
+    'syES5kZWJ0LlJlY2VpcHRGaWxlUgVmaWxlcxIiCgR0YWdzGBIgAygLMg4uZGVidC5UYWdJbmRl'
+    'eFIEdGFncxItCgVzcGxpdBgTIAEoCzISLmRlYnQuUmVjZWlwdFNwbGl0SAhSBXNwbGl0iAEBQg'
+    '4KDF9kZXNjcmlwdGlvbkIOCgxfYW1vdW50X3BhaWRCCwoJX2R1ZV9kYXRlQgoKCF9wYWlkX2F0'
+    'QggKBl9ub3Rlc0INCgtfdXBkYXRlZF9hdEIPCg1fcmVjaXBpZW50X2lkQgwKCl9yZWNpcGllbn'
+    'RCCAoGX3NwbGl0SgQIDxAQUg5yZWNpcGllbnRfbmFtZQ==');
 
 @$core.Deprecated('Use actionResponseDescriptor instead')
 const ActionResponse$json = {

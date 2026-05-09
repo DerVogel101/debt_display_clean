@@ -3,29 +3,43 @@ SQLite database setup via SQLAlchemy async.
 Stores a local user record keyed by the Auth0 `sub` claim.
 Auth0 owns authentication – we only store what we need for our app.
 """
+from dataclasses import dataclass
 from datetime import datetime, timezone
 import math
+from uuid import uuid4
 
 from collections.abc import AsyncGenerator
 from sqlalchemy import (
-    String, Integer, ForeignKey, event, DateTime, func,
+    String, Integer, ForeignKey, DateTime, func,
     BigInteger, UniqueConstraint, Index, Boolean, Table, Column, Text, select,
-    or_, text,
+    or_, text, update,
 )
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
     create_async_engine,
 )
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, Session, selectinload
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, selectinload, foreign
 from backend.config import settings
 
 engine = create_async_engine(settings.DATABASE_URL, echo=False)
 async_session_maker = async_sessionmaker(engine, expire_on_commit=False)
+DELETED_USER_FIELD = "[DELETED]"
 
 
 class Base(DeclarativeBase):
     pass
+
+
+@dataclass(frozen=True)
+class UserAnonymizationResult:
+    user_id: int
+    old_sub: str
+    new_sub: str
+    storage_keys: list[str]
+    receipts_deleted: int
+    owned_groups_deleted: int
+    retained_memberships: int
 
 
 # ── Recipient ↔ User membership ───────────────────────────────────────────────
@@ -65,6 +79,7 @@ class User(Base):
     email:      Mapped[str|None] = mapped_column(String(256), nullable=True)
     name:       Mapped[str|None] = mapped_column(String(256), nullable=True)
     avatar_url: Mapped[str|None] = mapped_column(String(512), nullable=True)
+    deleted:    Mapped[bool]     = mapped_column(Boolean, default=False, nullable=False)
 
     recipient_memberships: Mapped[list["Recipient"]] = relationship(
         secondary="recipient_members",
@@ -118,9 +133,6 @@ class Receipt(Base):
         index=True,
     )
 
-    # Snapshot — survives recipient deletion
-    recipient_name: Mapped[str|None] = mapped_column(String(256), nullable=True)
-
     owner: Mapped["User"] = relationship(
         back_populates="receipts_owned",
         foreign_keys=[owner_id],
@@ -164,10 +176,13 @@ class ReceiptRecipientShare(Base):
     user_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     share_percent: Mapped[float] = mapped_column(nullable=False)
     amount_paid: Mapped[float] = mapped_column(nullable=False, default=0.0)
-    user_name_snapshot: Mapped[str|None] = mapped_column(String(256), nullable=True)
-    user_email_snapshot: Mapped[str|None] = mapped_column(String(256), nullable=True)
 
     receipt: Mapped["Receipt"] = relationship(back_populates="recipient_shares")
+    user: Mapped["User|None"] = relationship(
+        "User",
+        primaryjoin=lambda: foreign(ReceiptRecipientShare.user_id) == User.id,
+        viewonly=True,
+    )
 
 
 class ReceiptFile(Base):
@@ -238,18 +253,6 @@ class TaggedReceipt(Base):
     tag:     Mapped["TagIndex"] = relationship(back_populates="tagged_receipts")
 
 
-# ── Event listener ────────────────────────────────────────────────────────────
-@event.listens_for(Receipt.recipient_id, "set")
-def sync_recipient_name(target: Receipt, value: int | None, oldvalue, initiator):
-    if value is None:
-        return  # preserve existing snapshot
-    session = Session.object_session(target)
-    if session:
-        r = session.get(Recipient, value)
-        if r:
-            target.recipient_name = r.name
-
-
 # ── User Methods ──────────────────────────────────────────────────────────────
 
 async def get_or_create_user(
@@ -273,6 +276,8 @@ async def get_or_create_user(
             user.name = name
         if avatar_url is not None:
             user.avatar_url = avatar_url
+        if user.deleted:
+            user.deleted = False
         await session.flush()
     return user
 
@@ -325,6 +330,7 @@ async def search_users_by_prefix(
     result = await session.execute(
         select(User)
         .where(User.id != exclude_user_id)
+        .where(User.deleted.is_(False))
         .where(
             or_(
                 func.lower(User.name).like(prefix),
@@ -337,13 +343,16 @@ async def search_users_by_prefix(
     return list(result.scalars().all())
 
 
-async def delete_user(session: AsyncSession, user_id: int) -> list[str]:
+async def delete_user(session: AsyncSession, user_id: int) -> UserAnonymizationResult:
     """
-    Deletes the user row. DB cascade removes owned receipts and their file rows.
-    Returns all storage_key paths of deleted ReceiptFiles so the caller can
-    remove the actual files from disk.
+    Anonymizes the user row and removes app-owned data for GDPR erasure.
+    The row remains so historic references from other users can display a
+    deleted placeholder without retaining profile PII.
     """
-    # Collect all storage keys before deletion
+    user = await session.get(User, user_id)
+    if user is None:
+        raise ValueError(f"User {user_id} not found")
+
     result = await session.execute(
         select(ReceiptFile.storage_key)
         .join(Receipt, Receipt.id == ReceiptFile.receipt_id)
@@ -351,11 +360,79 @@ async def delete_user(session: AsyncSession, user_id: int) -> list[str]:
     )
     storage_keys = list(result.scalars().all())
 
-    user = await session.get(User, user_id)
-    if user is not None:
-        await session.delete(user)
-        await session.flush()
-    return storage_keys
+    receipt_count = (
+        await session.execute(select(func.count()).select_from(Receipt).where(Receipt.owner_id == user_id))
+    ).scalar_one()
+    owned_group_ids = list(
+        (
+            await session.execute(select(Recipient.id).where(Recipient.owner_id == user_id))
+        ).scalars().all()
+    )
+    retained_memberships = (
+        await session.execute(
+            select(func.count())
+            .select_from(recipient_members)
+            .join(Recipient, Recipient.id == recipient_members.c.recipient_id)
+            .where(recipient_members.c.user_id == user_id)
+            .where(Recipient.owner_id != user_id)
+        )
+    ).scalar_one()
+
+    if owned_group_ids:
+        await session.execute(
+            update(Receipt)
+            .where(Receipt.recipient_id.in_(owned_group_ids))
+            .values(recipient_id=None)
+        )
+        await session.execute(
+            recipient_members.delete().where(
+                recipient_members.c.recipient_id.in_(owned_group_ids)
+            )
+        )
+        for recipient_id in owned_group_ids:
+            recipient = await session.get(Recipient, recipient_id)
+            if recipient is not None:
+                await session.delete(recipient)
+
+    owned_receipts = list(
+        (
+            await session.execute(select(Receipt).where(Receipt.owner_id == user_id))
+        ).scalars().all()
+    )
+    for receipt in owned_receipts:
+        await session.delete(receipt)
+
+    old_sub = user.sub
+    user.sub = await _random_deleted_sub(session)
+    user.email = DELETED_USER_FIELD
+    user.name = DELETED_USER_FIELD
+    user.avatar_url = None
+    user.deleted = True
+
+    await session.flush()
+    return UserAnonymizationResult(
+        user_id=user_id,
+        old_sub=old_sub,
+        new_sub=user.sub,
+        storage_keys=storage_keys,
+        receipts_deleted=int(receipt_count),
+        owned_groups_deleted=len(owned_group_ids),
+        retained_memberships=int(retained_memberships),
+    )
+
+
+async def delete_user_by_sub(session: AsyncSession, sub: str) -> UserAnonymizationResult:
+    user = await get_user_by_sub(session, sub)
+    if user is None:
+        raise ValueError(f"User with sub {sub!r} not found")
+    return await delete_user(session, user.id)
+
+
+async def _random_deleted_sub(session: AsyncSession) -> str:
+    while True:
+        candidate = f"deleted|{uuid4().hex}"
+        if await get_user_by_sub(session, candidate) is None:
+            return candidate
 
 
 # ── Recipient Methods ─────────────────────────────────────────────────────────
@@ -373,6 +450,8 @@ async def create_recipient(
     if member_ids:
         result = await session.execute(select(User).where(User.id.in_(member_ids)))
         members = list(result.scalars().all())
+        if any(member.deleted for member in members):
+            raise ValueError("Deleted users cannot be added to recipient groups")
         recipient.members = members
 
     session.add(recipient)
@@ -447,6 +526,8 @@ async def add_member_to_recipient(
     user = await session.get(User, user_id)
     if user is None:
         raise ValueError(f"User {user_id} not found")
+    if user.deleted:
+        raise ValueError("Deleted users cannot be added to recipient groups")
     if user not in recipient.members:
         recipient.members.append(user)
         await session.flush()
@@ -468,11 +549,20 @@ async def remove_member_from_recipient(
 
 async def delete_recipient(session: AsyncSession, recipient_id: int) -> None:
     """
-    Deletes recipient row. DB sets Receipt.recipient_id = NULL (SET NULL).
-    The receipt_name snapshot on existing receipts is preserved.
+    Deletes recipient row and clears receipt links that pointed at it.
     """
     recipient = await session.get(Recipient, recipient_id)
     if recipient is not None:
+        await session.execute(
+            update(Receipt)
+            .where(Receipt.recipient_id == recipient_id)
+            .values(recipient_id=None)
+        )
+        await session.execute(
+            recipient_members.delete().where(
+                recipient_members.c.recipient_id == recipient_id
+            )
+        )
         await session.delete(recipient)
         await session.flush()
 
@@ -518,7 +608,9 @@ async def get_receipt_by_id(
         .where(Receipt.id == receipt_id)
         .options(
             selectinload(Receipt.recipient),
-            selectinload(Receipt.recipient_shares),
+            selectinload(Receipt.recipient_shares).selectinload(
+                ReceiptRecipientShare.user
+            ),
             selectinload(Receipt.files),
             selectinload(Receipt.tags),
         )
@@ -558,7 +650,9 @@ async def list_receipts_for_owner(
     stmt = stmt.order_by(Receipt.id).limit(limit)
     stmt = stmt.options(
         selectinload(Receipt.recipient),
-        selectinload(Receipt.recipient_shares),
+        selectinload(Receipt.recipient_shares).selectinload(
+            ReceiptRecipientShare.user
+        ),
         selectinload(Receipt.files),
         selectinload(Receipt.tags),
     )
@@ -582,7 +676,11 @@ async def update_receipt(
     result = await session.execute(
         select(Receipt)
         .where(Receipt.id == receipt_id)
-        .options(selectinload(Receipt.recipient_shares))
+        .options(
+            selectinload(Receipt.recipient_shares).selectinload(
+                ReceiptRecipientShare.user
+            )
+        )
     )
     receipt = result.scalar_one_or_none()
     if receipt is None:
@@ -671,7 +769,11 @@ async def set_receipt_split(
     result = await session.execute(
         select(Receipt)
         .where(Receipt.id == receipt_id)
-        .options(selectinload(Receipt.recipient_shares))
+        .options(
+            selectinload(Receipt.recipient_shares).selectinload(
+                ReceiptRecipientShare.user
+            )
+        )
     )
     receipt = result.scalar_one_or_none()
     if receipt is None:
@@ -722,7 +824,6 @@ async def set_receipt_split(
     next_shares: list[ReceiptRecipientShare] = []
 
     for user_id, share_percent in recipient_shares:
-        user = members_by_id[user_id]
         share = existing_shares.pop(user_id, None)
         if share is None:
             share = ReceiptRecipientShare(
@@ -735,8 +836,6 @@ async def set_receipt_split(
             float(share.amount_paid or 0.0),
             _receipt_recipient_share_amount(receipt, share),
         )
-        share.user_name_snapshot = user.name
-        share.user_email_snapshot = user.email
         next_shares.append(share)
 
     for stale_share in existing_shares.values():
@@ -757,7 +856,11 @@ async def clear_receipt_split(
     result = await session.execute(
         select(Receipt)
         .where(Receipt.id == receipt_id)
-        .options(selectinload(Receipt.recipient_shares))
+        .options(
+            selectinload(Receipt.recipient_shares).selectinload(
+                ReceiptRecipientShare.user
+            )
+        )
     )
     receipt = result.scalar_one_or_none()
     if receipt is None:
@@ -782,7 +885,11 @@ async def set_receipt_payments(
     result = await session.execute(
         select(Receipt)
         .where(Receipt.id == receipt_id)
-        .options(selectinload(Receipt.recipient_shares))
+        .options(
+            selectinload(Receipt.recipient_shares).selectinload(
+                ReceiptRecipientShare.user
+            )
+        )
     )
     receipt = result.scalar_one_or_none()
     if receipt is None:
@@ -829,7 +936,11 @@ async def mark_receipt_paid(
     result = await session.execute(
         select(Receipt)
         .where(Receipt.id == receipt_id)
-        .options(selectinload(Receipt.recipient_shares))
+        .options(
+            selectinload(Receipt.recipient_shares).selectinload(
+                ReceiptRecipientShare.user
+            )
+        )
     )
     receipt = result.scalar_one_or_none()
     if receipt is None:
@@ -850,7 +961,11 @@ async def mark_receipt_unpaid(
     result = await session.execute(
         select(Receipt)
         .where(Receipt.id == receipt_id)
-        .options(selectinload(Receipt.recipient_shares))
+        .options(
+            selectinload(Receipt.recipient_shares).selectinload(
+                ReceiptRecipientShare.user
+            )
+        )
     )
     receipt = result.scalar_one_or_none()
     if receipt is None:
@@ -1125,10 +1240,26 @@ async def set_receipt_tags(
 async def ensure_schema_compatible() -> None:
     """Applies small SQLite column additions for local databases."""
     async with engine.begin() as conn:  # type: ignore[arg-type]
+        user_columns = {
+            row[1]
+            for row in (await conn.execute(text("PRAGMA table_info(users)"))).all()
+        }
+        if user_columns and "deleted" not in user_columns:
+            await conn.execute(
+                text(
+                    "ALTER TABLE users "
+                    "ADD COLUMN deleted BOOLEAN NOT NULL DEFAULT 0"
+                )
+            )
+
         receipt_columns = {
             row[1]
             for row in (await conn.execute(text("PRAGMA table_info(receipts)"))).all()
         }
+        if "recipient_name" in receipt_columns:
+            await conn.execute(text("ALTER TABLE receipts DROP COLUMN recipient_name"))
+            receipt_columns.remove("recipient_name")
+
         if "owner_amount_paid" not in receipt_columns:
             await conn.execute(
                 text(
@@ -1143,6 +1274,23 @@ async def ensure_schema_compatible() -> None:
                 await conn.execute(text("PRAGMA table_info(receipt_recipient_shares)"))
             ).all()
         }
+        if "user_name_snapshot" in share_columns:
+            await conn.execute(
+                text(
+                    "ALTER TABLE receipt_recipient_shares "
+                    "DROP COLUMN user_name_snapshot"
+                )
+            )
+            share_columns.remove("user_name_snapshot")
+        if "user_email_snapshot" in share_columns:
+            await conn.execute(
+                text(
+                    "ALTER TABLE receipt_recipient_shares "
+                    "DROP COLUMN user_email_snapshot"
+                )
+            )
+            share_columns.remove("user_email_snapshot")
+
         if "amount_paid" not in share_columns:
             await conn.execute(
                 text(

@@ -8,8 +8,7 @@
 // ignore_for_file: constant_identifier_names
 // ignore_for_file: curly_braces_in_flow_control_structures
 // ignore_for_file: deprecated_member_use_from_same_package, library_prefixes
-// ignore_for_file: non_constant_identifier_names, prefer_relative_imports
-// ignore_for_file: always_use_package_imports
+// ignore_for_file: always_use_package_imports, non_constant_identifier_names, prefer_relative_imports
 
 import 'dart:core' as $core;
 
@@ -67,6 +66,7 @@ class User extends $pb.GeneratedMessage {
     $core.String? email,
     $core.String? name,
     $core.String? avatarUrl,
+    $core.bool? deleted,
   }) {
     final result = create();
     if (id != null) result.id = id;
@@ -74,6 +74,7 @@ class User extends $pb.GeneratedMessage {
     if (email != null) result.email = email;
     if (name != null) result.name = name;
     if (avatarUrl != null) result.avatarUrl = avatarUrl;
+    if (deleted != null) result.deleted = deleted;
     return result;
   }
 
@@ -95,6 +96,7 @@ class User extends $pb.GeneratedMessage {
     ..aOS(3, _omitFieldNames ? '' : 'email')
     ..aOS(4, _omitFieldNames ? '' : 'name')
     ..aOS(5, _omitFieldNames ? '' : 'avatarUrl')
+    ..aOB(6, _omitFieldNames ? '' : 'deleted')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -159,6 +161,15 @@ class User extends $pb.GeneratedMessage {
   $core.bool hasAvatarUrl() => $_has(4);
   @$pb.TagNumber(5)
   void clearAvatarUrl() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.bool get deleted => $_getBF(5);
+  @$pb.TagNumber(6)
+  set deleted($core.bool value) => $_setBool(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasDeleted() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearDeleted() => $_clearField(6);
 }
 
 class Recipient extends $pb.GeneratedMessage {
@@ -625,17 +636,15 @@ class ReceiptRecipientShare extends $pb.GeneratedMessage {
     $fixnum.Int64? userId,
     $core.double? sharePercent,
     $core.double? amount,
-    $core.String? userName,
-    $core.String? userEmail,
     $core.double? amountPaid,
+    User? user,
   }) {
     final result = create();
     if (userId != null) result.userId = userId;
     if (sharePercent != null) result.sharePercent = sharePercent;
     if (amount != null) result.amount = amount;
-    if (userName != null) result.userName = userName;
-    if (userEmail != null) result.userEmail = userEmail;
     if (amountPaid != null) result.amountPaid = amountPaid;
+    if (user != null) result.user = user;
     return result;
   }
 
@@ -655,9 +664,8 @@ class ReceiptRecipientShare extends $pb.GeneratedMessage {
     ..aInt64(1, _omitFieldNames ? '' : 'userId')
     ..aD(2, _omitFieldNames ? '' : 'sharePercent')
     ..aD(3, _omitFieldNames ? '' : 'amount')
-    ..aOS(4, _omitFieldNames ? '' : 'userName')
-    ..aOS(5, _omitFieldNames ? '' : 'userEmail')
     ..aD(6, _omitFieldNames ? '' : 'amountPaid')
+    ..aOM<User>(7, _omitFieldNames ? '' : 'user', subBuilder: User.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -707,32 +715,25 @@ class ReceiptRecipientShare extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearAmount() => $_clearField(3);
 
-  @$pb.TagNumber(4)
-  $core.String get userName => $_getSZ(3);
-  @$pb.TagNumber(4)
-  set userName($core.String value) => $_setString(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasUserName() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearUserName() => $_clearField(4);
-
-  @$pb.TagNumber(5)
-  $core.String get userEmail => $_getSZ(4);
-  @$pb.TagNumber(5)
-  set userEmail($core.String value) => $_setString(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasUserEmail() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearUserEmail() => $_clearField(5);
-
   @$pb.TagNumber(6)
-  $core.double get amountPaid => $_getN(5);
+  $core.double get amountPaid => $_getN(3);
   @$pb.TagNumber(6)
-  set amountPaid($core.double value) => $_setDouble(5, value);
+  set amountPaid($core.double value) => $_setDouble(3, value);
   @$pb.TagNumber(6)
-  $core.bool hasAmountPaid() => $_has(5);
+  $core.bool hasAmountPaid() => $_has(3);
   @$pb.TagNumber(6)
   void clearAmountPaid() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  User get user => $_getN(4);
+  @$pb.TagNumber(7)
+  set user(User value) => $_setField(7, value);
+  @$pb.TagNumber(7)
+  $core.bool hasUser() => $_has(4);
+  @$pb.TagNumber(7)
+  void clearUser() => $_clearField(7);
+  @$pb.TagNumber(7)
+  User ensureUser() => $_ensure(4);
 }
 
 class ReceiptSplit extends $pb.GeneratedMessage {
@@ -836,7 +837,6 @@ class Receipt extends $pb.GeneratedMessage {
     $core.String? updatedAt,
     $fixnum.Int64? ownerId,
     $fixnum.Int64? recipientId,
-    $core.String? recipientName,
     Recipient? recipient,
     $core.Iterable<ReceiptFile>? files,
     $core.Iterable<TagIndex>? tags,
@@ -857,7 +857,6 @@ class Receipt extends $pb.GeneratedMessage {
     if (updatedAt != null) result.updatedAt = updatedAt;
     if (ownerId != null) result.ownerId = ownerId;
     if (recipientId != null) result.recipientId = recipientId;
-    if (recipientName != null) result.recipientName = recipientName;
     if (recipient != null) result.recipient = recipient;
     if (files != null) result.files.addAll(files);
     if (tags != null) result.tags.addAll(tags);
@@ -892,7 +891,6 @@ class Receipt extends $pb.GeneratedMessage {
     ..aOS(12, _omitFieldNames ? '' : 'updatedAt')
     ..aInt64(13, _omitFieldNames ? '' : 'ownerId')
     ..aInt64(14, _omitFieldNames ? '' : 'recipientId')
-    ..aOS(15, _omitFieldNames ? '' : 'recipientName')
     ..aOM<Recipient>(16, _omitFieldNames ? '' : 'recipient',
         subBuilder: Recipient.create)
     ..pPM<ReceiptFile>(17, _omitFieldNames ? '' : 'files',
@@ -1047,42 +1045,33 @@ class Receipt extends $pb.GeneratedMessage {
   @$pb.TagNumber(14)
   void clearRecipientId() => $_clearField(14);
 
-  @$pb.TagNumber(15)
-  $core.String get recipientName => $_getSZ(14);
-  @$pb.TagNumber(15)
-  set recipientName($core.String value) => $_setString(14, value);
-  @$pb.TagNumber(15)
-  $core.bool hasRecipientName() => $_has(14);
-  @$pb.TagNumber(15)
-  void clearRecipientName() => $_clearField(15);
-
   @$pb.TagNumber(16)
-  Recipient get recipient => $_getN(15);
+  Recipient get recipient => $_getN(14);
   @$pb.TagNumber(16)
   set recipient(Recipient value) => $_setField(16, value);
   @$pb.TagNumber(16)
-  $core.bool hasRecipient() => $_has(15);
+  $core.bool hasRecipient() => $_has(14);
   @$pb.TagNumber(16)
   void clearRecipient() => $_clearField(16);
   @$pb.TagNumber(16)
-  Recipient ensureRecipient() => $_ensure(15);
+  Recipient ensureRecipient() => $_ensure(14);
 
   @$pb.TagNumber(17)
-  $pb.PbList<ReceiptFile> get files => $_getList(16);
+  $pb.PbList<ReceiptFile> get files => $_getList(15);
 
   @$pb.TagNumber(18)
-  $pb.PbList<TagIndex> get tags => $_getList(17);
+  $pb.PbList<TagIndex> get tags => $_getList(16);
 
   @$pb.TagNumber(19)
-  ReceiptSplit get split => $_getN(18);
+  ReceiptSplit get split => $_getN(17);
   @$pb.TagNumber(19)
   set split(ReceiptSplit value) => $_setField(19, value);
   @$pb.TagNumber(19)
-  $core.bool hasSplit() => $_has(18);
+  $core.bool hasSplit() => $_has(17);
   @$pb.TagNumber(19)
   void clearSplit() => $_clearField(19);
   @$pb.TagNumber(19)
-  ReceiptSplit ensureSplit() => $_ensure(18);
+  ReceiptSplit ensureSplit() => $_ensure(17);
 }
 
 class ActionResponse extends $pb.GeneratedMessage {

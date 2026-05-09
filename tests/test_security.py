@@ -434,12 +434,24 @@ class SchemaCompatibilityTests(AsyncDatabaseTestCase):
             await conn.run_sync(db.Base.metadata.drop_all)
             await conn.execute(
                 text(
+                    "CREATE TABLE users ("
+                    "id INTEGER PRIMARY KEY, "
+                    "sub VARCHAR(256) NOT NULL, "
+                    "email VARCHAR(256), "
+                    "name VARCHAR(256), "
+                    "avatar_url VARCHAR(512)"
+                    ")"
+                )
+            )
+            await conn.execute(
+                text(
                     "CREATE TABLE receipts ("
                     "id INTEGER PRIMARY KEY, "
                     "amount_owed FLOAT NOT NULL, "
                     "amount_paid FLOAT, "
                     "owner_share_percent FLOAT, "
-                    "is_paid BOOLEAN NOT NULL DEFAULT 0"
+                    "is_paid BOOLEAN NOT NULL DEFAULT 0, "
+                    "recipient_name VARCHAR(256)"
                     ")"
                 )
             )
@@ -449,6 +461,8 @@ class SchemaCompatibilityTests(AsyncDatabaseTestCase):
                     "receipt_id INTEGER NOT NULL, "
                     "user_id INTEGER NOT NULL, "
                     "share_percent FLOAT NOT NULL, "
+                    "user_name_snapshot VARCHAR(256), "
+                    "user_email_snapshot VARCHAR(256), "
                     "PRIMARY KEY (receipt_id, user_id)"
                     ")"
                 )
@@ -497,6 +511,20 @@ class SchemaCompatibilityTests(AsyncDatabaseTestCase):
                     )
                 ).all()
             }
+            user_columns = {
+                row[1]
+                for row in (await conn.execute(text("PRAGMA table_info(users)"))).all()
+            }
+            receipt_columns = {
+                row[1]
+                for row in (await conn.execute(text("PRAGMA table_info(receipts)"))).all()
+            }
+            share_columns = {
+                row[1]
+                for row in (
+                    await conn.execute(text("PRAGMA table_info(receipt_recipient_shares)"))
+                ).all()
+            }
 
         self.assertAlmostEqual(receipts[1].amount_paid, 100.0)
         self.assertAlmostEqual(receipts[1].owner_amount_paid, 25.0)
@@ -506,6 +534,10 @@ class SchemaCompatibilityTests(AsyncDatabaseTestCase):
         self.assertAlmostEqual(shares[(2, 21)], 30.0)
         self.assertAlmostEqual(receipts[3].amount_paid, 30.0)
         self.assertAlmostEqual(receipts[3].owner_amount_paid, 30.0)
+        self.assertIn("deleted", user_columns)
+        self.assertNotIn("recipient_name", receipt_columns)
+        self.assertNotIn("user_name_snapshot", share_columns)
+        self.assertNotIn("user_email_snapshot", share_columns)
 
 
 class ReceiptAndFileAuthorizationTests(AsyncDatabaseTestCase):
@@ -742,7 +774,7 @@ class ReceiptSplitTests(AsyncDatabaseTestCase):
         self.assertEqual(parsed.receipt.split.owner_amount, 30.0)
         self.assertEqual(
             {
-                (share.user_id, share.share_percent, share.amount, share.user_name)
+                (share.user_id, share.share_percent, share.amount, share.user.name)
                 for share in parsed.receipt.split.recipient_shares
             },
             {
@@ -945,7 +977,7 @@ class ReceiptSplitTests(AsyncDatabaseTestCase):
                     recipient_shares=[(self.stranger.id, 50.0)],
                 )
 
-    async def test_delete_user_preserves_split_rows_and_snapshots(self) -> None:
+    async def test_delete_user_anonymizes_and_preserves_split_references(self) -> None:
         async with db.async_session_maker() as session:
             receipt = await db.create_receipt(
                 session=session,
@@ -963,27 +995,35 @@ class ReceiptSplitTests(AsyncDatabaseTestCase):
             await session.commit()
 
         async with db.async_session_maker() as session:
-            deleted_storage_keys = await db.delete_user(session, self.member_a.id)
+            result = await db.delete_user(session, self.member_a.id)
             await session.commit()
 
-        self.assertEqual(deleted_storage_keys, [])
+        self.assertEqual(result.storage_keys, [])
+        self.assertEqual(result.retained_memberships, 1)
 
         async with db.async_session_maker() as session:
             stored = await db.get_receipt_by_id(session, receipt.id)
+            deleted_user = await db.get_user_by_id(session, self.member_a.id)
 
         self.assertIsNotNone(stored)
+        self.assertIsNotNone(deleted_user)
+        self.assertTrue(deleted_user.deleted)
+        self.assertNotEqual(deleted_user.sub, "auth0|member-a")
+        self.assertEqual(deleted_user.email, "[DELETED]")
+        self.assertEqual(deleted_user.name, "[DELETED]")
+        self.assertIsNone(deleted_user.avatar_url)
         self.assertEqual(stored.owner_share_percent, 25.0)
         self.assertEqual(
             [
                 (
                     share.user_id,
                     share.share_percent,
-                    share.user_name_snapshot,
-                    share.user_email_snapshot,
+                    share.user.deleted,
+                    share.user.name,
                 )
                 for share in stored.recipient_shares
             ],
-            [(self.member_a.id, 75.0, "Member A", "member-a@example.com")],
+            [(self.member_a.id, 75.0, True, "[DELETED]")],
         )
 
         response = await self._post_protobuf(
@@ -1002,13 +1042,83 @@ class ReceiptSplitTests(AsyncDatabaseTestCase):
                 (
                     share.user_id,
                     share.share_percent,
-                    share.user_name,
-                    share.user_email,
+                    share.user.deleted,
+                    share.user.name,
                 )
                 for share in parsed.receipt.split.recipient_shares
             ],
-            [(self.member_a.id, 75.0, "Member A", "member-a@example.com")],
+            [(self.member_a.id, 75.0, True, "[DELETED]")],
         )
+
+    async def test_users_delete_route_removes_owned_data_and_keeps_other_group_membership(self) -> None:
+        async with db.async_session_maker() as session:
+            owned_group = await db.create_recipient(
+                session=session,
+                owner_id=self.member_a.id,
+                name="Owned by deleted user",
+                description=None,
+                member_ids=[self.member_b.id],
+            )
+            retained_group = await db.create_recipient(
+                session=session,
+                owner_id=self.owner.id,
+                name="Retained group",
+                description=None,
+                member_ids=[self.member_a.id],
+            )
+            owned_receipt = await db.create_receipt(
+                session=session,
+                owner_id=self.member_a.id,
+                title="Deleted user receipt",
+                amount_owed=42.0,
+                recipient_id=owned_group.id,
+            )
+            file_record = await services.create_receipt_file_for_owner(
+                session=session,
+                actor_user_id=self.member_a.id,
+                receipt_id=owned_receipt.id,
+                client_filename="receipt.pdf",
+            )
+            await session.commit()
+
+            file_path = resolve_storage_path(file_record.storage_key, settings.UPLOAD_DIR)
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            file_path.write_bytes(b"receipt")
+
+        response = await self._post_protobuf(
+            "/api/users/delete",
+            debt_pb2.EmptyRequest(),
+            "member-a-token",
+        )
+        parsed = self._parse_message(debt_pb2.ActionResponse, response)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(parsed.success)
+        self.assertFalse(file_path.exists())
+
+        async with db.async_session_maker() as session:
+            deleted_user = await db.get_user_by_id(session, self.member_a.id)
+            removed_receipt = await db.get_receipt_by_id(session, owned_receipt.id)
+            removed_group = await db.get_recipient_by_id(session, owned_group.id)
+            kept_group = await db.get_recipient_by_id(session, retained_group.id)
+
+        self.assertIsNotNone(deleted_user)
+        self.assertTrue(deleted_user.deleted)
+        self.assertEqual(deleted_user.email, "[DELETED]")
+        self.assertIsNone(removed_receipt)
+        self.assertIsNone(removed_group)
+        self.assertIsNotNone(kept_group)
+        self.assertEqual([member.id for member in kept_group.members], [self.member_a.id])
+        self.assertTrue(kept_group.members[0].deleted)
+
+        search_response = await self._post_protobuf(
+            "/api/users/search",
+            debt_pb2.UserSearchRequest(query="mem"),
+            "owner-token",
+        )
+        search = self._parse_message(debt_pb2.UsersResponse, search_response)
+        self.assertEqual(search_response.status_code, 200)
+        self.assertNotIn(self.member_a.id, [user.id for user in search.users])
 
     async def test_update_receipt_split_fully_replaces_old_rows(self) -> None:
         async with db.async_session_maker() as session:

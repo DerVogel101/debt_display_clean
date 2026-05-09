@@ -181,7 +181,7 @@ def _action_response(message: str = "") -> debt_pb2.ActionResponse:
 
 
 def _user_to_pb(user) -> debt_pb2.User:
-    msg = debt_pb2.User(id=user.id, sub=user.sub)
+    msg = debt_pb2.User(id=user.id, sub=user.sub, deleted=bool(user.deleted))
     if user.email is not None:
         msg.email = user.email
     if user.name is not None:
@@ -264,10 +264,8 @@ def _receipt_split_to_pb(receipt) -> debt_pb2.ReceiptSplit | None:
             amount=amount_owed * float(share.share_percent) / 100.0,
             amount_paid=float(share.amount_paid or 0.0),
         )
-        if share.user_name_snapshot is not None:
-            share_msg.user_name = share.user_name_snapshot
-        if share.user_email_snapshot is not None:
-            share_msg.user_email = share.user_email_snapshot
+        if share.user is not None:
+            share_msg.user.CopyFrom(_user_to_pb(share.user))
     return msg
 
 
@@ -295,8 +293,6 @@ def _receipt_to_pb(receipt) -> debt_pb2.Receipt:
         msg.updated_at = _dt_to_proto(receipt.updated_at)
     if receipt.recipient_id is not None:
         msg.recipient_id = receipt.recipient_id
-    if receipt.recipient_name is not None:
-        msg.recipient_name = receipt.recipient_name
     if receipt.recipient is not None:
         msg.recipient.CopyFrom(_recipient_to_pb(receipt.recipient, include_members=False))
     for file_record in getattr(receipt, "files", []) or []:
@@ -470,9 +466,9 @@ async def search_users_route(request: Request, session: AsyncSession = Depends(g
 async def delete_me(request: Request, session: AsyncSession = Depends(get_session)) -> ProtobufResponse:
     try:
         user = await _current_user(request, session)
-        storage_keys = await delete_user(session, user.id)
+        result = await delete_user(session, user.id)
         await session.commit()
-        for storage_key in storage_keys:
+        for storage_key in result.storage_keys:
             _delete_managed_file(storage_key)
         return _pb_response(debt_pb2.ActionResponse(success=True, message="User deleted"))
     except Exception as exc:
