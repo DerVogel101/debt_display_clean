@@ -80,4 +80,4 @@ For Flutter UI state in this repo:
 
 ## AGENTS.md Maintenance
 
-If you notice repo-specific commands, pitfalls, conventions, or workflows that would likely help future agents, suggest adding them to this `AGENTS.md` file when appropriate.
+If you notice repo-specific commands, pitfalls, conventions, or workflows that would likely help future agents, suggest adding them to this `AGENTS.md` file.

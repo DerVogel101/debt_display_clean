@@ -6,6 +6,8 @@ backend/proto/__pycache__/
 __pycache__/
 backend/database.sqlite
 database.sqlite
+backend/uploads/
+uploads/
 
 # Miscellaneous
 *.class
