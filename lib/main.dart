@@ -158,7 +158,7 @@ class _AppRootState extends State<_AppRoot> {
         AppLocalizations.delegate,
         ...GlobalMaterialLocalizations.delegates,
       ],
-      supportedLocales: AppLocalizations.supportedLocales,
+      supportedLocales: const [Locale('en'), Locale('de')],
       themeMode: themeMode,
       theme: lightTheme,
       darkTheme: darkTheme,
