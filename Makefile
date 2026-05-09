@@ -15,6 +15,6 @@ dev-flutter:
 	flutter run -d chrome --web-port=3000
 
 release-flutter:
-	flutter build web --release --pwa-strategy=none
+	flutter build web --release --pwa-strategy=none --no-wasm-dry-run
 	robocopy "build/web" "backend/web" /MIR /R:0 /W:0 & IF %ERRORLEVEL% LSS 8 EXIT /B 0
 	echo "Web assets belong here" >> backend/web/.gitkeep
