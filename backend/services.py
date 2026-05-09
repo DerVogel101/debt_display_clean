@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 import json
 from dataclasses import asdict, dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -39,6 +39,30 @@ class ReceiptPage:
 class ReceiptUnpaidSummary:
     unpaid_share_total: float
     unpaid_bill_count: int
+
+
+@dataclass(frozen=True)
+class ReceiptChartStatusTotals:
+    paid_share: float = 0.0
+    open_share: float = 0.0
+    overdue_open_share: float = 0.0
+
+
+@dataclass(frozen=True)
+class ReceiptChartTagBucket:
+    tag: db.TagIndex
+    paid_share: float
+    open_share: float
+    overdue_open_share: float
+    receipt_count: int
+
+
+@dataclass(frozen=True)
+class ReceiptChartSummary:
+    totals: ReceiptChartStatusTotals
+    tag_buckets: list[ReceiptChartTagBucket]
+    available_tags: list[db.TagIndex]
+    default_tag_ids: list[int]
 
 
 @dataclass(frozen=True)
@@ -610,6 +634,158 @@ async def summarize_visible_unpaid_receipts(
         unpaid_share_total=total,
         unpaid_bill_count=count,
     )
+
+
+async def summarize_visible_receipt_charts(
+    session: AsyncSession,
+    actor_user_id: int,
+    *,
+    created_at_from: datetime | None = None,
+    created_at_to: datetime | None = None,
+    tag_ids: list[int] | None = None,
+    tag_limit: int = 5,
+    now: datetime | None = None,
+) -> ReceiptChartSummary:
+    capped_tag_limit = max(1, min(tag_limit, 20))
+    reference_now = _normalize_datetime(now or datetime.now(timezone.utc))
+    stmt = select(Receipt).where(
+        _receipt_actor_visibility_filter(actor_user_id, "owner_or_recipient_group")
+    )
+    if created_at_from is not None:
+        stmt = stmt.where(Receipt.created_at >= created_at_from)
+    if created_at_to is not None:
+        stmt = stmt.where(Receipt.created_at < created_at_to)
+    stmt = stmt.options(
+        selectinload(Receipt.recipient_shares).selectinload(
+            ReceiptRecipientShare.user
+        ),
+        selectinload(Receipt.tags),
+    )
+
+    result = await session.execute(stmt)
+    receipts = list(result.scalars().all())
+    tag_usage: dict[int, tuple[db.TagIndex, int]] = {}
+    totals = [0.0, 0.0, 0.0]
+
+    for receipt in receipts:
+        paid_share, open_share, overdue_open_share = _chart_values_for_user(
+            receipt,
+            actor_user_id,
+            reference_now,
+        )
+        totals[0] += paid_share
+        totals[1] += open_share
+        totals[2] += overdue_open_share
+        for tag in receipt.tags:
+            current = tag_usage.get(tag.id)
+            tag_usage[tag.id] = (tag, (current[1] if current is not None else 0) + 1)
+
+    available_tags = [
+        tag
+        for tag, _ in sorted(
+            tag_usage.values(),
+            key=lambda item: (-item[1], item[0].text.lower(), item[0].id),
+        )
+    ]
+    default_tag_ids = [tag.id for tag in available_tags[:capped_tag_limit]]
+    selected_tag_ids = _normalize_tag_ids(tag_ids) if tag_ids else default_tag_ids
+    selected_tag_id_set = set(selected_tag_ids)
+    selected_tags_by_id = {
+        tag.id: tag for tag in available_tags if tag.id in selected_tag_id_set
+    }
+    bucket_values = {
+        tag_id: [0.0, 0.0, 0.0, 0] for tag_id in selected_tag_ids
+    }
+
+    for receipt in receipts:
+        receipt_tag_ids = {tag.id for tag in receipt.tags}
+        matching_tag_ids = selected_tag_id_set.intersection(receipt_tag_ids)
+        if not matching_tag_ids:
+            continue
+        paid_share, open_share, overdue_open_share = _chart_values_for_user(
+            receipt,
+            actor_user_id,
+            reference_now,
+        )
+        for tag_id in matching_tag_ids:
+            if tag_id not in selected_tags_by_id:
+                continue
+            bucket = bucket_values[tag_id]
+            bucket[0] += paid_share
+            bucket[1] += open_share
+            bucket[2] += overdue_open_share
+            bucket[3] += 1
+
+    tag_buckets = [
+        ReceiptChartTagBucket(
+            tag=selected_tags_by_id[tag_id],
+            paid_share=bucket_values[tag_id][0],
+            open_share=bucket_values[tag_id][1],
+            overdue_open_share=bucket_values[tag_id][2],
+            receipt_count=int(bucket_values[tag_id][3]),
+        )
+        for tag_id in selected_tag_ids
+        if tag_id in selected_tags_by_id
+    ]
+
+    return ReceiptChartSummary(
+        totals=ReceiptChartStatusTotals(
+            paid_share=totals[0],
+            open_share=totals[1],
+            overdue_open_share=totals[2],
+        ),
+        tag_buckets=tag_buckets,
+        available_tags=available_tags,
+        default_tag_ids=default_tag_ids,
+    )
+
+
+def _normalize_datetime(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def _chart_values_for_user(
+    receipt: Receipt,
+    actor_user_id: int,
+    now: datetime,
+) -> tuple[float, float, float]:
+    share_amount = _share_amount_for_user(receipt, actor_user_id)
+    if share_amount <= 1e-6:
+        return 0.0, 0.0, 0.0
+    paid_share = min(max(_paid_share_for_user(receipt, actor_user_id), 0.0), share_amount)
+    remaining = max(0.0, share_amount - paid_share)
+    if remaining <= 1e-6:
+        return paid_share, 0.0, 0.0
+    if receipt.due_date is not None and _normalize_datetime(receipt.due_date) < now:
+        return paid_share, 0.0, remaining
+    return paid_share, remaining, 0.0
+
+
+def _share_amount_for_user(receipt: Receipt, actor_user_id: int) -> float:
+    amount_owed = float(receipt.amount_owed)
+    if receipt.owner_id == actor_user_id:
+        if receipt.owner_share_percent is None:
+            return amount_owed
+        return amount_owed * float(receipt.owner_share_percent) / 100.0
+
+    for share in getattr(receipt, "recipient_shares", []) or []:
+        if share.user_id == actor_user_id:
+            return amount_owed * float(share.share_percent) / 100.0
+
+    return 0.0
+
+
+def _paid_share_for_user(receipt: Receipt, actor_user_id: int) -> float:
+    if receipt.owner_id == actor_user_id:
+        return float(receipt.owner_amount_paid or 0.0)
+
+    for share in getattr(receipt, "recipient_shares", []) or []:
+        if share.user_id == actor_user_id:
+            return float(share.amount_paid or 0.0)
+
+    return 0.0
 
 
 def _remaining_share_for_user(receipt: Receipt, actor_user_id: int) -> float:

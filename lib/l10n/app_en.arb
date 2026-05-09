@@ -5,6 +5,7 @@
   "brandSubtitle": "Shared debt and receipts",
   "destinationHome": "Home",
   "destinationBills": "Bills",
+  "destinationCharts": "Charts",
   "destinationCreateBill": "Create Bill",
   "destinationRecipientGroups": "Recipient groups",
   "destinationProfile": "Profile",
@@ -70,6 +71,7 @@
   "menuDescription": "Use this overflow area for profile access and appearance settings, especially on mobile where the bottom bar stays compact.",
   "menuHomeDescription": "Return to the unpaid bill dashboard and overview.",
   "menuBillsDescription": "Open the full bills view with filters, sorting, and pagination controls.",
+  "menuChartsDescription": "Review paid, open, and overdue shares by date and tag.",
   "menuCreateBillDescription": "Create a bill with tags, splits, notes, and uploaded receipt files.",
   "menuRecipientGroupsDescription": "Create shared recipient groups and manage who can receive split bills.",
   "menuProfileLoggedOutDescription": "Open your account details to sign in and inspect your user data.",
@@ -243,5 +245,39 @@
   "findUser": "Find user",
   "findUserHelper": "Type at least 3 characters from name or email.",
   "addMember": "Add member",
-  "noMembers": "No members"
+  "noMembers": "No members",
+  "chartsDescription": "Track your paid, open, and overdue shares across visible receipts.",
+  "loginToViewCharts": "Log in to view charts",
+  "chartDateRange": "Date range",
+  "chartAllTime": "All time",
+  "chartLast30Days": "Last 30 days",
+  "chartLast90Days": "Last 90 days",
+  "chartThisYear": "This year",
+  "chartCustom": "Custom",
+  "chartFromDate": "From",
+  "chartToDate": "To",
+  "chartPickDate": "Pick date",
+  "chartClearDate": "Clear",
+  "chartDebtBreakdown": "Debt breakdown",
+  "chartTagBreakdown": "Tag breakdown",
+  "chartNoData": "No chart data for this range.",
+  "chartNoTags": "No tags available for this range.",
+  "chartPaidShare": "Paid share",
+  "chartOpenShare": "Open share",
+  "chartOverdueOpenShare": "Overdue open share",
+  "chartSelectTags": "Tags",
+  "chartReceiptsCount": "{count} receipts",
+  "@chartReceiptsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "couldNotLoadCharts": "Could not load charts. {message}",
+  "@couldNotLoadCharts": {
+    "placeholders": {
+      "message": {}
+    }
+  }
 }

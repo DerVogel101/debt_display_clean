@@ -305,6 +305,16 @@ def _receipt_to_pb(receipt) -> debt_pb2.Receipt:
     return msg
 
 
+def _chart_totals_to_pb(
+    totals: services.ReceiptChartStatusTotals,
+) -> debt_pb2.ReceiptChartStatusTotals:
+    return debt_pb2.ReceiptChartStatusTotals(
+        paid_share=totals.paid_share,
+        open_share=totals.open_share,
+        overdue_open_share=totals.overdue_open_share,
+    )
+
+
 async def _current_user(request: Request, session: AsyncSession):
     return await get_current_user(request=request, session=session)
 
@@ -760,6 +770,47 @@ async def unpaid_receipts_summary_route(request: Request, session: AsyncSession 
     except Exception as exc:
         await session.rollback()
         return _error_response(debt_pb2.ReceiptUnpaidSummaryResponse, exc)
+
+
+@api_app.post("/receipts/chart-summary")
+async def receipt_chart_summary_route(request: Request, session: AsyncSession = Depends(get_session)) -> ProtobufResponse:
+    body = await request.body()
+    proto_req = debt_pb2.ReceiptChartSummaryRequest()
+    proto_req.ParseFromString(body)
+    try:
+        user = await _current_user(request, session)
+        summary = await services.summarize_visible_receipt_charts(
+            session,
+            actor_user_id=user.id,
+            created_at_from=_dt_from_proto(
+                proto_req.created_at_from if _has_field(proto_req, "created_at_from") else None
+            ),
+            created_at_to=_dt_from_proto(
+                proto_req.created_at_to if _has_field(proto_req, "created_at_to") else None
+            ),
+            tag_ids=list(proto_req.tag_ids) or None,
+            tag_limit=proto_req.tag_limit if _has_field(proto_req, "tag_limit") else 5,
+        )
+        await session.commit()
+        resp = debt_pb2.ReceiptChartSummaryResponse(
+            success=True,
+            totals=_chart_totals_to_pb(summary.totals),
+        )
+        for bucket in summary.tag_buckets:
+            bucket_msg = resp.tag_buckets.add(
+                paid_share=bucket.paid_share,
+                open_share=bucket.open_share,
+                overdue_open_share=bucket.overdue_open_share,
+                receipt_count=bucket.receipt_count,
+            )
+            bucket_msg.tag.CopyFrom(_tag_to_pb(bucket.tag))
+        for tag in summary.available_tags:
+            resp.available_tags.add().CopyFrom(_tag_to_pb(tag))
+        resp.default_tag_ids.extend(summary.default_tag_ids)
+        return _pb_response(resp)
+    except Exception as exc:
+        await session.rollback()
+        return _error_response(debt_pb2.ReceiptChartSummaryResponse, exc)
 
 
 @api_app.post("/receipts/update")

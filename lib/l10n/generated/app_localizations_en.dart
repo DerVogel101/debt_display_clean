@@ -24,6 +24,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get destinationBills => 'Bills';
 
   @override
+  String get destinationCharts => 'Charts';
+
+  @override
   String get destinationCreateBill => 'Create Bill';
 
   @override
@@ -167,6 +170,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get menuBillsDescription =>
       'Open the full bills view with filters, sorting, and pagination controls.';
+
+  @override
+  String get menuChartsDescription =>
+      'Review paid, open, and overdue shares by date and tag.';
 
   @override
   String get menuCreateBillDescription =>
@@ -567,4 +574,75 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get noMembers => 'No members';
+
+  @override
+  String get chartsDescription =>
+      'Track your paid, open, and overdue shares across visible receipts.';
+
+  @override
+  String get loginToViewCharts => 'Log in to view charts';
+
+  @override
+  String get chartDateRange => 'Date range';
+
+  @override
+  String get chartAllTime => 'All time';
+
+  @override
+  String get chartLast30Days => 'Last 30 days';
+
+  @override
+  String get chartLast90Days => 'Last 90 days';
+
+  @override
+  String get chartThisYear => 'This year';
+
+  @override
+  String get chartCustom => 'Custom';
+
+  @override
+  String get chartFromDate => 'From';
+
+  @override
+  String get chartToDate => 'To';
+
+  @override
+  String get chartPickDate => 'Pick date';
+
+  @override
+  String get chartClearDate => 'Clear';
+
+  @override
+  String get chartDebtBreakdown => 'Debt breakdown';
+
+  @override
+  String get chartTagBreakdown => 'Tag breakdown';
+
+  @override
+  String get chartNoData => 'No chart data for this range.';
+
+  @override
+  String get chartNoTags => 'No tags available for this range.';
+
+  @override
+  String get chartPaidShare => 'Paid share';
+
+  @override
+  String get chartOpenShare => 'Open share';
+
+  @override
+  String get chartOverdueOpenShare => 'Overdue open share';
+
+  @override
+  String get chartSelectTags => 'Tags';
+
+  @override
+  String chartReceiptsCount(int count) {
+    return '$count receipts';
+  }
+
+  @override
+  String couldNotLoadCharts(Object message) {
+    return 'Could not load charts. $message';
+  }
 }

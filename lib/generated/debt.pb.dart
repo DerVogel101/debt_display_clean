@@ -8,7 +8,8 @@
 // ignore_for_file: constant_identifier_names
 // ignore_for_file: curly_braces_in_flow_control_structures
 // ignore_for_file: deprecated_member_use_from_same_package, library_prefixes
-// ignore_for_file: always_use_package_imports, non_constant_identifier_names, prefer_relative_imports
+// ignore_for_file: non_constant_identifier_names, prefer_relative_imports
+// ignore_for_file: always_use_package_imports
 
 import 'dart:core' as $core;
 
@@ -1744,6 +1745,382 @@ class ReceiptUnpaidSummaryResponse extends $pb.GeneratedMessage {
   $core.bool hasUnpaidBillCount() => $_has(3);
   @$pb.TagNumber(4)
   void clearUnpaidBillCount() => $_clearField(4);
+}
+
+class ReceiptChartSummaryRequest extends $pb.GeneratedMessage {
+  factory ReceiptChartSummaryRequest({
+    $core.String? createdAtFrom,
+    $core.String? createdAtTo,
+    $core.Iterable<$fixnum.Int64>? tagIds,
+    $core.int? tagLimit,
+  }) {
+    final result = create();
+    if (createdAtFrom != null) result.createdAtFrom = createdAtFrom;
+    if (createdAtTo != null) result.createdAtTo = createdAtTo;
+    if (tagIds != null) result.tagIds.addAll(tagIds);
+    if (tagLimit != null) result.tagLimit = tagLimit;
+    return result;
+  }
+
+  ReceiptChartSummaryRequest._();
+
+  factory ReceiptChartSummaryRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ReceiptChartSummaryRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ReceiptChartSummaryRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'debt'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'createdAtFrom')
+    ..aOS(2, _omitFieldNames ? '' : 'createdAtTo')
+    ..p<$fixnum.Int64>(3, _omitFieldNames ? '' : 'tagIds', $pb.PbFieldType.K6)
+    ..aI(4, _omitFieldNames ? '' : 'tagLimit')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ReceiptChartSummaryRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ReceiptChartSummaryRequest copyWith(
+          void Function(ReceiptChartSummaryRequest) updates) =>
+      super.copyWith(
+              (message) => updates(message as ReceiptChartSummaryRequest))
+          as ReceiptChartSummaryRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ReceiptChartSummaryRequest create() => ReceiptChartSummaryRequest._();
+  @$core.override
+  ReceiptChartSummaryRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ReceiptChartSummaryRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ReceiptChartSummaryRequest>(create);
+  static ReceiptChartSummaryRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get createdAtFrom => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set createdAtFrom($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasCreatedAtFrom() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearCreatedAtFrom() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get createdAtTo => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set createdAtTo($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasCreatedAtTo() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearCreatedAtTo() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $pb.PbList<$fixnum.Int64> get tagIds => $_getList(2);
+
+  @$pb.TagNumber(4)
+  $core.int get tagLimit => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set tagLimit($core.int value) => $_setSignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasTagLimit() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearTagLimit() => $_clearField(4);
+}
+
+class ReceiptChartStatusTotals extends $pb.GeneratedMessage {
+  factory ReceiptChartStatusTotals({
+    $core.double? paidShare,
+    $core.double? openShare,
+    $core.double? overdueOpenShare,
+  }) {
+    final result = create();
+    if (paidShare != null) result.paidShare = paidShare;
+    if (openShare != null) result.openShare = openShare;
+    if (overdueOpenShare != null) result.overdueOpenShare = overdueOpenShare;
+    return result;
+  }
+
+  ReceiptChartStatusTotals._();
+
+  factory ReceiptChartStatusTotals.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ReceiptChartStatusTotals.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ReceiptChartStatusTotals',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'debt'),
+      createEmptyInstance: create)
+    ..aD(1, _omitFieldNames ? '' : 'paidShare')
+    ..aD(2, _omitFieldNames ? '' : 'openShare')
+    ..aD(3, _omitFieldNames ? '' : 'overdueOpenShare')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ReceiptChartStatusTotals clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ReceiptChartStatusTotals copyWith(
+          void Function(ReceiptChartStatusTotals) updates) =>
+      super.copyWith((message) => updates(message as ReceiptChartStatusTotals))
+          as ReceiptChartStatusTotals;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ReceiptChartStatusTotals create() => ReceiptChartStatusTotals._();
+  @$core.override
+  ReceiptChartStatusTotals createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ReceiptChartStatusTotals getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ReceiptChartStatusTotals>(create);
+  static ReceiptChartStatusTotals? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.double get paidShare => $_getN(0);
+  @$pb.TagNumber(1)
+  set paidShare($core.double value) => $_setDouble(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPaidShare() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPaidShare() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.double get openShare => $_getN(1);
+  @$pb.TagNumber(2)
+  set openShare($core.double value) => $_setDouble(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasOpenShare() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearOpenShare() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.double get overdueOpenShare => $_getN(2);
+  @$pb.TagNumber(3)
+  set overdueOpenShare($core.double value) => $_setDouble(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasOverdueOpenShare() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearOverdueOpenShare() => $_clearField(3);
+}
+
+class ReceiptChartTagBucket extends $pb.GeneratedMessage {
+  factory ReceiptChartTagBucket({
+    TagIndex? tag,
+    $core.double? paidShare,
+    $core.double? openShare,
+    $core.double? overdueOpenShare,
+    $core.int? receiptCount,
+  }) {
+    final result = create();
+    if (tag != null) result.tag = tag;
+    if (paidShare != null) result.paidShare = paidShare;
+    if (openShare != null) result.openShare = openShare;
+    if (overdueOpenShare != null) result.overdueOpenShare = overdueOpenShare;
+    if (receiptCount != null) result.receiptCount = receiptCount;
+    return result;
+  }
+
+  ReceiptChartTagBucket._();
+
+  factory ReceiptChartTagBucket.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ReceiptChartTagBucket.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ReceiptChartTagBucket',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'debt'),
+      createEmptyInstance: create)
+    ..aOM<TagIndex>(1, _omitFieldNames ? '' : 'tag',
+        subBuilder: TagIndex.create)
+    ..aD(2, _omitFieldNames ? '' : 'paidShare')
+    ..aD(3, _omitFieldNames ? '' : 'openShare')
+    ..aD(4, _omitFieldNames ? '' : 'overdueOpenShare')
+    ..aI(5, _omitFieldNames ? '' : 'receiptCount')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ReceiptChartTagBucket clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ReceiptChartTagBucket copyWith(
+          void Function(ReceiptChartTagBucket) updates) =>
+      super.copyWith((message) => updates(message as ReceiptChartTagBucket))
+          as ReceiptChartTagBucket;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ReceiptChartTagBucket create() => ReceiptChartTagBucket._();
+  @$core.override
+  ReceiptChartTagBucket createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ReceiptChartTagBucket getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ReceiptChartTagBucket>(create);
+  static ReceiptChartTagBucket? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  TagIndex get tag => $_getN(0);
+  @$pb.TagNumber(1)
+  set tag(TagIndex value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasTag() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearTag() => $_clearField(1);
+  @$pb.TagNumber(1)
+  TagIndex ensureTag() => $_ensure(0);
+
+  @$pb.TagNumber(2)
+  $core.double get paidShare => $_getN(1);
+  @$pb.TagNumber(2)
+  set paidShare($core.double value) => $_setDouble(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasPaidShare() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearPaidShare() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.double get openShare => $_getN(2);
+  @$pb.TagNumber(3)
+  set openShare($core.double value) => $_setDouble(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasOpenShare() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearOpenShare() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.double get overdueOpenShare => $_getN(3);
+  @$pb.TagNumber(4)
+  set overdueOpenShare($core.double value) => $_setDouble(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasOverdueOpenShare() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearOverdueOpenShare() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.int get receiptCount => $_getIZ(4);
+  @$pb.TagNumber(5)
+  set receiptCount($core.int value) => $_setSignedInt32(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasReceiptCount() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearReceiptCount() => $_clearField(5);
+}
+
+class ReceiptChartSummaryResponse extends $pb.GeneratedMessage {
+  factory ReceiptChartSummaryResponse({
+    $core.bool? success,
+    $core.String? message,
+    ReceiptChartStatusTotals? totals,
+    $core.Iterable<ReceiptChartTagBucket>? tagBuckets,
+    $core.Iterable<TagIndex>? availableTags,
+    $core.Iterable<$fixnum.Int64>? defaultTagIds,
+  }) {
+    final result = create();
+    if (success != null) result.success = success;
+    if (message != null) result.message = message;
+    if (totals != null) result.totals = totals;
+    if (tagBuckets != null) result.tagBuckets.addAll(tagBuckets);
+    if (availableTags != null) result.availableTags.addAll(availableTags);
+    if (defaultTagIds != null) result.defaultTagIds.addAll(defaultTagIds);
+    return result;
+  }
+
+  ReceiptChartSummaryResponse._();
+
+  factory ReceiptChartSummaryResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ReceiptChartSummaryResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ReceiptChartSummaryResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'debt'),
+      createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'success')
+    ..aOS(2, _omitFieldNames ? '' : 'message')
+    ..aOM<ReceiptChartStatusTotals>(3, _omitFieldNames ? '' : 'totals',
+        subBuilder: ReceiptChartStatusTotals.create)
+    ..pPM<ReceiptChartTagBucket>(4, _omitFieldNames ? '' : 'tagBuckets',
+        subBuilder: ReceiptChartTagBucket.create)
+    ..pPM<TagIndex>(5, _omitFieldNames ? '' : 'availableTags',
+        subBuilder: TagIndex.create)
+    ..p<$fixnum.Int64>(
+        6, _omitFieldNames ? '' : 'defaultTagIds', $pb.PbFieldType.K6)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ReceiptChartSummaryResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ReceiptChartSummaryResponse copyWith(
+          void Function(ReceiptChartSummaryResponse) updates) =>
+      super.copyWith(
+              (message) => updates(message as ReceiptChartSummaryResponse))
+          as ReceiptChartSummaryResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ReceiptChartSummaryResponse create() =>
+      ReceiptChartSummaryResponse._();
+  @$core.override
+  ReceiptChartSummaryResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ReceiptChartSummaryResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ReceiptChartSummaryResponse>(create);
+  static ReceiptChartSummaryResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get success => $_getBF(0);
+  @$pb.TagNumber(1)
+  set success($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSuccess() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSuccess() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get message => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set message($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasMessage() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearMessage() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  ReceiptChartStatusTotals get totals => $_getN(2);
+  @$pb.TagNumber(3)
+  set totals(ReceiptChartStatusTotals value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasTotals() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearTotals() => $_clearField(3);
+  @$pb.TagNumber(3)
+  ReceiptChartStatusTotals ensureTotals() => $_ensure(2);
+
+  @$pb.TagNumber(4)
+  $pb.PbList<ReceiptChartTagBucket> get tagBuckets => $_getList(3);
+
+  @$pb.TagNumber(5)
+  $pb.PbList<TagIndex> get availableTags => $_getList(4);
+
+  @$pb.TagNumber(6)
+  $pb.PbList<$fixnum.Int64> get defaultTagIds => $_getList(5);
 }
 
 class FileResponse extends $pb.GeneratedMessage {

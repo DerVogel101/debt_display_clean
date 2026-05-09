@@ -24,6 +24,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get destinationBills => 'Rechnungen';
 
   @override
+  String get destinationCharts => 'Diagramme';
+
+  @override
   String get destinationCreateBill => 'Rechnung erstellen';
 
   @override
@@ -166,6 +169,10 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get menuBillsDescription =>
       'Öffne die komplette Rechnungsansicht mit Filtern, Sortierung und Seitensteuerung.';
+
+  @override
+  String get menuChartsDescription =>
+      'Prüfe bezahlte, offene und überfällige Anteile nach Datum und Tag.';
 
   @override
   String get menuCreateBillDescription =>
@@ -571,4 +578,75 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get noMembers => 'Keine Mitglieder';
+
+  @override
+  String get chartsDescription =>
+      'Verfolge deine bezahlten, offenen und überfälligen Anteile über sichtbare Belege.';
+
+  @override
+  String get loginToViewCharts => 'Anmelden, um Diagramme zu sehen';
+
+  @override
+  String get chartDateRange => 'Zeitraum';
+
+  @override
+  String get chartAllTime => 'Alle Zeit';
+
+  @override
+  String get chartLast30Days => 'Letzte 30 Tage';
+
+  @override
+  String get chartLast90Days => 'Letzte 90 Tage';
+
+  @override
+  String get chartThisYear => 'Dieses Jahr';
+
+  @override
+  String get chartCustom => 'Benutzerdefiniert';
+
+  @override
+  String get chartFromDate => 'Von';
+
+  @override
+  String get chartToDate => 'Bis';
+
+  @override
+  String get chartPickDate => 'Datum wählen';
+
+  @override
+  String get chartClearDate => 'Leeren';
+
+  @override
+  String get chartDebtBreakdown => 'Schuldenübersicht';
+
+  @override
+  String get chartTagBreakdown => 'Tag-Übersicht';
+
+  @override
+  String get chartNoData => 'Keine Diagrammdaten für diesen Zeitraum.';
+
+  @override
+  String get chartNoTags => 'Keine Tags für diesen Zeitraum verfügbar.';
+
+  @override
+  String get chartPaidShare => 'Bezahlter Anteil';
+
+  @override
+  String get chartOpenShare => 'Offener Anteil';
+
+  @override
+  String get chartOverdueOpenShare => 'Überfälliger offener Anteil';
+
+  @override
+  String get chartSelectTags => 'Tags';
+
+  @override
+  String chartReceiptsCount(int count) {
+    return '$count Belege';
+  }
+
+  @override
+  String couldNotLoadCharts(Object message) {
+    return 'Diagramme konnten nicht geladen werden. $message';
+  }
 }

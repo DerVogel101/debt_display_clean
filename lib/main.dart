@@ -11,6 +11,7 @@ import 'package:debt_display/services/debt_backend_service.dart';
 import 'package:debt_display/state/auth_session_state.dart';
 import 'package:debt_display/state/bill_creation_state.dart';
 import 'package:debt_display/state/bill_list_state.dart';
+import 'package:debt_display/state/chart_state.dart';
 import 'package:debt_display/state/home_bill_state.dart';
 import 'package:debt_display/state/language_state.dart';
 import 'package:debt_display/state/navigation_state.dart';
@@ -59,6 +60,11 @@ class MyApp extends StatelessWidget {
               HomeBillState(debtBackendService: DebtBackendService()),
           update: (_, authSessionState, homeBillState) =>
               homeBillState!..updateAuthSession(authSessionState),
+        ),
+        ChangeNotifierProxyProvider<AuthSessionState, ChartState>(
+          create: (_) => ChartState(debtBackendService: DebtBackendService()),
+          update: (_, authSessionState, chartState) =>
+              chartState!..updateAuthSession(authSessionState),
         ),
         ChangeNotifierProxyProvider<AuthSessionState, RecipientGroupState>(
           create: (_) =>
@@ -117,6 +123,7 @@ class _AppRootState extends State<_AppRoot> {
       await Future.wait([
         context.read<HomeBillState>().refresh(),
         context.read<BillListState>().refresh(),
+        context.read<ChartState>().refresh(),
         context.read<BillCreationState>().refresh(),
         context.read<RecipientGroupState>().refresh(),
       ]);

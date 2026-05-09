@@ -278,6 +278,58 @@ class ReceiptUnpaidSummaryResponse(_message.Message):
     unpaid_bill_count: int
     def __init__(self, success: _Optional[bool] = ..., message: _Optional[str] = ..., unpaid_share_total: _Optional[float] = ..., unpaid_bill_count: _Optional[int] = ...) -> None: ...
 
+class ReceiptChartSummaryRequest(_message.Message):
+    __slots__ = ("created_at_from", "created_at_to", "tag_ids", "tag_limit")
+    CREATED_AT_FROM_FIELD_NUMBER: _ClassVar[int]
+    CREATED_AT_TO_FIELD_NUMBER: _ClassVar[int]
+    TAG_IDS_FIELD_NUMBER: _ClassVar[int]
+    TAG_LIMIT_FIELD_NUMBER: _ClassVar[int]
+    created_at_from: str
+    created_at_to: str
+    tag_ids: _containers.RepeatedScalarFieldContainer[int]
+    tag_limit: int
+    def __init__(self, created_at_from: _Optional[str] = ..., created_at_to: _Optional[str] = ..., tag_ids: _Optional[_Iterable[int]] = ..., tag_limit: _Optional[int] = ...) -> None: ...
+
+class ReceiptChartStatusTotals(_message.Message):
+    __slots__ = ("paid_share", "open_share", "overdue_open_share")
+    PAID_SHARE_FIELD_NUMBER: _ClassVar[int]
+    OPEN_SHARE_FIELD_NUMBER: _ClassVar[int]
+    OVERDUE_OPEN_SHARE_FIELD_NUMBER: _ClassVar[int]
+    paid_share: float
+    open_share: float
+    overdue_open_share: float
+    def __init__(self, paid_share: _Optional[float] = ..., open_share: _Optional[float] = ..., overdue_open_share: _Optional[float] = ...) -> None: ...
+
+class ReceiptChartTagBucket(_message.Message):
+    __slots__ = ("tag", "paid_share", "open_share", "overdue_open_share", "receipt_count")
+    TAG_FIELD_NUMBER: _ClassVar[int]
+    PAID_SHARE_FIELD_NUMBER: _ClassVar[int]
+    OPEN_SHARE_FIELD_NUMBER: _ClassVar[int]
+    OVERDUE_OPEN_SHARE_FIELD_NUMBER: _ClassVar[int]
+    RECEIPT_COUNT_FIELD_NUMBER: _ClassVar[int]
+    tag: TagIndex
+    paid_share: float
+    open_share: float
+    overdue_open_share: float
+    receipt_count: int
+    def __init__(self, tag: _Optional[_Union[TagIndex, _Mapping]] = ..., paid_share: _Optional[float] = ..., open_share: _Optional[float] = ..., overdue_open_share: _Optional[float] = ..., receipt_count: _Optional[int] = ...) -> None: ...
+
+class ReceiptChartSummaryResponse(_message.Message):
+    __slots__ = ("success", "message", "totals", "tag_buckets", "available_tags", "default_tag_ids")
+    SUCCESS_FIELD_NUMBER: _ClassVar[int]
+    MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    TOTALS_FIELD_NUMBER: _ClassVar[int]
+    TAG_BUCKETS_FIELD_NUMBER: _ClassVar[int]
+    AVAILABLE_TAGS_FIELD_NUMBER: _ClassVar[int]
+    DEFAULT_TAG_IDS_FIELD_NUMBER: _ClassVar[int]
+    success: bool
+    message: str
+    totals: ReceiptChartStatusTotals
+    tag_buckets: _containers.RepeatedCompositeFieldContainer[ReceiptChartTagBucket]
+    available_tags: _containers.RepeatedCompositeFieldContainer[TagIndex]
+    default_tag_ids: _containers.RepeatedScalarFieldContainer[int]
+    def __init__(self, success: _Optional[bool] = ..., message: _Optional[str] = ..., totals: _Optional[_Union[ReceiptChartStatusTotals, _Mapping]] = ..., tag_buckets: _Optional[_Iterable[_Union[ReceiptChartTagBucket, _Mapping]]] = ..., available_tags: _Optional[_Iterable[_Union[TagIndex, _Mapping]]] = ..., default_tag_ids: _Optional[_Iterable[int]] = ...) -> None: ...
+
 class FileResponse(_message.Message):
     __slots__ = ("success", "message", "file")
     SUCCESS_FIELD_NUMBER: _ClassVar[int]

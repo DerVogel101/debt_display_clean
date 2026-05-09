@@ -128,6 +128,12 @@ abstract class AppLocalizations {
   /// **'Bills'**
   String get destinationBills;
 
+  /// No description provided for @destinationCharts.
+  ///
+  /// In en, this message translates to:
+  /// **'Charts'**
+  String get destinationCharts;
+
   /// No description provided for @destinationCreateBill.
   ///
   /// In en, this message translates to:
@@ -385,6 +391,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Open the full bills view with filters, sorting, and pagination controls.'**
   String get menuBillsDescription;
+
+  /// No description provided for @menuChartsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Review paid, open, and overdue shares by date and tag.'**
+  String get menuChartsDescription;
 
   /// No description provided for @menuCreateBillDescription.
   ///
@@ -1123,6 +1135,138 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No members'**
   String get noMembers;
+
+  /// No description provided for @chartsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Track your paid, open, and overdue shares across visible receipts.'**
+  String get chartsDescription;
+
+  /// No description provided for @loginToViewCharts.
+  ///
+  /// In en, this message translates to:
+  /// **'Log in to view charts'**
+  String get loginToViewCharts;
+
+  /// No description provided for @chartDateRange.
+  ///
+  /// In en, this message translates to:
+  /// **'Date range'**
+  String get chartDateRange;
+
+  /// No description provided for @chartAllTime.
+  ///
+  /// In en, this message translates to:
+  /// **'All time'**
+  String get chartAllTime;
+
+  /// No description provided for @chartLast30Days.
+  ///
+  /// In en, this message translates to:
+  /// **'Last 30 days'**
+  String get chartLast30Days;
+
+  /// No description provided for @chartLast90Days.
+  ///
+  /// In en, this message translates to:
+  /// **'Last 90 days'**
+  String get chartLast90Days;
+
+  /// No description provided for @chartThisYear.
+  ///
+  /// In en, this message translates to:
+  /// **'This year'**
+  String get chartThisYear;
+
+  /// No description provided for @chartCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom'**
+  String get chartCustom;
+
+  /// No description provided for @chartFromDate.
+  ///
+  /// In en, this message translates to:
+  /// **'From'**
+  String get chartFromDate;
+
+  /// No description provided for @chartToDate.
+  ///
+  /// In en, this message translates to:
+  /// **'To'**
+  String get chartToDate;
+
+  /// No description provided for @chartPickDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick date'**
+  String get chartPickDate;
+
+  /// No description provided for @chartClearDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get chartClearDate;
+
+  /// No description provided for @chartDebtBreakdown.
+  ///
+  /// In en, this message translates to:
+  /// **'Debt breakdown'**
+  String get chartDebtBreakdown;
+
+  /// No description provided for @chartTagBreakdown.
+  ///
+  /// In en, this message translates to:
+  /// **'Tag breakdown'**
+  String get chartTagBreakdown;
+
+  /// No description provided for @chartNoData.
+  ///
+  /// In en, this message translates to:
+  /// **'No chart data for this range.'**
+  String get chartNoData;
+
+  /// No description provided for @chartNoTags.
+  ///
+  /// In en, this message translates to:
+  /// **'No tags available for this range.'**
+  String get chartNoTags;
+
+  /// No description provided for @chartPaidShare.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid share'**
+  String get chartPaidShare;
+
+  /// No description provided for @chartOpenShare.
+  ///
+  /// In en, this message translates to:
+  /// **'Open share'**
+  String get chartOpenShare;
+
+  /// No description provided for @chartOverdueOpenShare.
+  ///
+  /// In en, this message translates to:
+  /// **'Overdue open share'**
+  String get chartOverdueOpenShare;
+
+  /// No description provided for @chartSelectTags.
+  ///
+  /// In en, this message translates to:
+  /// **'Tags'**
+  String get chartSelectTags;
+
+  /// No description provided for @chartReceiptsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} receipts'**
+  String chartReceiptsCount(int count);
+
+  /// No description provided for @couldNotLoadCharts.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load charts. {message}'**
+  String couldNotLoadCharts(Object message);
 }
 
 class _AppLocalizationsDelegate

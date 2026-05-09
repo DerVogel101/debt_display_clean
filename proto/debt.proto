@@ -143,6 +143,36 @@ message ReceiptUnpaidSummaryResponse {
   int32 unpaid_bill_count = 4;
 }
 
+message ReceiptChartSummaryRequest {
+  optional string created_at_from = 1;
+  optional string created_at_to = 2;
+  repeated int64 tag_ids = 3;
+  optional int32 tag_limit = 4;
+}
+
+message ReceiptChartStatusTotals {
+  double paid_share = 1;
+  double open_share = 2;
+  double overdue_open_share = 3;
+}
+
+message ReceiptChartTagBucket {
+  TagIndex tag = 1;
+  double paid_share = 2;
+  double open_share = 3;
+  double overdue_open_share = 4;
+  int32 receipt_count = 5;
+}
+
+message ReceiptChartSummaryResponse {
+  bool success = 1;
+  string message = 2;
+  ReceiptChartStatusTotals totals = 3;
+  repeated ReceiptChartTagBucket tag_buckets = 4;
+  repeated TagIndex available_tags = 5;
+  repeated int64 default_tag_ids = 6;
+}
+
 message FileResponse {
   bool success = 1;
   string message = 2;
