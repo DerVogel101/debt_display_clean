@@ -1,6 +1,6 @@
 {
-    "name": "debt_display",
-    "short_name": "debt_display",
+    "name": "Debt Display",
+    "short_name": "Debt Display",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
