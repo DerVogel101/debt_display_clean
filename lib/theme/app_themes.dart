@@ -278,6 +278,7 @@ ThemeData _buildThemeData(ColorScheme scheme) {
     colorScheme: scheme,
     brightness: scheme.brightness,
     useMaterial3: true,
+    fontFamily: 'Roboto',
     scaffoldBackgroundColor: Colors.transparent,
   );
   final isDark = scheme.brightness == Brightness.dark;

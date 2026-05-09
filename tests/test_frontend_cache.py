@@ -56,8 +56,28 @@ class FrontendCacheHeadersTests(unittest.TestCase):
             "public, max-age=60, must-revalidate",
         )
 
+    def test_main_dart_js_uses_strict_module_compatible_content_type(self) -> None:
+        response = self._client.get("/main.dart.js")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers.get("Content-Type"), "text/javascript")
+
     def test_other_static_assets_keep_default_headers(self) -> None:
         response = self._client.get("/icons/Icon-192.png")
 
         self.assertEqual(response.status_code, 200)
         self.assertNotIn("Cache-Control", response.headers)
+
+    def test_javascript_modules_use_strict_module_compatible_content_type(
+        self,
+    ) -> None:
+        response = self._client.get("/canvaskit/chromium/canvaskit.js")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers.get("Content-Type"), "text/javascript")
+
+    def test_wasm_files_use_wasm_content_type(self) -> None:
+        response = self._client.get("/canvaskit/chromium/canvaskit.wasm")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers.get("Content-Type"), "application/wasm")
