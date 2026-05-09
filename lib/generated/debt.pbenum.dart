@@ -25,6 +25,9 @@ class ReceiptOrderBy extends $pb.ProtobufEnum {
       3, _omitEnumNames ? '' : 'RECEIPT_ORDER_BY_COST_FOR_USER');
   static const ReceiptOrderBy RECEIPT_ORDER_BY_DUE_DATE =
       ReceiptOrderBy._(4, _omitEnumNames ? '' : 'RECEIPT_ORDER_BY_DUE_DATE');
+  static const ReceiptOrderBy RECEIPT_ORDER_BY_REMAINING_FOR_USER =
+      ReceiptOrderBy._(
+          5, _omitEnumNames ? '' : 'RECEIPT_ORDER_BY_REMAINING_FOR_USER');
 
   static const $core.List<ReceiptOrderBy> values = <ReceiptOrderBy>[
     RECEIPT_ORDER_BY_UNSPECIFIED,
@@ -32,10 +35,11 @@ class ReceiptOrderBy extends $pb.ProtobufEnum {
     RECEIPT_ORDER_BY_COST_TOTAL,
     RECEIPT_ORDER_BY_COST_FOR_USER,
     RECEIPT_ORDER_BY_DUE_DATE,
+    RECEIPT_ORDER_BY_REMAINING_FOR_USER,
   ];
 
   static final $core.List<ReceiptOrderBy?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 4);
+      $pb.ProtobufEnum.$_initByValueList(values, 5);
   static ReceiptOrderBy? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 

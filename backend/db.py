@@ -993,6 +993,33 @@ async def list_all_tags(session: AsyncSession) -> "list[TagIndex]":
     return list(result.scalars().all())
 
 
+async def list_visible_recommended_tags(
+    session: AsyncSession,
+    user_id: int,
+    limit: int = 50,
+) -> "list[TagIndex]":
+    visible_receipts = select(Receipt.id).where(
+        or_(
+            Receipt.owner_id == user_id,
+            Receipt.recipient_id.in_(
+                select(recipient_members.c.recipient_id).where(
+                    recipient_members.c.user_id == user_id
+                )
+            ),
+        )
+    )
+    usage_count = func.count(TaggedReceipt.receipt_id)
+    result = await session.execute(
+        select(TagIndex)
+        .join(TaggedReceipt, TaggedReceipt.tag_id == TagIndex.id)
+        .where(TaggedReceipt.receipt_id.in_(visible_receipts))
+        .group_by(TagIndex.id)
+        .order_by(usage_count.desc(), func.lower(TagIndex.text).asc())
+        .limit(max(1, min(limit, 100)))
+    )
+    return list(result.scalars().all())
+
+
 async def update_tag(
     session: AsyncSession,
     tag_id: int,

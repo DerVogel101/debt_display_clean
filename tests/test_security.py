@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
@@ -36,6 +37,7 @@ class AsyncDatabaseTestCase(unittest.IsolatedAsyncioTestCase):
         self._original_engine = db.engine
         self._original_session_maker = db.async_session_maker
         self._original_upload_dir = settings.UPLOAD_DIR
+        self._original_file_upload_max_bytes = settings.FILE_UPLOAD_MAX_BYTES
 
         self._engine = create_async_engine(self._db_url, echo=False)
         db.engine = self._engine
@@ -50,6 +52,7 @@ class AsyncDatabaseTestCase(unittest.IsolatedAsyncioTestCase):
         db.engine = self._original_engine
         db.async_session_maker = self._original_session_maker
         settings.UPLOAD_DIR = self._original_upload_dir
+        settings.FILE_UPLOAD_MAX_BYTES = self._original_file_upload_max_bytes
         try:
             self._tmpdir.cleanup()
         except PermissionError:
@@ -398,6 +401,11 @@ class TestDataSeedTests(AsyncDatabaseTestCase):
                 .where(db.Receipt.title == "Demo team lunch reimbursement")
                 .options(selectinload(db.Receipt.recipient_shares))
             )
+            visible_receipts = await services.list_visible_receipts(
+                session,
+                first_user.id,
+                limit=20,
+            )
 
         self.assertEqual([user.email for user in users], ["alice.demo@example.com"])
         recipient = recipients.scalar_one_or_none()
@@ -417,6 +425,7 @@ class TestDataSeedTests(AsyncDatabaseTestCase):
         self.assertEqual(owner_zero_receipt.owner_share_percent, 0.0)
         self.assertEqual(owner_zero_receipt.owner_amount_paid, 0.0)
         self.assertEqual(len(owner_zero_receipt.recipient_shares), 2)
+        self.assertGreater(len(visible_receipts.receipts), 10)
 
 
 class SchemaCompatibilityTests(AsyncDatabaseTestCase):
@@ -660,6 +669,40 @@ class ReceiptSplitTests(AsyncDatabaseTestCase):
                         "Content-Type": "application/x-protobuf",
                         "Authorization": f"Bearer {token}",
                     },
+                )
+
+    async def _upload_file(
+        self,
+        *,
+        token: str,
+        receipt_id: int,
+        filename: str,
+        content: bytes,
+        content_type: str,
+    ):
+        async def verify_side_effect(access_token: str):
+            return self._claims_by_token[access_token]
+
+        transport = ASGITransport(app=main.app)
+        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+            with patch("backend.auth.verify_token", new=AsyncMock(side_effect=verify_side_effect)):
+                return await client.post(
+                    "/api/files/upload",
+                    data={"receipt_id": str(receipt_id)},
+                    files={"file": (filename, content, content_type)},
+                    headers={"Authorization": f"Bearer {token}"},
+                )
+
+    async def _get_file_content(self, *, token: str, file_id: int):
+        async def verify_side_effect(access_token: str):
+            return self._claims_by_token[access_token]
+
+        transport = ASGITransport(app=main.app)
+        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+            with patch("backend.auth.verify_token", new=AsyncMock(side_effect=verify_side_effect)):
+                return await client.get(
+                    f"/api/files/{file_id}/content",
+                    headers={"Authorization": f"Bearer {token}"},
                 )
 
     def _parse_message(self, message_cls, response) -> object:
@@ -1234,6 +1277,40 @@ class LiveApiRegressionTests(AsyncDatabaseTestCase):
                     },
                 )
 
+    async def _upload_file(
+        self,
+        *,
+        token: str,
+        receipt_id: int,
+        filename: str,
+        content: bytes,
+        content_type: str,
+    ):
+        async def verify_side_effect(access_token: str):
+            return self._claims_by_token[access_token]
+
+        transport = ASGITransport(app=main.app)
+        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+            with patch("backend.auth.verify_token", new=AsyncMock(side_effect=verify_side_effect)):
+                return await client.post(
+                    "/api/files/upload",
+                    data={"receipt_id": str(receipt_id)},
+                    files={"file": (filename, content, content_type)},
+                    headers={"Authorization": f"Bearer {token}"},
+                )
+
+    async def _get_file_content(self, *, token: str, file_id: int):
+        async def verify_side_effect(access_token: str):
+            return self._claims_by_token[access_token]
+
+        transport = ASGITransport(app=main.app)
+        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+            with patch("backend.auth.verify_token", new=AsyncMock(side_effect=verify_side_effect)):
+                return await client.get(
+                    f"/api/files/{file_id}/content",
+                    headers={"Authorization": f"Bearer {token}"},
+                )
+
     def _parse_message(self, message_cls, response) -> object:
         message = message_cls()
         message.ParseFromString(response.content)
@@ -1404,6 +1481,90 @@ class LiveApiRegressionTests(AsyncDatabaseTestCase):
 
         self.assertIsNotNone(stored)
         self.assertEqual(stored.original_filename, "Quarterly Report_.pdf")
+
+    async def test_files_upload_writes_bytes_and_metadata(self) -> None:
+        payload = b"%PDF-1.4\nreceipt"
+        response = await self._upload_file(
+            token="owner-token",
+            receipt_id=self.shared_receipt.id,
+            filename=r"..\..\Quarterly Report?.pdf",
+            content=payload,
+            content_type="application/pdf",
+        )
+        parsed = self._parse_message(debt_pb2.FileResponse, response)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(parsed.success)
+        self.assertEqual(parsed.file.original_filename, "Quarterly Report_.pdf")
+        self.assertEqual(parsed.file.content_type, "application/pdf")
+        self.assertEqual(parsed.file.size_bytes, len(payload))
+
+        async with db.async_session_maker() as session:
+            stored = await session.get(db.ReceiptFile, parsed.file.id)
+
+        self.assertIsNotNone(stored)
+        self.assertEqual(stored.sha256, hashlib.sha256(payload).hexdigest())
+        stored_path = resolve_storage_path(stored.storage_key, self._tmpdir.name)
+        self.assertEqual(stored_path.read_bytes(), payload)
+
+    async def test_files_upload_rejects_payloads_over_size_limit(self) -> None:
+        settings.FILE_UPLOAD_MAX_BYTES = 8
+        response = await self._upload_file(
+            token="owner-token",
+            receipt_id=self.shared_receipt.id,
+            filename="large.pdf",
+            content=b"123456789",
+            content_type="application/pdf",
+        )
+        parsed = self._parse_message(debt_pb2.FileResponse, response)
+
+        self.assertEqual(response.status_code, 413)
+        self.assertFalse(parsed.success)
+        self.assertIn("upload limit", parsed.message)
+
+        async with db.async_session_maker() as session:
+            result = await session.execute(select(db.ReceiptFile))
+            stored_files = result.scalars().all()
+
+        self.assertEqual([file.id for file in stored_files], [self.shared_file.id])
+
+    async def test_files_upload_requires_receipt_owner(self) -> None:
+        response = await self._upload_file(
+            token="member-token",
+            receipt_id=self.shared_receipt.id,
+            filename="member.pdf",
+            content=b"not allowed",
+            content_type="application/pdf",
+        )
+        parsed = self._parse_message(debt_pb2.FileResponse, response)
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(parsed.success)
+
+    async def test_files_content_allows_member_and_rejects_stranger(self) -> None:
+        payload = b"\x89PNG\r\nreceipt"
+        upload = await self._upload_file(
+            token="owner-token",
+            receipt_id=self.shared_receipt.id,
+            filename="receipt.png",
+            content=payload,
+            content_type="image/png",
+        )
+        uploaded = self._parse_message(debt_pb2.FileResponse, upload)
+
+        member_response = await self._get_file_content(
+            token="member-token",
+            file_id=uploaded.file.id,
+        )
+        stranger_response = await self._get_file_content(
+            token="stranger-token",
+            file_id=uploaded.file.id,
+        )
+
+        self.assertEqual(member_response.status_code, 200)
+        self.assertEqual(member_response.content, payload)
+        self.assertEqual(member_response.headers["content-type"], "image/png")
+        self.assertEqual(stranger_response.status_code, 404)
 
     async def test_recipient_member_routes_are_owner_only(self) -> None:
         owner_response = await self._post_protobuf(
@@ -1764,6 +1925,25 @@ class ReceiptListOrderingAndFilterTests(AsyncDatabaseTestCase):
             ],
         )
 
+    async def test_receipts_list_page_token_paginates_remaining_for_user_sort(self) -> None:
+        ids = await self._collect_page_token_ids(
+            "member-a-token",
+            limit=2,
+            order_by=debt_pb2.RECEIPT_ORDER_BY_REMAINING_FOR_USER,
+            order_direction=debt_pb2.RECEIPT_ORDER_DIRECTION_ASC,
+        )
+        self.assertEqual(
+            ids,
+            [
+                self.shared_without_member_share.id,
+                self.member_owned_paid.id,
+                self.shared_with_split.id,
+                self.tie_low_id.id,
+                self.tie_high_id.id,
+                self.member_owned_large.id,
+            ],
+        )
+
     async def test_receipts_list_rejects_malformed_page_token(self) -> None:
         response = await self._post_protobuf(
             "/api/receipts/list",
@@ -1794,6 +1974,30 @@ class ReceiptListOrderingAndFilterTests(AsyncDatabaseTestCase):
                 limit=2,
                 page_token=first_page.next_page_token,
                 order_by=debt_pb2.RECEIPT_ORDER_BY_DUE_DATE,
+                order_direction=debt_pb2.RECEIPT_ORDER_DIRECTION_ASC,
+            ),
+            "member-a-token",
+        )
+        parsed = self._parse_message(debt_pb2.ReceiptsResponse, response)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(parsed.success)
+        self.assertIn("Page token does not match", parsed.message)
+
+    async def test_receipts_list_rejects_page_token_when_remaining_sort_changes(self) -> None:
+        first_page = await self._list_receipts_response(
+            "member-a-token",
+            limit=2,
+            order_by=debt_pb2.RECEIPT_ORDER_BY_REMAINING_FOR_USER,
+            order_direction=debt_pb2.RECEIPT_ORDER_DIRECTION_ASC,
+        )
+
+        response = await self._post_protobuf(
+            "/api/receipts/list",
+            debt_pb2.ReceiptListRequest(
+                limit=2,
+                page_token=first_page.next_page_token,
+                order_by=debt_pb2.RECEIPT_ORDER_BY_COST_FOR_USER,
                 order_direction=debt_pb2.RECEIPT_ORDER_DIRECTION_ASC,
             ),
             "member-a-token",
@@ -1894,6 +2098,50 @@ class ReceiptListOrderingAndFilterTests(AsyncDatabaseTestCase):
             order_direction=debt_pb2.RECEIPT_ORDER_DIRECTION_ASC,
         )
         self.assertEqual(ids[0], self.shared_without_member_share.id)
+
+    async def test_receipts_list_orders_by_remaining_for_user_for_owner(self) -> None:
+        ids = await self._list_receipts(
+            "owner-token",
+            order_by=debt_pb2.RECEIPT_ORDER_BY_REMAINING_FOR_USER,
+            order_direction=debt_pb2.RECEIPT_ORDER_DIRECTION_ASC,
+        )
+        self.assertEqual(
+            ids,
+            [
+                self.shared_with_split.id,
+                self.owner_unpaid.id,
+                self.shared_without_member_share.id,
+            ],
+        )
+
+    async def test_receipts_list_orders_by_remaining_for_user_for_member(self) -> None:
+        ids = await self._list_receipts(
+            "member-a-token",
+            order_by=debt_pb2.RECEIPT_ORDER_BY_REMAINING_FOR_USER,
+            order_direction=debt_pb2.RECEIPT_ORDER_DIRECTION_ASC,
+        )
+        self.assertEqual(
+            ids,
+            [
+                self.shared_without_member_share.id,
+                self.member_owned_paid.id,
+                self.shared_with_split.id,
+                self.tie_low_id.id,
+                self.tie_high_id.id,
+                self.member_owned_large.id,
+            ],
+        )
+
+    async def test_receipts_list_remaining_sort_treats_paid_receipts_as_zero(self) -> None:
+        ids = await self._list_receipts(
+            "member-a-token",
+            order_by=debt_pb2.RECEIPT_ORDER_BY_REMAINING_FOR_USER,
+            order_direction=debt_pb2.RECEIPT_ORDER_DIRECTION_ASC,
+        )
+        self.assertLess(
+            ids.index(self.member_owned_paid.id),
+            ids.index(self.shared_with_split.id),
+        )
 
     async def test_receipts_list_uses_id_tiebreaker_for_equal_primary_sort(self) -> None:
         ids = await self._list_receipts(

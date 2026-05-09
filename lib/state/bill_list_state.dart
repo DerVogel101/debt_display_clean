@@ -215,7 +215,6 @@ class BillListState extends ChangeNotifier {
   }
 
   Future<void> refresh() async {
-    _resetQueryStatePagination();
     await _loadPage();
   }
 
@@ -297,6 +296,38 @@ class BillListState extends ChangeNotifier {
     return 0;
   }
 
+  double amountPaidForCurrentUser(Receipt receipt) {
+    final currentUserId = _currentUserId;
+    if (currentUserId == null) {
+      return 0;
+    }
+
+    if (receipt.ownerId.toInt() == currentUserId) {
+      if (receipt.hasSplit()) {
+        return receipt.split.ownerAmountPaid;
+      }
+      return receipt.hasAmountPaid() ? receipt.amountPaid : 0;
+    }
+
+    if (!receipt.hasSplit()) {
+      return 0;
+    }
+
+    for (final share in receipt.split.recipientShares) {
+      if (share.userId.toInt() == currentUserId) {
+        return share.amountPaid;
+      }
+    }
+
+    return 0;
+  }
+
+  double remainingForCurrentUser(Receipt receipt) {
+    return (myShareFor(receipt) - amountPaidForCurrentUser(receipt))
+        .clamp(0, double.infinity)
+        .toDouble();
+  }
+
   Future<bool> setReceiptPayments({
     required Receipt receipt,
     required double ownerAmountPaid,
@@ -339,6 +370,20 @@ class BillListState extends ChangeNotifier {
     } finally {
       _isMutating = false;
       notifyListeners();
+    }
+  }
+
+  Future<ReceiptFileDownload?> downloadReceiptFile(ReceiptFile file) async {
+    if (!_isAuthenticated || _accessToken == null) {
+      return null;
+    }
+
+    try {
+      return await _debtBackendService.downloadReceiptFile(_accessToken!, file);
+    } catch (error) {
+      _errorMessage = _formatError(error);
+      notifyListeners();
+      return null;
     }
   }
 

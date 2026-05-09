@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import hashlib
 from datetime import datetime, timezone
 from pathlib import Path
+from uuid import uuid4
 
-from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import Response
+import aiofiles
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse as DownloadFileResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend import authorization, services
@@ -23,6 +26,7 @@ from backend.db import (
     list_all_tags,
     list_files_for_receipt,
     list_recipients_for_user,
+    list_visible_recommended_tags,
     remove_member_from_recipient,
     search_users_by_prefix,
     tag_receipt,
@@ -39,6 +43,8 @@ from backend.proto import auth_pb2, debt_pb2
 from backend.storage import resolve_storage_path
 
 api_app = FastAPI(title="api")
+
+_UPLOAD_CHUNK_SIZE_BYTES = 1024 * 1024
 
 
 class ProtobufResponse(Response):
@@ -78,6 +84,30 @@ def _dt_from_proto(value: str | None) -> datetime | None:
 def _upload_root() -> Path:
     return Path(settings.UPLOAD_DIR).resolve()
 
+
+async def _stream_upload_to_temp(
+    upload: UploadFile,
+    temp_path: Path,
+) -> tuple[int, str]:
+    digest = hashlib.sha256()
+    size_bytes = 0
+    max_bytes = settings.FILE_UPLOAD_MAX_BYTES
+
+    temp_path.parent.mkdir(parents=True, exist_ok=True)
+    async with aiofiles.open(temp_path, "wb") as handle:
+        while chunk := await upload.read(_UPLOAD_CHUNK_SIZE_BYTES):
+            size_bytes += len(chunk)
+            if size_bytes > max_bytes:
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"File exceeds {max_bytes} byte upload limit",
+                )
+            digest.update(chunk)
+            await handle.write(chunk)
+
+    return size_bytes, digest.hexdigest()
+
+
 def _delete_managed_file(storage_key: str) -> bool:
     try:
         resolved = resolve_storage_path(storage_key, _upload_root())
@@ -103,6 +133,8 @@ def _receipt_list_order_by(value: int) -> str:
         return "cost_for_user"
     if value == 4:
         return "due_date"
+    if value == 5:
+        return "remaining_for_user"
     raise ValueError("Unsupported receipt list order_by")
 
 
@@ -129,7 +161,7 @@ def _status_for_exc(exc: Exception) -> int:
         return exc.status_code
     if isinstance(exc, PermissionError):
         return 403
-    if isinstance(exc, LookupError):
+    if isinstance(exc, (LookupError, FileNotFoundError)):
         return 404
     if isinstance(exc, ValueError):
         return 404 if "not found" in str(exc).lower() else 400
@@ -710,6 +742,30 @@ async def list_receipts_route(request: Request, session: AsyncSession = Depends(
         return _error_response(debt_pb2.ReceiptsResponse, exc)
 
 
+@api_app.post("/receipts/unpaid-summary")
+async def unpaid_receipts_summary_route(request: Request, session: AsyncSession = Depends(get_session)) -> ProtobufResponse:
+    body = await request.body()
+    proto_req = debt_pb2.ReceiptUnpaidSummaryRequest()
+    proto_req.ParseFromString(body)
+    try:
+        user = await _current_user(request, session)
+        summary = await services.summarize_visible_unpaid_receipts(
+            session,
+            actor_user_id=user.id,
+        )
+        await session.commit()
+        return _pb_response(
+            debt_pb2.ReceiptUnpaidSummaryResponse(
+                success=True,
+                unpaid_share_total=summary.unpaid_share_total,
+                unpaid_bill_count=summary.unpaid_bill_count,
+            )
+        )
+    except Exception as exc:
+        await session.rollback()
+        return _error_response(debt_pb2.ReceiptUnpaidSummaryResponse, exc)
+
+
 @api_app.post("/receipts/update")
 async def update_receipt_route(request: Request, session: AsyncSession = Depends(get_session)) -> ProtobufResponse:
     body = await request.body()
@@ -866,6 +922,55 @@ async def attach_file_route(request: Request, session: AsyncSession = Depends(ge
         return _error_response(debt_pb2.FileResponse, exc)
 
 
+@api_app.post("/files/upload")
+async def upload_file_route(
+    request: Request,
+    receipt_id: int = Form(...),
+    file: UploadFile = File(...),
+    session: AsyncSession = Depends(get_session),
+) -> ProtobufResponse:
+    temp_path: Path | None = None
+    target_path: Path | None = None
+    try:
+        user = await _current_user(request, session)
+        filename = file.filename or "file"
+        content_type = file.content_type or "application/octet-stream"
+        upload_root = _upload_root()
+        temp_path = upload_root / ".tmp" / uuid4().hex
+        await services.get_owned_receipt(session, user.id, receipt_id)
+        size_bytes, sha256 = await _stream_upload_to_temp(file, temp_path)
+        file_record = await services.create_receipt_file_for_owner(
+            session=session,
+            actor_user_id=user.id,
+            receipt_id=receipt_id,
+            client_filename=filename,
+            content_type=content_type,
+            size_bytes=size_bytes,
+            sha256=sha256,
+        )
+        target_path = resolve_storage_path(file_record.storage_key, upload_root)
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            temp_path.replace(target_path)
+            temp_path = None
+        except Exception:
+            await session.rollback()
+            if temp_path is not None:
+                temp_path.unlink(missing_ok=True)
+            target_path.unlink(missing_ok=True)
+            raise
+
+        await session.commit()
+        return _pb_response(debt_pb2.FileResponse(success=True, file=_file_to_pb(file_record)))
+    except Exception as exc:
+        await session.rollback()
+        if temp_path is not None:
+            temp_path.unlink(missing_ok=True)
+        if target_path is not None:
+            target_path.unlink(missing_ok=True)
+        return _error_response(debt_pb2.FileResponse, exc)
+
+
 @api_app.post("/files/get")
 async def get_file_route(request: Request, session: AsyncSession = Depends(get_session)) -> ProtobufResponse:
     body = await request.body()
@@ -887,6 +992,33 @@ async def get_file_route(request: Request, session: AsyncSession = Depends(get_s
     except Exception as exc:
         await session.rollback()
         return _error_response(debt_pb2.FileResponse, exc)
+
+
+@api_app.get("/files/{file_id}/content")
+async def get_file_content_route(
+    file_id: int,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> DownloadFileResponse:
+    try:
+        user = await _current_user(request, session)
+        file_record = await services.get_file_for_actor(session, user.id, file_id)
+        path = resolve_storage_path(file_record.storage_key, _upload_root())
+        if not path.is_file():
+            raise FileNotFoundError("File content not found")
+        await session.commit()
+        return DownloadFileResponse(
+            path,
+            media_type=file_record.content_type or "application/octet-stream",
+            filename=file_record.original_filename,
+            content_disposition_type="inline",
+        )
+    except Exception as exc:
+        await session.rollback()
+        raise HTTPException(
+            status_code=_status_for_exc(exc),
+            detail=_error_message(exc),
+        ) from exc
 
 
 @api_app.post("/files/list")
@@ -983,6 +1115,21 @@ async def list_tags_route(request: Request, session: AsyncSession = Depends(get_
     try:
         await _current_user(request, session)
         tags = await list_all_tags(session)
+        await session.commit()
+        resp = debt_pb2.TagsResponse(success=True)
+        for tag in tags:
+            resp.tags.add().CopyFrom(_tag_to_pb(tag))
+        return _pb_response(resp)
+    except Exception as exc:
+        await session.rollback()
+        return _error_response(debt_pb2.TagsResponse, exc)
+
+
+@api_app.post("/tags/recommended")
+async def list_recommended_tags_route(request: Request, session: AsyncSession = Depends(get_session)) -> ProtobufResponse:
+    try:
+        user = await _current_user(request, session)
+        tags = await list_visible_recommended_tags(session, user.id)
         await session.commit()
         resp = debt_pb2.TagsResponse(success=True)
         for tag in tags:

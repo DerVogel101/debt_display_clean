@@ -24,6 +24,7 @@ const ReceiptOrderBy$json = {
     {'1': 'RECEIPT_ORDER_BY_COST_TOTAL', '2': 2},
     {'1': 'RECEIPT_ORDER_BY_COST_FOR_USER', '2': 3},
     {'1': 'RECEIPT_ORDER_BY_DUE_DATE', '2': 4},
+    {'1': 'RECEIPT_ORDER_BY_REMAINING_FOR_USER', '2': 5},
   ],
 };
 
@@ -32,7 +33,7 @@ final $typed_data.Uint8List receiptOrderByDescriptor = $convert.base64Decode(
     'Cg5SZWNlaXB0T3JkZXJCeRIgChxSRUNFSVBUX09SREVSX0JZX1VOU1BFQ0lGSUVEEAASFwoTUk'
     'VDRUlQVF9PUkRFUl9CWV9JRBABEh8KG1JFQ0VJUFRfT1JERVJfQllfQ09TVF9UT1RBTBACEiIK'
     'HlJFQ0VJUFRfT1JERVJfQllfQ09TVF9GT1JfVVNFUhADEh0KGVJFQ0VJUFRfT1JERVJfQllfRF'
-    'VFX0RBVEUQBA==');
+    'VFX0RBVEUQBBInCiNSRUNFSVBUX09SREVSX0JZX1JFTUFJTklOR19GT1JfVVNFUhAF');
 
 @$core.Deprecated('Use receiptOrderDirectionDescriptor instead')
 const ReceiptOrderDirection$json = {
@@ -620,6 +621,39 @@ final $typed_data.Uint8List receiptsResponseDescriptor = $convert.base64Decode(
     'gCIAEoCVIHbWVzc2FnZRIpCghyZWNlaXB0cxgDIAMoCzINLmRlYnQuUmVjZWlwdFIIcmVjZWlw'
     'dHMSKwoPbmV4dF9wYWdlX3Rva2VuGAQgASgJSABSDW5leHRQYWdlVG9rZW6IAQFCEgoQX25leH'
     'RfcGFnZV90b2tlbg==');
+
+@$core.Deprecated('Use receiptUnpaidSummaryRequestDescriptor instead')
+const ReceiptUnpaidSummaryRequest$json = {
+  '1': 'ReceiptUnpaidSummaryRequest',
+};
+
+/// Descriptor for `ReceiptUnpaidSummaryRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List receiptUnpaidSummaryRequestDescriptor =
+    $convert.base64Decode('ChtSZWNlaXB0VW5wYWlkU3VtbWFyeVJlcXVlc3Q=');
+
+@$core.Deprecated('Use receiptUnpaidSummaryResponseDescriptor instead')
+const ReceiptUnpaidSummaryResponse$json = {
+  '1': 'ReceiptUnpaidSummaryResponse',
+  '2': [
+    {'1': 'success', '3': 1, '4': 1, '5': 8, '10': 'success'},
+    {'1': 'message', '3': 2, '4': 1, '5': 9, '10': 'message'},
+    {
+      '1': 'unpaid_share_total',
+      '3': 3,
+      '4': 1,
+      '5': 1,
+      '10': 'unpaidShareTotal'
+    },
+    {'1': 'unpaid_bill_count', '3': 4, '4': 1, '5': 5, '10': 'unpaidBillCount'},
+  ],
+};
+
+/// Descriptor for `ReceiptUnpaidSummaryResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List receiptUnpaidSummaryResponseDescriptor = $convert.base64Decode(
+    'ChxSZWNlaXB0VW5wYWlkU3VtbWFyeVJlc3BvbnNlEhgKB3N1Y2Nlc3MYASABKAhSB3N1Y2Nlc3'
+    'MSGAoHbWVzc2FnZRgCIAEoCVIHbWVzc2FnZRIsChJ1bnBhaWRfc2hhcmVfdG90YWwYAyABKAFS'
+    'EHVucGFpZFNoYXJlVG90YWwSKgoRdW5wYWlkX2JpbGxfY291bnQYBCABKAVSD3VucGFpZEJpbG'
+    'xDb3VudA==');
 
 @$core.Deprecated('Use fileResponseDescriptor instead')
 const FileResponse$json = {

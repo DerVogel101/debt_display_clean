@@ -129,6 +129,15 @@ message ReceiptsResponse {
   optional string next_page_token = 4;
 }
 
+message ReceiptUnpaidSummaryRequest {}
+
+message ReceiptUnpaidSummaryResponse {
+  bool success = 1;
+  string message = 2;
+  double unpaid_share_total = 3;
+  int32 unpaid_bill_count = 4;
+}
+
 message FileResponse {
   bool success = 1;
   string message = 2;
@@ -206,6 +215,7 @@ enum ReceiptOrderBy {
   RECEIPT_ORDER_BY_COST_TOTAL = 2;
   RECEIPT_ORDER_BY_COST_FOR_USER = 3;
   RECEIPT_ORDER_BY_DUE_DATE = 4;
+  RECEIPT_ORDER_BY_REMAINING_FOR_USER = 5;
 }
 
 enum ReceiptOrderDirection {

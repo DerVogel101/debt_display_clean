@@ -21,6 +21,7 @@ class Settings(BaseSettings):
 
     # File upload root directory
     UPLOAD_DIR: str = "./uploads"
+    FILE_UPLOAD_MAX_BYTES: int = 20 * 1024 * 1024
 
     # Built frontend output directory mounted by FastAPI.
     # Relative paths are resolved from the backend config directory.

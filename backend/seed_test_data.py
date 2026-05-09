@@ -93,86 +93,183 @@ async def seed_test_data() -> None:
             icon="🚆",
             color="#64B5F6",
         )
-
-        rent_receipt = await _get_or_create_receipt(
+        food_tag = await _get_or_update_tag(
             session,
-            owner_id=owner.id,
-            title="Demo rent top-up",
-            amount_owed=427.0,
-            recipient_id=recipient.id,
-            description="Seeded shared household bill",
-            due_date=datetime.now(timezone.utc) + timedelta(days=7),
-        )
-        await db.set_receipt_tags(session, rent_receipt.id, [rent_tag.id])
-        await _set_demo_split(
-            session,
-            receipt_id=rent_receipt.id,
-            amount_owed=427.0,
-            owner_share_percent=40.0,
-            member_ids=household_member_ids,
-            owner_amount_paid=170.8,
-            member_paid_fraction=0.25,
+            text="Food",
+            icon="🍽️",
+            color="#81C784",
         )
 
-        utility_receipt = await _get_or_create_receipt(
-            session,
-            owner_id=owner.id,
-            title="Demo electricity bill",
-            amount_owed=248.4,
-            recipient_id=recipient.id,
-            description="Seeded utility split",
-            due_date=datetime.now(timezone.utc) + timedelta(days=5),
-        )
-        await db.set_receipt_tags(session, utility_receipt.id, [utility_tag.id])
-        await _set_demo_split(
-            session,
-            receipt_id=utility_receipt.id,
-            amount_owed=248.4,
-            owner_share_percent=50.0,
-            member_ids=household_member_ids,
-            owner_amount_paid=62.1,
-            member_paid_fraction=0.0,
-        )
+        demo_receipt_seeds = [
+            {
+                "title": "Demo rent top-up",
+                "amount_owed": 427.0,
+                "recipient": recipient,
+                "description": "Seeded shared household bill",
+                "due_in_days": 7,
+                "tag_ids": [rent_tag.id],
+                "owner_share_percent": 40.0,
+                "member_ids": household_member_ids,
+                "owner_amount_paid": 170.8,
+                "member_paid_fraction": 0.25,
+            },
+            {
+                "title": "Demo electricity bill",
+                "amount_owed": 248.4,
+                "recipient": recipient,
+                "description": "Seeded utility split",
+                "due_in_days": 5,
+                "tag_ids": [utility_tag.id],
+                "owner_share_percent": 50.0,
+                "member_ids": household_member_ids,
+                "owner_amount_paid": 62.1,
+                "member_paid_fraction": 0.0,
+            },
+            {
+                "title": "Demo train tickets",
+                "amount_owed": 176.3,
+                "recipient": travel_group,
+                "description": "Seeded trip bill",
+                "due_in_days": 2,
+                "tag_ids": [travel_tag.id],
+                "owner_share_percent": 34.0,
+                "member_ids": trip_member_ids,
+                "owner_amount_paid": 0.0,
+                "member_paid_fraction": 0.5,
+            },
+            {
+                "title": "Demo team lunch reimbursement",
+                "amount_owed": 96.0,
+                "recipient": recipient,
+                "description": "Owner tracks the bill but owes no share",
+                "due_in_days": 3,
+                "tag_ids": [utility_tag.id],
+                "owner_share_percent": 0.0,
+                "member_ids": household_member_ids,
+                "owner_amount_paid": 0.0,
+                "member_paid_fraction": 0.5,
+            },
+            {
+                "title": "Demo grocery run",
+                "amount_owed": 142.75,
+                "recipient": recipient,
+                "description": "Seeded household groceries",
+                "due_in_days": 1,
+                "tag_ids": [food_tag.id],
+                "owner_share_percent": 50.0,
+                "member_ids": household_member_ids,
+                "owner_amount_paid": 35.0,
+                "member_paid_fraction": 0.0,
+            },
+            {
+                "title": "Demo internet plan",
+                "amount_owed": 64.9,
+                "recipient": recipient,
+                "description": "Seeded monthly internet split",
+                "due_in_days": 9,
+                "tag_ids": [utility_tag.id],
+                "owner_share_percent": 50.0,
+                "member_ids": household_member_ids,
+                "owner_amount_paid": 0.0,
+                "member_paid_fraction": 0.0,
+            },
+            {
+                "title": "Demo water bill",
+                "amount_owed": 88.2,
+                "recipient": recipient,
+                "description": "Seeded household utility",
+                "due_in_days": 11,
+                "tag_ids": [utility_tag.id],
+                "owner_share_percent": 50.0,
+                "member_ids": household_member_ids,
+                "owner_amount_paid": 20.0,
+                "member_paid_fraction": 0.25,
+            },
+            {
+                "title": "Demo parking fees",
+                "amount_owed": 39.5,
+                "recipient": travel_group,
+                "description": "Seeded trip parking split",
+                "due_in_days": 4,
+                "tag_ids": [travel_tag.id],
+                "owner_share_percent": 34.0,
+                "member_ids": trip_member_ids,
+                "owner_amount_paid": 13.43,
+                "member_paid_fraction": 1.0,
+            },
+            {
+                "title": "Demo hostel deposit",
+                "amount_owed": 312.0,
+                "recipient": travel_group,
+                "description": "Seeded shared accommodation",
+                "due_in_days": 14,
+                "tag_ids": [travel_tag.id],
+                "owner_share_percent": 34.0,
+                "member_ids": trip_member_ids,
+                "owner_amount_paid": 50.0,
+                "member_paid_fraction": 0.0,
+            },
+            {
+                "title": "Demo cafe meetup",
+                "amount_owed": 54.8,
+                "recipient": travel_group,
+                "description": "Seeded travel meal split",
+                "due_in_days": 6,
+                "tag_ids": [food_tag.id, travel_tag.id],
+                "owner_share_percent": 34.0,
+                "member_ids": trip_member_ids,
+                "owner_amount_paid": 18.63,
+                "member_paid_fraction": 0.5,
+            },
+            {
+                "title": "Demo cleaning supplies",
+                "amount_owed": 73.35,
+                "recipient": recipient,
+                "description": "Seeded household supplies",
+                "due_in_days": 12,
+                "tag_ids": [food_tag.id],
+                "owner_share_percent": 50.0,
+                "member_ids": household_member_ids,
+                "owner_amount_paid": 0.0,
+                "member_paid_fraction": 0.0,
+            },
+            {
+                "title": "Demo appliance repair",
+                "amount_owed": 219.99,
+                "recipient": recipient,
+                "description": "Seeded shared repair bill",
+                "due_in_days": 16,
+                "tag_ids": [utility_tag.id],
+                "owner_share_percent": 50.0,
+                "member_ids": household_member_ids,
+                "owner_amount_paid": 40.0,
+                "member_paid_fraction": 0.2,
+            },
+        ]
 
-        travel_receipt = await _get_or_create_receipt(
-            session,
-            owner_id=owner.id,
-            title="Demo train tickets",
-            amount_owed=176.3,
-            recipient_id=travel_group.id,
-            description="Seeded trip bill",
-            due_date=datetime.now(timezone.utc) + timedelta(days=2),
-        )
-        await db.set_receipt_tags(session, travel_receipt.id, [travel_tag.id])
-        await _set_demo_split(
-            session,
-            receipt_id=travel_receipt.id,
-            amount_owed=176.3,
-            owner_share_percent=34.0,
-            member_ids=trip_member_ids,
-            owner_amount_paid=0.0,
-            member_paid_fraction=0.5,
-        )
-
-        owner_zero_receipt = await _get_or_create_receipt(
-            session,
-            owner_id=owner.id,
-            title="Demo team lunch reimbursement",
-            amount_owed=96.0,
-            recipient_id=recipient.id,
-            description="Owner tracks the bill but owes no share",
-            due_date=datetime.now(timezone.utc) + timedelta(days=3),
-        )
-        await db.set_receipt_tags(session, owner_zero_receipt.id, [utility_tag.id])
-        await _set_demo_split(
-            session,
-            receipt_id=owner_zero_receipt.id,
-            amount_owed=96.0,
-            owner_share_percent=0.0,
-            member_ids=household_member_ids,
-            owner_amount_paid=0.0,
-            member_paid_fraction=0.5,
-        )
+        for receipt_seed in demo_receipt_seeds:
+            receipt = await _get_or_create_receipt(
+                session,
+                owner_id=owner.id,
+                title=receipt_seed["title"],
+                amount_owed=receipt_seed["amount_owed"],
+                recipient_id=receipt_seed["recipient"].id,
+                description=receipt_seed["description"],
+                due_date=(
+                    datetime.now(timezone.utc)
+                    + timedelta(days=receipt_seed["due_in_days"])
+                ),
+            )
+            await db.set_receipt_tags(session, receipt.id, receipt_seed["tag_ids"])
+            await _set_demo_split(
+                session,
+                receipt_id=receipt.id,
+                amount_owed=receipt_seed["amount_owed"],
+                owner_share_percent=receipt_seed["owner_share_percent"],
+                member_ids=receipt_seed["member_ids"],
+                owner_amount_paid=receipt_seed["owner_amount_paid"],
+                member_paid_fraction=receipt_seed["member_paid_fraction"],
+            )
 
         await session.commit()
 

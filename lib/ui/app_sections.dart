@@ -1,10 +1,13 @@
 import 'package:auth0_flutter/auth0_flutter.dart';
 import 'package:debt_display/generated/debt.pb.dart';
 import 'package:debt_display/state/auth_session_state.dart';
+import 'package:debt_display/state/bill_list_state.dart';
+import 'package:debt_display/state/home_bill_state.dart';
 import 'package:debt_display/state/navigation_state.dart';
 import 'package:debt_display/state/recipient_group_state.dart';
 import 'package:debt_display/state/theme_state.dart';
 import 'package:debt_display/theme/app_themes.dart';
+import 'package:debt_display/ui/bill_creation_section.dart';
 import 'package:debt_display/ui/bills_section.dart';
 import 'package:debt_display/ui/app_shared.dart';
 import 'package:flutter/material.dart';
@@ -152,6 +155,11 @@ class _AppSectionsState extends State<AppSections> {
           key: const ValueKey('bills'),
           isDesktop: widget.isDesktop,
         );
+      case AppDestination.createBill:
+        return BillCreationSection(
+          key: const ValueKey('create-bill'),
+          isDesktop: widget.isDesktop,
+        );
       case AppDestination.recipientGroups:
         return const RecipientGroupsSection(key: ValueKey('recipient-groups'));
       case AppDestination.profile:
@@ -162,107 +170,52 @@ class _AppSectionsState extends State<AppSections> {
   }
 }
 
-class HomeSection extends StatelessWidget {
+class HomeSection extends StatefulWidget {
   const HomeSection({super.key, required this.isDesktop, this.referenceDate});
 
   final bool isDesktop;
   final DateTime? referenceDate;
 
-  static const List<_PlaceholderBillSeed> _placeholderBillSeeds = [
-    _PlaceholderBillSeed(
-      title: 'Studio rent top-up',
-      dueInDays: 7,
-      amount: 427.00,
-      tags: [
-        _PlaceholderTag(icon: '🏠', text: 'Home', color: '#FFB74D'),
-        _PlaceholderTag(icon: '⚠️', text: 'Due soon', color: '#E57373'),
-        _PlaceholderTag(icon: '👥', text: 'Shared household', color: '#81C784'),
-        _PlaceholderTag(icon: '📆', text: 'Monthly cycle', color: '#64B5F6'),
-        _PlaceholderTag(icon: '📌', text: 'Fixed cost', color: '#BA68C8'),
-      ],
-    ),
-    _PlaceholderBillSeed(
-      title: 'Quarterly electricity bill',
-      dueInDays: 5,
-      amount: 248.40,
-      tags: [
-        _PlaceholderTag(icon: '⚡', text: 'Utilities', color: '#FFD54F'),
-        _PlaceholderTag(icon: '🧾', text: 'Invoice', color: '#90A4AE'),
-      ],
-    ),
-    _PlaceholderBillSeed(
-      title: 'Spring grocery split',
-      dueInDays: 4,
-      amount: 413.78,
-      tags: [
-        _PlaceholderTag(icon: '🛒', text: 'Groceries', color: '#81C784'),
-        _PlaceholderTag(icon: '👥', text: 'Shared', color: '#4DB6AC'),
-      ],
-    ),
-    _PlaceholderBillSeed(
-      title: 'Weekend train tickets',
-      dueInDays: 2,
-      amount: 176.30,
-      tags: [
-        _PlaceholderTag(icon: '🚆', text: 'Travel', color: '#64B5F6'),
-        _PlaceholderTag(icon: '🤝', text: 'Split', color: '#A1887F'),
-      ],
-    ),
-    _PlaceholderBillSeed(
-      title: 'Internet renewal',
-      dueInDays: 1,
-      amount: 92.15,
-      tags: [
-        _PlaceholderTag(icon: '🌐', text: 'Internet', color: '#4FC3F7'),
-        _PlaceholderTag(icon: '🔁', text: 'Renewal', color: '#9575CD'),
-      ],
-    ),
-  ];
+  @override
+  State<HomeSection> createState() => _HomeSectionState();
+}
 
-  static DateTime _dateOnly(DateTime value) {
-    return DateTime(value.year, value.month, value.day);
-  }
-
-  static List<_PlaceholderBill> _buildPlaceholderBills(DateTime referenceDate) {
-    final baseDate = _dateOnly(referenceDate);
-
-    return _placeholderBillSeeds
-        .map(
-          (seed) => _PlaceholderBill(
-            title: seed.title,
-            dueDate: baseDate.add(Duration(days: seed.dueInDays)),
-            amount: seed.amount,
-            tags: seed.tags,
-          ),
-        )
-        .toList(growable: false);
+class _HomeSectionState extends State<HomeSection> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      context.read<HomeBillState>().ensureLoaded();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    final isAuthenticated = context.select<AuthSessionState, bool>(
+      (state) => state.isAuthenticated,
+    );
     final backendError = context.select<AuthSessionState, String?>(
       (state) => state.backendError,
     );
+    final homeState = context.watch<HomeBillState>();
     final locale = Localizations.localeOf(context);
     final materialLocalizations = MaterialLocalizations.of(context);
-    final placeholderBills = _buildPlaceholderBills(
-      referenceDate ?? DateTime.now(),
-    );
     final currencyFormat = NumberFormat.currency(
       locale: locale.toString(),
       symbol: '€',
       decimalDigits: 2,
     );
-    final totalStillOwed = placeholderBills.fold<double>(
-      0,
-      (sum, bill) => sum + bill.amount,
-    );
+    final billListState = context.watch<BillListState>();
+    final totalStillOwed = homeState.unpaidShareTotal;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         PageSection(
-          padding: EdgeInsets.all(isDesktop ? 28 : 22),
+          padding: EdgeInsets.all(widget.isDesktop ? 28 : 22),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -278,51 +231,107 @@ class HomeSection extends StatelessWidget {
                       fontWeight: FontWeight.w900,
                     ),
                   ),
-                  OutlinedButton.icon(
-                    key: const ValueKey('open-bill-list-button'),
-                    onPressed: () {
-                      context.read<NavigationState>().selectDestination(
-                        AppDestination.bills,
-                      );
-                    },
-                    icon: const Icon(Icons.receipt_long_rounded),
-                    label: const Text('View Bills'),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: [
+                      OutlinedButton.icon(
+                        key: const ValueKey('open-bill-list-button'),
+                        onPressed: () {
+                          context.read<NavigationState>().selectDestination(
+                            AppDestination.bills,
+                          );
+                        },
+                        icon: const Icon(Icons.receipt_long_rounded),
+                        label: Text(widget.isDesktop ? 'View Bills' : 'View'),
+                      ),
+                      FilledButton.icon(
+                        key: const ValueKey('open-bill-create-button'),
+                        onPressed: () {
+                          context.read<NavigationState>().selectDestination(
+                            AppDestination.createBill,
+                          );
+                        },
+                        icon: const Icon(Icons.add_rounded),
+                        label: Text(
+                          widget.isDesktop ? 'Create Bill' : 'Create',
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
               const SizedBox(height: 10),
               Text(
-                'Static placeholder data for the upcoming home dashboard.',
+                isAuthenticated
+                    ? 'The newest unpaid bills you own or take part in.'
+                    : 'Log in to load the bills you own or share with other participants.',
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   color: mutedForegroundColor(context, alpha: 0.88),
                   height: 1.45,
                 ),
               ),
               const SizedBox(height: 20),
-              ...placeholderBills.asMap().entries.map(
-                (entry) => Padding(
-                  padding: EdgeInsets.only(
-                    bottom: entry.key == placeholderBills.length - 1 ? 0 : 12,
+              if (!isAuthenticated)
+                FilledButton.icon(
+                  key: const ValueKey('home-login-button'),
+                  onPressed: context.read<AuthSessionState>().login,
+                  icon: const Icon(Icons.login_rounded),
+                  label: const Text('Log in to view bills'),
+                )
+              else if (homeState.isLoading && homeState.receipts.isEmpty)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: CircularProgressIndicator(strokeWidth: 3),
                   ),
-                  child: _PlaceholderBillTile(
-                    title: entry.value.title,
-                    dueLabel:
-                        'Due ${materialLocalizations.formatShortDate(entry.value.dueDate)}',
-                    amountLabel: currencyFormat.format(entry.value.amount),
-                    tags: entry.value.tags,
+                )
+              else if (homeState.receipts.isEmpty)
+                Text(
+                  'No unpaid bills right now.',
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: mutedForegroundColor(context, alpha: 0.88),
+                  ),
+                )
+              else
+                ...homeState.receipts.asMap().entries.map(
+                  (entry) => Padding(
+                    padding: EdgeInsets.only(
+                      bottom: entry.key == homeState.receipts.length - 1
+                          ? 0
+                          : 12,
+                    ),
+                    child: _HomeBillTile(
+                      receipt: entry.value,
+                      roleLabel: billListState.roleLabelFor(entry.value),
+                      amountLabel: _homeAmountLabel(
+                        entry.value,
+                        locale,
+                        currencyFormat,
+                      ),
+                      dueLabel: _homeDueLabel(
+                        entry.value,
+                        materialLocalizations,
+                      ),
+                      onTap: () => showBillDetailModal(
+                        context,
+                        receipt: entry.value,
+                        state: billListState,
+                        isDesktop: widget.isDesktop,
+                      ),
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
         ),
         const SizedBox(height: 18),
-        if (backendError != null) ...[
-          ErrorSection(message: backendError),
+        if (backendError != null || homeState.errorMessage != null) ...[
+          ErrorSection(message: backendError ?? homeState.errorMessage!),
           const SizedBox(height: 18),
         ],
         PageSection(
-          padding: EdgeInsets.all(isDesktop ? 28 : 22),
+          padding: EdgeInsets.all(widget.isDesktop ? 28 : 22),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -334,7 +343,7 @@ class HomeSection extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               Text(
-                'Combined balance across the same five placeholder bills.',
+                'Combined balance across all unpaid bills you take part in.',
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   color: mutedForegroundColor(context, alpha: 0.88),
                   height: 1.45,
@@ -343,7 +352,7 @@ class HomeSection extends StatelessWidget {
               const SizedBox(height: 18),
               GlassPanel.secondary(
                 width: double.infinity,
-                padding: EdgeInsets.all(isDesktop ? 24 : 20),
+                padding: EdgeInsets.all(widget.isDesktop ? 24 : 20),
                 borderRadius: const BorderRadius.all(Radius.circular(24)),
                 tone: brandPrimary,
                 child: Column(
@@ -358,7 +367,7 @@ class HomeSection extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '${placeholderBills.length} unpaid placeholder bills',
+                      '${homeState.unpaidBillCount} unpaid bills need your share',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         color: mutedForegroundColor(context, alpha: 0.8),
                         fontWeight: FontWeight.w700,
@@ -443,8 +452,7 @@ class MenuSection extends StatelessWidget {
     final items = [
       (
         title: 'Home',
-        body:
-            'Return to the placeholder dashboard and outstanding bill overview.',
+        body: 'Return to the unpaid bill dashboard and overview.',
         icon: Icons.home_rounded,
         destination: AppDestination.home,
       ),
@@ -454,6 +462,13 @@ class MenuSection extends StatelessWidget {
             'Open the full bills view with filters, sorting, and pagination controls.',
         icon: Icons.receipt_long_rounded,
         destination: AppDestination.bills,
+      ),
+      (
+        title: 'Create Bill',
+        body:
+            'Create a bill with tags, splits, notes, and uploaded receipt files.',
+        icon: Icons.add_circle_rounded,
+        destination: AppDestination.createBill,
       ),
       (
         title: 'Recipient groups',
@@ -523,22 +538,98 @@ class MenuSection extends StatelessWidget {
   }
 }
 
-class _PlaceholderBillTile extends StatelessWidget {
-  const _PlaceholderBillTile({
-    required this.title,
+String _homeAmountLabel(
+  Receipt receipt,
+  Locale locale,
+  NumberFormat fallbackFormat,
+) {
+  if (receipt.currency == 'EUR') {
+    return fallbackFormat.format(receipt.amountOwed);
+  }
+  return NumberFormat.currency(
+    locale: locale.toString(),
+    symbol: '${receipt.currency} ',
+    decimalDigits: 2,
+  ).format(receipt.amountOwed);
+}
+
+String _homeDueLabel(
+  Receipt receipt,
+  MaterialLocalizations materialLocalizations,
+) {
+  if (!receipt.hasDueDate()) {
+    return 'No due date';
+  }
+  final dueDate = DateTime.tryParse(receipt.dueDate);
+  if (dueDate == null) {
+    return 'No due date';
+  }
+  return 'Due ${materialLocalizations.formatShortDate(dueDate.toLocal())}';
+}
+
+String _homeRecipientLabel(Receipt receipt) {
+  if (receipt.hasRecipientName() && receipt.recipientName.trim().isNotEmpty) {
+    return receipt.recipientName;
+  }
+  if (receipt.hasRecipient() && receipt.recipient.name.trim().isNotEmpty) {
+    return receipt.recipient.name;
+  }
+  return 'Personal bill';
+}
+
+String _homeParticipantsLabel(Receipt receipt) {
+  if (receipt.hasRecipient() && receipt.recipient.members.isNotEmpty) {
+    return receipt.recipient.members.map(_homeUserLabel).join(', ');
+  }
+  if (receipt.hasSplit() && receipt.split.recipientShares.isNotEmpty) {
+    return receipt.split.recipientShares.map(_homeShareUserLabel).join(', ');
+  }
+  return _homeRecipientLabel(receipt);
+}
+
+String _homeUserLabel(User user) {
+  if (user.hasName() && user.name.trim().isNotEmpty) {
+    return user.name;
+  }
+  if (user.hasEmail() && user.email.trim().isNotEmpty) {
+    return user.email;
+  }
+  return 'User ${user.id}';
+}
+
+String _homeShareUserLabel(ReceiptRecipientShare share) {
+  if (share.hasUserName() && share.userName.trim().isNotEmpty) {
+    return share.userName;
+  }
+  if (share.hasUserEmail() && share.userEmail.trim().isNotEmpty) {
+    return share.userEmail;
+  }
+  return 'User ${share.userId}';
+}
+
+class _HomeBillTile extends StatelessWidget {
+  const _HomeBillTile({
+    required this.receipt,
+    required this.roleLabel,
     required this.dueLabel,
     required this.amountLabel,
-    required this.tags,
+    required this.onTap,
   });
 
-  final String title;
+  final Receipt receipt;
+  final String roleLabel;
   final String dueLabel;
   final String amountLabel;
-  final List<_PlaceholderTag> tags;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return GlassPanel.secondary(
+    final groupLabel = _homeRecipientLabel(receipt);
+    final participantsLabel = _homeParticipantsLabel(receipt);
+    final filesLabel = receipt.files.length == 1
+        ? '1 file included'
+        : '${receipt.files.length} files included';
+    final panel = GlassPanel.secondary(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       borderRadius: const BorderRadius.all(Radius.circular(24)),
@@ -562,20 +653,66 @@ class _PlaceholderBillTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  title,
+                  receipt.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-                const SizedBox(height: 4),
+                if (receipt.hasDescription() &&
+                    receipt.description.trim().isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    receipt.description,
+                    maxLines: 1,
+                    softWrap: false,
+                    overflow: TextOverflow.fade,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: mutedForegroundColor(context, alpha: 0.82),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _HomeMetaChip(
+                      label: roleLabel,
+                      icon: roleLabel == 'Owner'
+                          ? Icons.badge_rounded
+                          : Icons.people_alt_rounded,
+                    ),
+                    _HomeMetaChip(
+                      label: receipt.isPaid ? 'Paid' : 'Unpaid',
+                      icon: receipt.isPaid
+                          ? Icons.check_circle_rounded
+                          : Icons.schedule_rounded,
+                    ),
+                    _HomeMetaChip(
+                      label: groupLabel,
+                      icon: Icons.group_work_rounded,
+                      tooltip: participantsLabel,
+                    ),
+                    if (receipt.files.isNotEmpty)
+                      _HomeMetaChip(
+                        label: filesLabel,
+                        icon: Icons.attach_file_rounded,
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 8),
                 Text(
                   dueLabel,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: mutedForegroundColor(context, alpha: 0.82),
                   ),
                 ),
-                const SizedBox(height: 10),
-                _PlaceholderTagRow(tags: tags),
+                if (receipt.tags.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  _HomeTagRow(tags: receipt.tags),
+                ],
               ],
             ),
           ),
@@ -589,57 +726,72 @@ class _PlaceholderBillTile extends StatelessWidget {
         ],
       ),
     );
+    return InkWell(
+      key: ValueKey('home-receipt-row-${receipt.id}'),
+      onTap: onTap,
+      borderRadius: const BorderRadius.all(Radius.circular(24)),
+      child: panel,
+    );
   }
 }
 
-class _PlaceholderBillSeed {
-  const _PlaceholderBillSeed({
-    required this.title,
-    required this.dueInDays,
-    required this.amount,
-    required this.tags,
-  });
+class _HomeMetaChip extends StatelessWidget {
+  const _HomeMetaChip({required this.label, required this.icon, this.tooltip});
 
-  final String title;
-  final int dueInDays;
-  final double amount;
-  final List<_PlaceholderTag> tags;
+  final String label;
+  final IconData icon;
+  final String? tooltip;
+
+  @override
+  Widget build(BuildContext context) {
+    final chip = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: glassSurfaceDecoration(
+        context,
+        variant: AppGlassVariant.secondary,
+        tone: brandPrimary,
+        borderRadius: const BorderRadius.all(Radius.circular(999)),
+        includeShadows: false,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: brandPrimary),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              softWrap: false,
+              style: Theme.of(
+                context,
+              ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
+    final message = tooltip?.trim();
+    if (message == null || message.isEmpty || message == label) {
+      return chip;
+    }
+    return Tooltip(
+      message: message,
+      triggerMode: TooltipTriggerMode.tap,
+      child: chip,
+    );
+  }
 }
 
-class _PlaceholderBill {
-  const _PlaceholderBill({
-    required this.title,
-    required this.dueDate,
-    required this.amount,
-    required this.tags,
-  });
-
-  final String title;
-  final DateTime dueDate;
-  final double amount;
-  final List<_PlaceholderTag> tags;
-}
-
-class _PlaceholderTag {
-  const _PlaceholderTag({
-    required this.icon,
-    required this.text,
-    required this.color,
-  });
-
-  final String icon;
-  final String text;
-  final String color;
-}
-
-class _PlaceholderTagRow extends StatelessWidget {
-  const _PlaceholderTagRow({required this.tags});
+class _HomeTagRow extends StatelessWidget {
+  const _HomeTagRow({required this.tags});
 
   static const _chipSpacing = 8.0;
   static const _chipHorizontalPadding = 10.0;
   static const _iconSpacing = 6.0;
 
-  final List<_PlaceholderTag> tags;
+  final List<TagIndex> tags;
 
   @override
   Widget build(BuildContext context) {
@@ -660,7 +812,7 @@ class _PlaceholderTagRow extends StatelessWidget {
           context,
         ).textTheme.bodyMedium?.copyWith(fontSize: 15);
 
-        final visibleTags = <_PlaceholderTag>[];
+        final visibleTags = <TagIndex>[];
         final tagWidths = tags
             .map((tag) => _measureTagWidth(context, tag, labelStyle, iconStyle))
             .toList();
@@ -689,9 +841,8 @@ class _PlaceholderTagRow extends StatelessWidget {
 
         final hiddenCount = tags.length - visibleTags.length;
         final children = <Widget>[
-          for (final tag in visibleTags) _PlaceholderTagChip(tag: tag),
-          if (hiddenCount > 0)
-            _PlaceholderTagOverflowChip(hiddenCount: hiddenCount),
+          for (final tag in visibleTags) _HomeTagChip(tag: tag),
+          if (hiddenCount > 0) _HomeTagOverflowChip(hiddenCount: hiddenCount),
         ];
 
         return Wrap(
@@ -705,7 +856,7 @@ class _PlaceholderTagRow extends StatelessWidget {
 
   static double _measureTagWidth(
     BuildContext context,
-    _PlaceholderTag tag,
+    TagIndex tag,
     TextStyle? labelStyle,
     TextStyle? iconStyle,
   ) {
@@ -740,10 +891,10 @@ class _PlaceholderTagRow extends StatelessWidget {
   }
 }
 
-class _PlaceholderTagChip extends StatelessWidget {
-  const _PlaceholderTagChip({required this.tag});
+class _HomeTagChip extends StatelessWidget {
+  const _HomeTagChip({required this.tag});
 
-  final _PlaceholderTag tag;
+  final TagIndex tag;
 
   @override
   Widget build(BuildContext context) {
@@ -780,8 +931,8 @@ class _PlaceholderTagChip extends StatelessWidget {
   }
 }
 
-class _PlaceholderTagOverflowChip extends StatelessWidget {
-  const _PlaceholderTagOverflowChip({required this.hiddenCount});
+class _HomeTagOverflowChip extends StatelessWidget {
+  const _HomeTagOverflowChip({required this.hiddenCount});
 
   final int hiddenCount;
 
@@ -809,10 +960,16 @@ class _PlaceholderTagOverflowChip extends StatelessWidget {
 Color _parseTagColor(String value) {
   final normalized = value.trim().replaceFirst('#', '');
   if (normalized.length == 6) {
-    return Color(int.parse('FF$normalized', radix: 16));
+    final parsed = int.tryParse('FF$normalized', radix: 16);
+    if (parsed != null) {
+      return Color(parsed);
+    }
   }
   if (normalized.length == 8) {
-    return Color(int.parse(normalized, radix: 16));
+    final parsed = int.tryParse(normalized, radix: 16);
+    if (parsed != null) {
+      return Color(parsed);
+    }
   }
   return brandPrimary;
 }
@@ -889,26 +1046,6 @@ class _LoggedInProfileCard extends StatelessWidget {
         ),
         const SizedBox(height: 24),
         _ProfileInfoTable(credentials: credentials, displayName: displayName),
-        const SizedBox(height: 24),
-        Text(
-          'Raw user object',
-          style: Theme.of(
-            context,
-          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 12),
-        GlassPanel.secondary(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          borderRadius: const BorderRadius.all(Radius.circular(20)),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: SelectableText(
-              credentials.user.toString(),
-              style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
-            ),
-          ),
-        ),
         const SizedBox(height: 24),
         FilledButton.tonalIcon(
           onPressed: () {

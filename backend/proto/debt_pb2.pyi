@@ -14,6 +14,7 @@ class ReceiptOrderBy(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     RECEIPT_ORDER_BY_COST_TOTAL: _ClassVar[ReceiptOrderBy]
     RECEIPT_ORDER_BY_COST_FOR_USER: _ClassVar[ReceiptOrderBy]
     RECEIPT_ORDER_BY_DUE_DATE: _ClassVar[ReceiptOrderBy]
+    RECEIPT_ORDER_BY_REMAINING_FOR_USER: _ClassVar[ReceiptOrderBy]
 
 class ReceiptOrderDirection(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -32,6 +33,7 @@ RECEIPT_ORDER_BY_ID: ReceiptOrderBy
 RECEIPT_ORDER_BY_COST_TOTAL: ReceiptOrderBy
 RECEIPT_ORDER_BY_COST_FOR_USER: ReceiptOrderBy
 RECEIPT_ORDER_BY_DUE_DATE: ReceiptOrderBy
+RECEIPT_ORDER_BY_REMAINING_FOR_USER: ReceiptOrderBy
 RECEIPT_ORDER_DIRECTION_UNSPECIFIED: ReceiptOrderDirection
 RECEIPT_ORDER_DIRECTION_ASC: ReceiptOrderDirection
 RECEIPT_ORDER_DIRECTION_DESC: ReceiptOrderDirection
@@ -261,6 +263,22 @@ class ReceiptsResponse(_message.Message):
     receipts: _containers.RepeatedCompositeFieldContainer[Receipt]
     next_page_token: str
     def __init__(self, success: _Optional[bool] = ..., message: _Optional[str] = ..., receipts: _Optional[_Iterable[_Union[Receipt, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
+
+class ReceiptUnpaidSummaryRequest(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...
+
+class ReceiptUnpaidSummaryResponse(_message.Message):
+    __slots__ = ("success", "message", "unpaid_share_total", "unpaid_bill_count")
+    SUCCESS_FIELD_NUMBER: _ClassVar[int]
+    MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    UNPAID_SHARE_TOTAL_FIELD_NUMBER: _ClassVar[int]
+    UNPAID_BILL_COUNT_FIELD_NUMBER: _ClassVar[int]
+    success: bool
+    message: str
+    unpaid_share_total: float
+    unpaid_bill_count: int
+    def __init__(self, success: _Optional[bool] = ..., message: _Optional[str] = ..., unpaid_share_total: _Optional[float] = ..., unpaid_bill_count: _Optional[int] = ...) -> None: ...
 
 class FileResponse(_message.Message):
     __slots__ = ("success", "message", "file")

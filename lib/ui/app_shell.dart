@@ -521,6 +521,7 @@ class _MobileBottomNavigation extends StatelessWidget {
   static const _mobileDestinations = [
     AppDestination.home,
     AppDestination.bills,
+    AppDestination.createBill,
     AppDestination.menu,
   ];
 
@@ -534,6 +535,7 @@ class _MobileBottomNavigation extends StatelessWidget {
       AppDestination.recipientGroups => AppDestination.menu,
       AppDestination.home => AppDestination.home,
       AppDestination.bills => AppDestination.bills,
+      AppDestination.createBill => AppDestination.createBill,
       AppDestination.menu => AppDestination.menu,
     };
     final scheme = Theme.of(context).colorScheme;
@@ -577,7 +579,11 @@ class _MobileBottomNavigation extends StatelessWidget {
                       .map(
                         (destination) => NavigationDestination(
                           icon: Icon(destination.icon),
-                          label: destination.label,
+                          label: switch (destination) {
+                            AppDestination.bills => 'View',
+                            AppDestination.createBill => 'Create',
+                            _ => destination.label,
+                          },
                         ),
                       )
                       .toList(),
