@@ -36,6 +36,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get destinationProfile => 'Profile';
 
   @override
+  String get destinationPrivacyPolicy => 'Privacy policy';
+
+  @override
   String get destinationMenu => 'Menu';
 
   @override
@@ -190,6 +193,33 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get menuProfileLoggedInDescription =>
       'Review the synced account profile and active session details.';
+
+  @override
+  String get menuPrivacyPolicyDescription =>
+      'Read the privacy policy and stored consent details.';
+
+  @override
+  String get privacyPolicyTitle => 'Privacy policy';
+
+  @override
+  String get privacyPolicyIntro =>
+      'Please read and accept the privacy policy before using Debt Display.';
+
+  @override
+  String get privacyPolicyLoadFailed => 'Could not load the privacy policy.';
+
+  @override
+  String get acceptPrivacyPolicy => 'Accept and continue';
+
+  @override
+  String get revokePrivacyConsent => 'Revoke consent';
+
+  @override
+  String get sourceCodeTitle => 'Source code';
+
+  @override
+  String get sourceCodeDescription =>
+      'Open the public GitHub repository for this application.';
 
   @override
   String get loginToContinue => 'Log in to continue';

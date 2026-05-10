@@ -544,6 +544,7 @@ class _MobileBottomNavigation extends StatelessWidget {
       AppDestination.profile => AppDestination.menu,
       AppDestination.recipientGroups => AppDestination.menu,
       AppDestination.charts => AppDestination.menu,
+      AppDestination.privacyPolicy => AppDestination.menu,
       AppDestination.home => AppDestination.home,
       AppDestination.bills => AppDestination.bills,
       AppDestination.createBill => AppDestination.createBill,

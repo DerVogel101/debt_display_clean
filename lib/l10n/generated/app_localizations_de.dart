@@ -36,6 +36,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get destinationProfile => 'Profil';
 
   @override
+  String get destinationPrivacyPolicy => 'Datenschutzerklärung';
+
+  @override
   String get destinationMenu => 'Menü';
 
   @override
@@ -189,6 +192,34 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get menuProfileLoggedInDescription =>
       'Prüfe synchronisiertes Kontoprofil und aktive Sitzungsdetails.';
+
+  @override
+  String get menuPrivacyPolicyDescription =>
+      'Lies die Datenschutzerklärung und die gespeicherte Zustimmung.';
+
+  @override
+  String get privacyPolicyTitle => 'Datenschutzerklärung';
+
+  @override
+  String get privacyPolicyIntro =>
+      'Bitte lies und akzeptiere die Datenschutzerklärung, bevor du Debt Display nutzt.';
+
+  @override
+  String get privacyPolicyLoadFailed =>
+      'Die Datenschutzerklärung konnte nicht geladen werden.';
+
+  @override
+  String get acceptPrivacyPolicy => 'Akzeptieren und fortfahren';
+
+  @override
+  String get revokePrivacyConsent => 'Zustimmung widerrufen';
+
+  @override
+  String get sourceCodeTitle => 'Quellcode';
+
+  @override
+  String get sourceCodeDescription =>
+      'Öffne das öffentliche GitHub-Repository dieser Anwendung.';
 
   @override
   String get loginToContinue => 'Anmelden, um fortzufahren';
