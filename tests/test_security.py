@@ -1674,6 +1674,27 @@ class LiveApiRegressionTests(AsyncDatabaseTestCase):
         stored_path = resolve_storage_path(stored.storage_key, self._tmpdir.name)
         self.assertEqual(stored_path.read_bytes(), payload)
 
+    async def test_files_upload_sanitizes_active_content_type(self) -> None:
+        payload = b"<script>alert(1)</script>"
+        response = await self._upload_file(
+            token="owner-token",
+            receipt_id=self.shared_receipt.id,
+            filename="receipt.html",
+            content=payload,
+            content_type="Text/HTML; Charset=UTF-8",
+        )
+        parsed = self._parse_message(debt_pb2.FileResponse, response)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(parsed.success)
+        self.assertEqual(parsed.file.content_type, "application/octet-stream")
+
+        async with db.async_session_maker() as session:
+            stored = await session.get(db.ReceiptFile, parsed.file.id)
+
+        self.assertIsNotNone(stored)
+        self.assertEqual(stored.content_type, "application/octet-stream")
+
     async def test_files_upload_rejects_payloads_over_size_limit(self) -> None:
         settings.FILE_UPLOAD_MAX_BYTES = 8
         response = await self._upload_file(
@@ -1731,7 +1752,34 @@ class LiveApiRegressionTests(AsyncDatabaseTestCase):
         self.assertEqual(member_response.status_code, 200)
         self.assertEqual(member_response.content, payload)
         self.assertEqual(member_response.headers["content-type"], "image/png")
+        self.assertTrue(member_response.headers["content-disposition"].startswith("inline"))
+        self.assertIn("receipt.png", member_response.headers["content-disposition"])
+        self.assertEqual(member_response.headers["x-content-type-options"], "nosniff")
         self.assertEqual(stranger_response.status_code, 404)
+
+    async def test_files_content_serves_active_content_as_download(self) -> None:
+        payload = b"<html><script>alert(1)</script></html>"
+        upload = await self._upload_file(
+            token="owner-token",
+            receipt_id=self.shared_receipt.id,
+            filename="receipt.html",
+            content=payload,
+            content_type="text/html",
+        )
+        uploaded = self._parse_message(debt_pb2.FileResponse, upload)
+
+        member_response = await self._get_file_content(
+            token="member-token",
+            file_id=uploaded.file.id,
+        )
+
+        self.assertEqual(member_response.status_code, 200)
+        self.assertEqual(member_response.content, payload)
+        self.assertEqual(member_response.headers["content-type"], "application/octet-stream")
+        self.assertTrue(member_response.headers["content-disposition"].startswith("attachment"))
+        self.assertIn("receipt.html", member_response.headers["content-disposition"])
+        self.assertEqual(member_response.headers["x-content-type-options"], "nosniff")
+        self.assertNotIn("text/html", str(member_response.headers).lower())
 
     async def test_recipient_member_routes_are_owner_only(self) -> None:
         owner_response = await self._post_protobuf(

@@ -2,6 +2,7 @@ import 'dart:js_interop';
 import 'dart:typed_data';
 import 'dart:ui_web' as ui_web;
 
+import 'package:debt_display/services/file_mime_policy.dart';
 import 'package:flutter/widgets.dart';
 import 'package:web/web.dart' as web;
 
@@ -27,9 +28,10 @@ class _BlobFilePreviewState extends State<BlobFilePreview> {
   void initState() {
     super.initState();
     _viewType = 'file-preview-${DateTime.now().microsecondsSinceEpoch}';
+    final safeContentType = normalizeFileContentType(widget.contentType);
     final blob = web.Blob(
       <web.BlobPart>[widget.bytes.toJS].toJS,
-      web.BlobPropertyBag(type: widget.contentType),
+      web.BlobPropertyBag(type: safeContentType),
     );
     _url = web.URL.createObjectURL(blob);
     final frame = web.HTMLIFrameElement()

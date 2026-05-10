@@ -1791,6 +1791,69 @@ void main() {
     expect(openedFilename, 'statement.pdf');
   });
 
+  testWidgets('non-web receipt file open forces active content download type', (
+    tester,
+  ) async {
+    _setTestSurfaceSize(tester, width: 430, height: 1000);
+
+    final file = ReceiptFile(
+      id: Int64(84),
+      receiptId: Int64(50),
+      originalFilename: 'receipt.html',
+      contentType: 'text/html',
+    );
+    final fakeService = _FakeDebtBackendService(
+      availableTags: const [],
+      onListReceipts: (_) {
+        final response = ReceiptsResponse(success: true);
+        response.receipts.add(
+          _testReceipt(
+            id: 50,
+            title: 'Receipt with active file',
+            amountOwed: 10,
+            files: [file],
+          ),
+        );
+        return response;
+      },
+      onDownloadReceiptFile: (_) => ReceiptFileDownload(
+        file: file.deepCopy(),
+        bytes: Uint8List.fromList([60, 104, 116, 109, 108, 62]),
+        contentType: 'text/html',
+      ),
+    );
+
+    String? openedContentType;
+    debugSetPendingFileWindowFactory(
+      () => PendingFileWindow(({
+        required bytes,
+        required contentType,
+        required filename,
+      }) async {
+        openedContentType = contentType;
+      }),
+    );
+
+    await tester.pumpWidget(
+      _buildBillsSectionTestApp(
+        authState: _TestAuthSessionState(
+          isAuthenticatedValue: true,
+          accessTokenValue: 'token-1',
+          userIdValue: 10,
+        ),
+        billListState: BillListState(debtBackendService: fakeService),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('receipt-row-50')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('receipt-file-open-84')));
+    await tester.pumpAndSettle();
+
+    expect(openedContentType, 'application/octet-stream');
+  });
+
   testWidgets('receipt file preview keeps one download future across rebuilds', (
     tester,
   ) async {
@@ -1851,6 +1914,61 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(downloadCount, 1);
+  });
+
+  testWidgets('receipt file preview does not inline svg content', (
+    tester,
+  ) async {
+    _setTestSurfaceSize(tester, width: 430, height: 1000);
+
+    final file = ReceiptFile(
+      id: Int64(85),
+      receiptId: Int64(51),
+      originalFilename: 'receipt.svg',
+      contentType: 'image/svg+xml',
+    );
+    var downloadCount = 0;
+    final fakeService = _FakeDebtBackendService(
+      availableTags: const [],
+      onListReceipts: (_) {
+        final response = ReceiptsResponse(success: true);
+        response.receipts.add(
+          _testReceipt(
+            id: 51,
+            title: 'Receipt with svg',
+            amountOwed: 10,
+            files: [file],
+          ),
+        );
+        return response;
+      },
+      onDownloadReceiptFile: (_) {
+        downloadCount += 1;
+        return ReceiptFileDownload(
+          file: file.deepCopy(),
+          bytes: Uint8List.fromList([60, 115, 118, 103, 62]),
+          contentType: 'image/svg+xml',
+        );
+      },
+    );
+
+    await tester.pumpWidget(
+      _buildBillsSectionTestApp(
+        authState: _TestAuthSessionState(
+          isAuthenticatedValue: true,
+          accessTokenValue: 'token-1',
+          userIdValue: 10,
+        ),
+        billListState: BillListState(debtBackendService: fakeService),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('receipt-row-51')));
+    await tester.pumpAndSettle();
+
+    expect(downloadCount, 0);
+    expect(find.byKey(const ValueKey('receipt-file-open-85')), findsOneWidget);
   });
 
   testWidgets('non-web receipt file open shows snackbar on open failure', (

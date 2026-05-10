@@ -45,6 +45,18 @@ from backend.storage import resolve_storage_path
 api_app = FastAPI(title="api")
 
 _UPLOAD_CHUNK_SIZE_BYTES = 1024 * 1024
+_DEFAULT_FILE_CONTENT_TYPE = "application/octet-stream"
+_SAFE_INLINE_FILE_CONTENT_TYPES = frozenset(
+    {
+        "application/pdf",
+        "image/png",
+        "image/jpeg",
+        "image/gif",
+        "image/webp",
+        "image/avif",
+        "image/bmp",
+    }
+)
 
 
 class ProtobufResponse(Response):
@@ -83,6 +95,23 @@ def _dt_from_proto(value: str | None) -> datetime | None:
 
 def _upload_root() -> Path:
     return Path(settings.UPLOAD_DIR).resolve()
+
+
+def _normalize_file_content_type(content_type: str | None) -> str:
+    if content_type is None:
+        return ""
+    return content_type.split(";", 1)[0].strip().lower()
+
+
+def _safe_file_content_type(content_type: str | None) -> str:
+    normalized = _normalize_file_content_type(content_type)
+    if normalized in _SAFE_INLINE_FILE_CONTENT_TYPES:
+        return normalized
+    return _DEFAULT_FILE_CONTENT_TYPE
+
+
+def _file_content_disposition_type(content_type: str) -> str:
+    return "inline" if content_type in _SAFE_INLINE_FILE_CONTENT_TYPES else "attachment"
 
 
 async def _stream_upload_to_temp(
@@ -958,7 +987,9 @@ async def attach_file_route(request: Request, session: AsyncSession = Depends(ge
             actor_user_id=user.id,
             receipt_id=proto_req.receipt_id,
             client_filename=proto_req.original_filename,
-            content_type=proto_req.content_type if _has_field(proto_req, "content_type") else None,
+            content_type=_safe_file_content_type(
+                proto_req.content_type if _has_field(proto_req, "content_type") else None
+            ),
             size_bytes=proto_req.size_bytes if _has_field(proto_req, "size_bytes") else None,
             sha256=proto_req.sha256 if _has_field(proto_req, "sha256") else None,
         )
@@ -981,7 +1012,7 @@ async def upload_file_route(
     try:
         user = await _current_user(request, session)
         filename = file.filename or "file"
-        content_type = file.content_type or "application/octet-stream"
+        content_type = _safe_file_content_type(file.content_type)
         upload_root = _upload_root()
         temp_path = upload_root / ".tmp" / uuid4().hex
         await services.get_owned_receipt(session, user.id, receipt_id)
@@ -1054,11 +1085,13 @@ async def get_file_content_route(
         if not path.is_file():
             raise FileNotFoundError("File content not found")
         await session.commit()
+        content_type = _safe_file_content_type(file_record.content_type)
         return DownloadFileResponse(
             path,
-            media_type=file_record.content_type or "application/octet-stream",
+            media_type=content_type,
             filename=file_record.original_filename,
-            content_disposition_type="inline",
+            content_disposition_type=_file_content_disposition_type(content_type),
+            headers={"X-Content-Type-Options": "nosniff"},
         )
     except Exception as exc:
         await session.rollback()

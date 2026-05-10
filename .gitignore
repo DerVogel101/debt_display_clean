@@ -8,6 +8,7 @@ backend/database.sqlite
 database.sqlite
 backend/uploads/
 uploads/
+.codex-security-scans/
 
 # Miscellaneous
 *.class

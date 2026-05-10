@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:debt_display/config/app_config.dart';
 import 'package:debt_display/generated/debt.pb.dart';
+import 'package:debt_display/services/file_mime_policy.dart';
 import 'package:dio/dio.dart';
 
 class DebtBackendService {
@@ -341,10 +342,10 @@ class DebtBackendService {
     return ReceiptFileDownload(
       file: file.deepCopy(),
       bytes: _bytesFromResponse(response),
-      contentType:
-          response.headers.value(Headers.contentTypeHeader) ??
-          (file.hasContentType() ? file.contentType : null) ??
-          'application/octet-stream',
+      contentType: normalizeFileContentType(
+        response.headers.value(Headers.contentTypeHeader) ??
+            (file.hasContentType() ? file.contentType : null),
+      ),
     );
   }
 

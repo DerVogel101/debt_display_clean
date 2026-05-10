@@ -1,6 +1,7 @@
 import 'package:debt_display/generated/debt.pb.dart';
 import 'package:debt_display/l10n/generated/app_localizations.dart';
 import 'package:debt_display/services/debt_backend_service.dart';
+import 'package:debt_display/services/file_mime_policy.dart';
 import 'package:debt_display/services/file_preview.dart';
 import 'package:debt_display/services/file_viewer.dart';
 import 'package:debt_display/state/auth_session_state.dart';
@@ -1488,7 +1489,9 @@ class _ReceiptFileDetailTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final contentType = file.hasContentType() ? file.contentType : null;
+    final contentType = file.hasContentType()
+        ? normalizeFileContentType(file.contentType)
+        : null;
     return DecoratedBox(
       decoration: glassSurfaceDecoration(
         context,
@@ -1526,7 +1529,7 @@ class _ReceiptFileDetailTile extends StatelessWidget {
             if (showPreview && _canPreviewInline(contentType)) ...[
               const SizedBox(height: 10),
               SizedBox(
-                height: contentType == 'application/pdf' ? 280 : 190,
+                height: isPdfContentType(contentType) ? 280 : 190,
                 width: double.infinity,
                 child: ClipRRect(
                   borderRadius: const BorderRadius.all(Radius.circular(12)),
@@ -1583,13 +1586,13 @@ class _ReceiptFilePreviewState extends State<_ReceiptFilePreview> {
             child: Text(AppLocalizations.of(context).previewUnavailable),
           );
         }
-        if (download.contentType.startsWith('image/')) {
+        if (isRasterImageContentType(download.contentType)) {
           return Image.memory(download.bytes, fit: BoxFit.contain);
         }
-        if (download.contentType == 'application/pdf') {
+        if (isPdfContentType(download.contentType)) {
           return BlobFilePreview(
             bytes: download.bytes,
-            contentType: download.contentType,
+            contentType: normalizeFileContentType(download.contentType),
           );
         }
         return const SizedBox.shrink();
@@ -1617,7 +1620,7 @@ Future<void> _openReceiptFile(
     }
     await pendingWindow.showBytes(
       bytes: download.bytes,
-      contentType: download.contentType,
+      contentType: normalizeFileContentType(download.contentType),
       filename: download.file.originalFilename,
     );
   } catch (_) {
@@ -1668,8 +1671,7 @@ String _recipientMemberLabel(User user, AppLocalizations l10n) {
 }
 
 bool _canPreviewInline(String? contentType) {
-  return contentType == 'application/pdf' ||
-      contentType?.startsWith('image/') == true;
+  return isInlinePreviewContentType(contentType);
 }
 
 class _ControlBlock extends StatelessWidget {
@@ -1883,10 +1885,10 @@ Color _parseTagColor(String value) {
 }
 
 IconData _fileIcon(String? contentType) {
-  if (contentType == 'application/pdf') {
+  if (isPdfContentType(contentType)) {
     return Icons.picture_as_pdf_rounded;
   }
-  if (contentType?.startsWith('image/') == true) {
+  if (isRasterImageContentType(contentType)) {
     return Icons.image_rounded;
   }
   return Icons.insert_drive_file_rounded;
