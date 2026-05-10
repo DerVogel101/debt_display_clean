@@ -27,6 +27,7 @@ ENV PYTHONUNBUFFERED=1 \
     FRONTEND_STATIC_DIR=/app/backend/web
 
 COPY pyproject.toml uv.lock ./
+RUN pip install --no-cache-dir uv
 RUN uv sync --frozen --no-dev --no-install-project
 
 COPY backend ./backend
