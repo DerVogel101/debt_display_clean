@@ -1,19 +1,12 @@
 services:
   debt-display:
-    build: .
+    build:
+      context: .
+      network: host
     container_name: debt-display
     restart: unless-stopped
     ports:
       - "3300:3300"
-    environment:
-      BACKEND_HOST: 0.0.0.0
-      BACKEND_PORT: 3300
-      DATABASE_URL: sqlite+aiosqlite:////data/database.sqlite
-      UPLOAD_DIR: /data/uploads
-      GENERATE_TEST_DATA_ON_STARTUP: "false"
-      ALLOWED_ORIGINS: https://your-domain.example
-      AUTH0_DOMAIN: your-auth0-domain
-      AUTH0_AUDIENCE: your-auth0-audience
     volumes:
       - type: bind
         source: ${DEBT_DISPLAY_DATA_DIR:-./data}

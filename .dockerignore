@@ -15,8 +15,6 @@ __pycache__
 *.pyo
 *.log
 
-.env
-backend/.env
 backend/web/*
 !backend/web/.gitkeep
 database.sqlite

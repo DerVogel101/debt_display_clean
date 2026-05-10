@@ -21,12 +21,16 @@ web app from `backend/web`.
 
 ## Runtime Configuration
 
-Create local config files from the examples:
+Create config files from the examples after pulling the repository:
 
 ```powershell
 Copy-Item assets\env\app.env.example assets\env\app.env
 Copy-Item backend\.env.example backend\.env
 ```
+
+Keep deployment-specific values in these files instead of in `docker-compose.yml`.
+The frontend reads `assets/env/app.env` during the Flutter web build, and the
+backend reads `backend/.env` at runtime.
 
 Important backend settings:
 
@@ -121,16 +125,11 @@ then copies the generated assets into the backend runtime image:
 docker build -t debt-display .
 ```
 
-Run it locally with host-mounted data:
+Run it locally with host-mounted data after creating `backend/.env` and
+`assets/env/app.env`:
 
 ```powershell
-docker run --rm -p 3300:3300 `
-  -e GENERATE_TEST_DATA_ON_STARTUP=false `
-  -e AUTH0_DOMAIN=your-tenant.us.auth0.com `
-  -e AUTH0_AUDIENCE=https://your-api-identifier `
-  -e ALLOWED_ORIGINS=https://your-domain.example `
-  -v ${PWD}\data:/data `
-  debt-display
+docker run --rm -p 3300:3300 -v ${PWD}\data:/data debt-display
 ```
 
 Inside the container:
@@ -142,7 +141,7 @@ Inside the container:
 
 The included `docker-compose.yml` is intended for Portainer stacks. It bind
 mounts a host directory into `/data` so SQLite and uploads survive container
-updates.
+updates. Environment values are intentionally not stored in the Compose file.
 
 On the Linux host, create the data directory:
 
@@ -156,11 +155,19 @@ In Portainer, deploy this repository as a stack and set:
 DEBT_DISPLAY_DATA_DIR=/opt/debt-display/data
 ```
 
-Then adjust the stack environment values for your deployment:
+After pulling the repository on the deployment host, create and edit the config
+files before building or redeploying the stack:
 
-- `AUTH0_DOMAIN`
-- `AUTH0_AUDIENCE`
-- `ALLOWED_ORIGINS`
-- `GENERATE_TEST_DATA_ON_STARTUP=false`
+```bash
+cp assets/env/app.env.example assets/env/app.env
+cp backend/.env.example backend/.env
+```
+
+Set deployment values in those files:
+
+- `assets/env/app.env`: `BACKEND_URL_RELEASE`, `FRONTEND_URL_RELEASE`,
+  `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, and `AUTH0_AUDIENCE`.
+- `backend/.env`: `AUTH0_DOMAIN`, `AUTH0_AUDIENCE`, `ALLOWED_ORIGINS`, and
+  `GENERATE_TEST_DATA_ON_STARTUP=false`.
 
 Expose port `3300` directly or put a reverse proxy in front of it.
