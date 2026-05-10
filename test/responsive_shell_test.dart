@@ -2110,6 +2110,67 @@ void main() {
     expect(find.byType(Image), findsOneWidget);
   });
 
+  testWidgets('delete dialog disables receipt file previews', (tester) async {
+    _setTestSurfaceSize(tester, width: 430, height: 1000);
+
+    final file = ReceiptFile(
+      id: Int64(87),
+      receiptId: Int64(53),
+      originalFilename: 'delete-receipt.png',
+      contentType: 'image/png',
+    );
+    final imageBytes = base64Decode(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=',
+    );
+    final fakeService = _FakeDebtBackendService(
+      availableTags: const [],
+      onListReceipts: (_) {
+        final response = ReceiptsResponse(success: true);
+        response.receipts.add(
+          _testReceipt(
+            id: 53,
+            title: 'Receipt with delete preview',
+            amountOwed: 10,
+            files: [file],
+          ),
+        );
+        return response;
+      },
+      onDownloadReceiptFile: (_) {
+        return ReceiptFileDownload(
+          file: file.deepCopy(),
+          bytes: imageBytes,
+          contentType: 'image/png',
+        );
+      },
+    );
+
+    await tester.pumpWidget(
+      _buildBillsSectionTestApp(
+        authState: _TestAuthSessionState(
+          isAuthenticatedValue: true,
+          accessTokenValue: 'token-1',
+          userIdValue: 10,
+        ),
+        billListState: BillListState(debtBackendService: fakeService),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('receipt-row-53')));
+    await tester.pumpAndSettle();
+    expect(find.byType(Image), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('receipt-delete-53')));
+    await tester.pumpAndSettle();
+    expect(find.byType(Image), findsNothing);
+    expect(find.byKey(const ValueKey('receipt-file-open-87')), findsOneWidget);
+
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(find.byType(Image), findsOneWidget);
+  });
+
   testWidgets('receipt file preview does not inline svg content', (
     tester,
   ) async {

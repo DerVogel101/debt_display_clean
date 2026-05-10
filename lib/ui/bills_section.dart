@@ -47,6 +47,17 @@ Future<void> showBillDetailModal(
             });
           }
         },
+        onDeleteReceipt: (receipt) async {
+          setModalState(() {
+            showFilePreviews = false;
+          });
+          await _confirmDeleteReceipt(context, state, receipt);
+          if (context.mounted) {
+            setModalState(() {
+              showFilePreviews = true;
+            });
+          }
+        },
       );
     },
   );
@@ -983,6 +994,7 @@ class _BillDetailPanel extends StatelessWidget {
     required this.state,
     required this.showFilePreviews,
     required this.onShowPayments,
+    required this.onDeleteReceipt,
   });
 
   final Receipt receipt;
@@ -990,6 +1002,7 @@ class _BillDetailPanel extends StatelessWidget {
   final bool showFilePreviews;
   final Future<void> Function(Receipt receipt, NumberFormat amountFormat)
   onShowPayments;
+  final Future<void> Function(Receipt receipt) onDeleteReceipt;
 
   @override
   Widget build(BuildContext context) {
@@ -1074,7 +1087,7 @@ class _BillDetailPanel extends StatelessWidget {
                   key: ValueKey('receipt-delete-${receipt.id}'),
                   onPressed: state.isMutating
                       ? null
-                      : () => _confirmDeleteReceipt(context, state, receipt),
+                      : () => onDeleteReceipt(receipt),
                   icon: const Icon(Icons.delete_outline_rounded),
                   label: Text(l10n.deleteBill),
                   style: OutlinedButton.styleFrom(
