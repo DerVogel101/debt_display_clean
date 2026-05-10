@@ -369,6 +369,54 @@ void main() {
     expect(find.text('Protected app content'), findsOneWidget);
   });
 
+  testWidgets(
+    'privacy gate does not allow acceptance when policy fails to load',
+    (tester) async {
+      _setTestSurfaceSize(tester, width: 430, height: 900);
+      final privacyConsentState = PrivacyConsentState.test(
+        hasAcceptedCurrentVersion: false,
+      );
+      final policyTextCompleter = Completer<String>();
+
+      await tester.pumpWidget(
+        _buildPrivacyCardTestApp(
+          privacyConsentState: privacyConsentState,
+          policyTextFuture: policyTextCompleter.future,
+          requireAcceptance: true,
+        ),
+      );
+      await tester.pump();
+      policyTextCompleter.completeError(Exception('missing asset'));
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.text('Could not load the privacy policy.'), findsOneWidget);
+      expect(find.byKey(const ValueKey('privacy-accept-button')), findsNothing);
+      expect(privacyConsentState.hasAcceptedCurrentVersion, isFalse);
+    },
+  );
+
+  testWidgets('privacy gate allows acceptance after policy loads', (
+    tester,
+  ) async {
+    _setTestSurfaceSize(tester, width: 430, height: 900);
+    final privacyConsentState = PrivacyConsentState.test(
+      hasAcceptedCurrentVersion: false,
+    );
+
+    await tester.pumpWidget(
+      _buildPrivacyCardTestApp(
+        privacyConsentState: privacyConsentState,
+        policyTextFuture: Future<String>.value('Loaded policy text'),
+        requireAcceptance: true,
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('Loaded policy text'), findsOneWidget);
+    expect(find.byKey(const ValueKey('privacy-accept-button')), findsOneWidget);
+  });
+
   testWidgets('saved privacy consent skips the gate', (tester) async {
     _setTestSurfaceSize(tester, width: 430, height: 900);
 
@@ -461,11 +509,12 @@ void main() {
     await tester.ensureVisible(revokeButton);
     await tester.pump();
     await tester.tap(revokeButton);
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+    for (var index = 0; index < 10; index++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
 
     expect(privacyConsentState.hasAcceptedCurrentVersion, isFalse);
-    expect(find.byKey(const ValueKey('privacy-accept-button')), findsOneWidget);
+    expect(find.byKey(const ValueKey('privacy-revoke-button')), findsNothing);
   });
 
   testWidgets('menu section includes bills navigation action', (tester) async {
@@ -2961,6 +3010,30 @@ Widget _buildPrivacyGateTestApp({
     home: ChangeNotifierProvider<PrivacyConsentState>.value(
       value: privacyConsentState,
       child: PrivacyConsentGate(child: child),
+    ),
+  );
+}
+
+Widget _buildPrivacyCardTestApp({
+  required PrivacyConsentState privacyConsentState,
+  required Future<String> policyTextFuture,
+  required bool requireAcceptance,
+}) {
+  return MaterialApp(
+    locale: const Locale('en', 'US'),
+    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    supportedLocales: _supportedLocales,
+    theme: buildLightTheme(),
+    home: ChangeNotifierProvider<PrivacyConsentState>.value(
+      value: privacyConsentState,
+      child: Scaffold(
+        body: SingleChildScrollView(
+          child: PrivacyPolicyCard(
+            requireAcceptance: requireAcceptance,
+            policyTextFuture: policyTextFuture,
+          ),
+        ),
+      ),
     ),
   );
 }

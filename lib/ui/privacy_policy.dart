@@ -78,10 +78,30 @@ class PrivacyPolicySection extends StatelessWidget {
   }
 }
 
-class PrivacyPolicyCard extends StatelessWidget {
-  const PrivacyPolicyCard({super.key, required this.requireAcceptance});
+class PrivacyPolicyCard extends StatefulWidget {
+  const PrivacyPolicyCard({
+    super.key,
+    required this.requireAcceptance,
+    this.policyTextFuture,
+  });
 
   final bool requireAcceptance;
+  final Future<String>? policyTextFuture;
+
+  @override
+  State<PrivacyPolicyCard> createState() => _PrivacyPolicyCardState();
+}
+
+class _PrivacyPolicyCardState extends State<PrivacyPolicyCard> {
+  late final Future<String> _policyTextFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _policyTextFuture =
+        widget.policyTextFuture ??
+        rootBundle.loadString(_privacyPolicyAssetPath);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -106,31 +126,39 @@ class PrivacyPolicyCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 20),
-          const _PrivacyPolicyText(),
-          const SizedBox(height: 20),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              if (requireAcceptance)
-                FilledButton.icon(
-                  key: const ValueKey('privacy-accept-button'),
-                  onPressed: () {
-                    context.read<PrivacyConsentState>().accept();
-                  },
-                  icon: const Icon(Icons.check_circle_rounded),
-                  label: Text(l10n.acceptPrivacyPolicy),
-                )
-              else
-                OutlinedButton.icon(
-                  key: const ValueKey('privacy-revoke-button'),
-                  onPressed: () {
-                    context.read<PrivacyConsentState>().revoke();
-                  },
-                  icon: const Icon(Icons.block_rounded),
-                  label: Text(l10n.revokePrivacyConsent),
+          FutureBuilder<String>(
+            future: _policyTextFuture,
+            builder: (context, snapshot) => Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _PrivacyPolicyText(snapshot: snapshot),
+                const SizedBox(height: 20),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    if (widget.requireAcceptance && snapshot.hasData)
+                      FilledButton.icon(
+                        key: const ValueKey('privacy-accept-button'),
+                        onPressed: () {
+                          context.read<PrivacyConsentState>().accept();
+                        },
+                        icon: const Icon(Icons.check_circle_rounded),
+                        label: Text(l10n.acceptPrivacyPolicy),
+                      )
+                    else if (!widget.requireAcceptance)
+                      OutlinedButton.icon(
+                        key: const ValueKey('privacy-revoke-button'),
+                        onPressed: () {
+                          context.read<PrivacyConsentState>().revoke();
+                        },
+                        icon: const Icon(Icons.block_rounded),
+                        label: Text(l10n.revokePrivacyConsent),
+                      ),
+                  ],
                 ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
@@ -138,66 +166,50 @@ class PrivacyPolicyCard extends StatelessWidget {
   }
 }
 
-class _PrivacyPolicyText extends StatefulWidget {
-  const _PrivacyPolicyText();
+class _PrivacyPolicyText extends StatelessWidget {
+  const _PrivacyPolicyText({required this.snapshot});
 
-  @override
-  State<_PrivacyPolicyText> createState() => _PrivacyPolicyTextState();
-}
-
-class _PrivacyPolicyTextState extends State<_PrivacyPolicyText> {
-  late final Future<String> _policyTextFuture;
-
-  @override
-  void initState() {
-    super.initState();
-    _policyTextFuture = rootBundle.loadString(_privacyPolicyAssetPath);
-  }
+  final AsyncSnapshot<String> snapshot;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return FutureBuilder<String>(
-      future: _policyTextFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return const Center(
-            child: Padding(
-              padding: EdgeInsets.symmetric(vertical: 28),
-              child: CircularProgressIndicator(strokeWidth: 3),
-            ),
-          );
-        }
+    if (snapshot.connectionState != ConnectionState.done) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 28),
+          child: CircularProgressIndicator(strokeWidth: 3),
+        ),
+      );
+    }
 
-        if (snapshot.hasError || !snapshot.hasData) {
-          return Text(
-            l10n.privacyPolicyLoadFailed,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: Theme.of(context).colorScheme.error,
-              fontWeight: FontWeight.w700,
-            ),
-          );
-        }
+    if (snapshot.hasError || !snapshot.hasData) {
+      return Text(
+        l10n.privacyPolicyLoadFailed,
+        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+          color: Theme.of(context).colorScheme.error,
+          fontWeight: FontWeight.w700,
+        ),
+      );
+    }
 
-        return DecoratedBox(
-          decoration: glassSurfaceDecoration(
-            context,
-            variant: AppGlassVariant.secondary,
-            borderRadius: const BorderRadius.all(Radius.circular(20)),
-            includeShadows: false,
+    return DecoratedBox(
+      decoration: glassSurfaceDecoration(
+        context,
+        variant: AppGlassVariant.secondary,
+        borderRadius: const BorderRadius.all(Radius.circular(20)),
+        includeShadows: false,
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: SelectableText(
+          snapshot.data!,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            height: 1.45,
+            color: mutedForegroundColor(context, alpha: 0.92),
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: SelectableText(
-              snapshot.data!,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                height: 1.45,
-                color: mutedForegroundColor(context, alpha: 0.92),
-              ),
-            ),
-          ),
-        );
-      },
+        ),
+      ),
     );
   }
 }
