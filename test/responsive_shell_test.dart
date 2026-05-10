@@ -1123,6 +1123,51 @@ void main() {
     },
   );
 
+  testWidgets('bill creation only lists owned recipient groups', (
+    tester,
+  ) async {
+    final navigationState = NavigationState()
+      ..selectDestination(AppDestination.createBill);
+    _setTestSurfaceSize(tester, width: 430, height: 1400);
+    final fakeService = _FakeDebtBackendService(
+      recipients: [
+        _testRecipient(id: 77, name: 'Owned group', ownerId: 10),
+        _testRecipient(
+          id: 88,
+          name: 'Member only group',
+          ownerId: 20,
+          members: [
+            _testUser(id: 10, name: 'Current User', email: 'me@test.dev'),
+          ],
+        ),
+      ],
+      onListReceipts: (_) => ReceiptsResponse(success: true),
+    );
+
+    await tester.pumpWidget(
+      _buildResponsiveShellTestApp(
+        authState: _TestAuthSessionState(
+          isAuthenticatedValue: true,
+          accessTokenValue: 'token-1',
+          userIdValue: 10,
+        ),
+        navigationState: navigationState,
+        billCreationState: BillCreationState(debtBackendService: fakeService),
+        recipientGroupState: RecipientGroupState(
+          debtBackendService: fakeService,
+        ),
+        billListState: BillListState(debtBackendService: fakeService),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('bill-create-group-field')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Owned group'), findsOneWidget);
+    expect(find.text('Member only group'), findsNothing);
+  });
+
   testWidgets('bill creation validates required title and amount', (
     tester,
   ) async {
@@ -1658,6 +1703,94 @@ void main() {
     );
   });
 
+  testWidgets('owner can delete a bill from detail view', (tester) async {
+    _setTestSurfaceSize(tester, width: 430, height: 1000);
+
+    final receipts = [
+      _testReceipt(id: 44, title: 'Deletable receipt', amountOwed: 42),
+    ];
+    final fakeService = _FakeDebtBackendService(
+      availableTags: const [],
+      onListReceipts: (_) {
+        final response = ReceiptsResponse(success: true);
+        response.receipts.addAll(receipts.map((receipt) => receipt.deepCopy()));
+        return response;
+      },
+      onDeleteReceipt: (request) {
+        receipts.removeWhere(
+          (receipt) => receipt.id.toInt() == request.receiptId.toInt(),
+        );
+        return ActionResponse(success: true);
+      },
+    );
+
+    await tester.pumpWidget(
+      _buildBillsSectionTestApp(
+        authState: _TestAuthSessionState(
+          isAuthenticatedValue: true,
+          accessTokenValue: 'token-1',
+          userIdValue: 10,
+        ),
+        billListState: BillListState(debtBackendService: fakeService),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('receipt-row-44')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('receipt-delete-44')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('receipt-confirm-delete-button')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(fakeService.deleteReceiptRequests, hasLength(1));
+    expect(fakeService.deleteReceiptRequests.single.receiptId.toInt(), 44);
+    expect(find.byKey(const ValueKey('receipt-row-44')), findsNothing);
+    expect(find.text('Bill deleted.'), findsOneWidget);
+  });
+
+  testWidgets('participant cannot delete a bill from detail view', (
+    tester,
+  ) async {
+    _setTestSurfaceSize(tester, width: 430, height: 1000);
+
+    final fakeService = _FakeDebtBackendService(
+      availableTags: const [],
+      onListReceipts: (_) {
+        final response = ReceiptsResponse(success: true);
+        response.receipts.add(
+          _testReceipt(
+            id: 45,
+            title: 'Participant receipt',
+            amountOwed: 42,
+            ownerId: 10,
+          ),
+        );
+        return response;
+      },
+    );
+
+    await tester.pumpWidget(
+      _buildBillsSectionTestApp(
+        authState: _TestAuthSessionState(
+          isAuthenticatedValue: true,
+          accessTokenValue: 'token-1',
+          userIdValue: 20,
+        ),
+        billListState: BillListState(debtBackendService: fakeService),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('receipt-row-45')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('receipt-delete-45')), findsNothing);
+    expect(find.byKey(const ValueKey('receipt-payments-45')), findsNothing);
+  });
+
   testWidgets('bill detail dialog shows current participant paid amount', (
     tester,
   ) async {
@@ -1914,6 +2047,67 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(downloadCount, 1);
+  });
+
+  testWidgets('payment dialog disables receipt file previews', (tester) async {
+    _setTestSurfaceSize(tester, width: 430, height: 1000);
+
+    final file = ReceiptFile(
+      id: Int64(86),
+      receiptId: Int64(52),
+      originalFilename: 'receipt.png',
+      contentType: 'image/png',
+    );
+    final imageBytes = base64Decode(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=',
+    );
+    final fakeService = _FakeDebtBackendService(
+      availableTags: const [],
+      onListReceipts: (_) {
+        final response = ReceiptsResponse(success: true);
+        response.receipts.add(
+          _testReceipt(
+            id: 52,
+            title: 'Receipt with payment preview',
+            amountOwed: 10,
+            files: [file],
+          ),
+        );
+        return response;
+      },
+      onDownloadReceiptFile: (_) {
+        return ReceiptFileDownload(
+          file: file.deepCopy(),
+          bytes: imageBytes,
+          contentType: 'image/png',
+        );
+      },
+    );
+
+    await tester.pumpWidget(
+      _buildBillsSectionTestApp(
+        authState: _TestAuthSessionState(
+          isAuthenticatedValue: true,
+          accessTokenValue: 'token-1',
+          userIdValue: 10,
+        ),
+        billListState: BillListState(debtBackendService: fakeService),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('receipt-row-52')));
+    await tester.pumpAndSettle();
+    expect(find.byType(Image), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('receipt-payments-52')));
+    await tester.pumpAndSettle();
+    expect(find.byType(Image), findsNothing);
+    expect(find.byKey(const ValueKey('receipt-file-open-86')), findsOneWidget);
+
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(find.byType(Image), findsOneWidget);
   });
 
   testWidgets('receipt file preview does not inline svg content', (

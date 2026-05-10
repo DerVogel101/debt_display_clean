@@ -850,6 +850,23 @@ class ReceiptSplitTests(AsyncDatabaseTestCase):
             {(self.member_a.id, 30.0), (self.member_b.id, 40.0)},
         )
 
+    async def test_create_receipt_rejects_member_only_recipient_group(self) -> None:
+        request = debt_pb2.CreateReceiptRequest(
+            title="Member bill",
+            amount_owed=25.0,
+            recipient_id=self.recipient.id,
+        )
+
+        response = await self._post_protobuf(
+            "/api/receipts/create",
+            request,
+            "member-a-token",
+        )
+        parsed = self._parse_message(debt_pb2.ReceiptResponse, response)
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(parsed.success)
+
     async def test_set_receipt_payments_accumulates_individual_paid_amounts(self) -> None:
         create_response = await self._post_protobuf(
             "/api/receipts/create",

@@ -788,6 +788,36 @@ abstract class AppLocalizations {
   /// **'Save'**
   String get save;
 
+  /// No description provided for @deleteBill.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete bill'**
+  String get deleteBill;
+
+  /// No description provided for @deleteBillQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete bill?'**
+  String get deleteBillQuestion;
+
+  /// No description provided for @deleteBillContent.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete \"{title}\" permanently.'**
+  String deleteBillContent(Object title);
+
+  /// No description provided for @billDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Bill deleted.'**
+  String get billDeleted;
+
+  /// No description provided for @couldNotDeleteBill.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not delete bill.'**
+  String get couldNotDeleteBill;
+
   /// No description provided for @open.
   ///
   /// In en, this message translates to:

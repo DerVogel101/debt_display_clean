@@ -373,6 +373,44 @@ class BillListState extends ChangeNotifier {
     }
   }
 
+  Future<bool> deleteReceipt(Receipt receipt) async {
+    if (!_isAuthenticated || _accessToken == null || _isMutating) {
+      return false;
+    }
+
+    _isMutating = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final response = await _debtBackendService.deleteReceipt(
+        _accessToken!,
+        ReceiptLookupRequest(receiptId: receipt.id),
+      );
+      if (!response.success) {
+        throw StateError(response.message);
+      }
+
+      _receipts = List<Receipt>.unmodifiable(
+        _receipts.where((candidate) => candidate.id != receipt.id),
+      );
+    } catch (error) {
+      _errorMessage = _formatError(error);
+      return false;
+    } finally {
+      _isMutating = false;
+      notifyListeners();
+    }
+
+    try {
+      await refresh();
+    } catch (error) {
+      _errorMessage = _formatError(error);
+      notifyListeners();
+    }
+    return true;
+  }
+
   Future<ReceiptFileDownload?> downloadReceiptFile(ReceiptFile file) async {
     if (!_isAuthenticated || _accessToken == null) {
       return null;

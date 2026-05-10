@@ -392,6 +392,23 @@ class AppLocalizationsDe extends AppLocalizations {
   String get save => 'Speichern';
 
   @override
+  String get deleteBill => 'Rechnung löschen';
+
+  @override
+  String get deleteBillQuestion => 'Rechnung löschen?';
+
+  @override
+  String deleteBillContent(Object title) {
+    return '\"$title\" dauerhaft löschen.';
+  }
+
+  @override
+  String get billDeleted => 'Rechnung gelöscht.';
+
+  @override
+  String get couldNotDeleteBill => 'Rechnung konnte nicht gelöscht werden.';
+
+  @override
   String get open => 'Öffnen';
 
   @override

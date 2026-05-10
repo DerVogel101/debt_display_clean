@@ -113,8 +113,9 @@ class _BillCreationSectionState extends State<BillCreationSection> {
       return _LoggedOutBillCreationSection(isDesktop: widget.isDesktop);
     }
 
-    final groups = groupState.groups;
+    final groups = _ownedGroups(groupState);
     final selectedGroup = _selectedGroup(groups);
+    final selectedGroupId = selectedGroup?.id.toInt();
 
     return PageSection(
       padding: EdgeInsets.all(widget.isDesktop ? 28 : 22),
@@ -182,7 +183,7 @@ class _BillCreationSectionState extends State<BillCreationSection> {
             const SizedBox(height: 22),
             _GroupAndSharesSection(
               groups: groups,
-              selectedGroupId: _selectedGroupId,
+              selectedGroupId: selectedGroupId,
               selectedGroup: selectedGroup,
               amountFormat: _amountFormat(),
               shareDelta: _totalSharePercentDelta(),
@@ -253,6 +254,16 @@ class _BillCreationSectionState extends State<BillCreationSection> {
       }
     }
     return null;
+  }
+
+  List<Recipient> _ownedGroups(RecipientGroupState groupState) {
+    final currentUserId = groupState.currentUserId;
+    if (currentUserId == null) {
+      return const [];
+    }
+    return groupState.groups
+        .where((group) => group.ownerId.toInt() == currentUserId)
+        .toList(growable: false);
   }
 
   NumberFormat _amountFormat() {
@@ -385,7 +396,9 @@ class _BillCreationSectionState extends State<BillCreationSection> {
       _sharePercents.clear();
       Recipient? selected;
       if (groupId != null) {
-        for (final candidate in context.read<RecipientGroupState>().groups) {
+        for (final candidate in _ownedGroups(
+          context.read<RecipientGroupState>(),
+        )) {
           if (candidate.id.toInt() == groupId) {
             selected = candidate;
             break;
@@ -551,7 +564,11 @@ class _BillCreationSectionState extends State<BillCreationSection> {
     if (amount == null || amount <= 0) {
       return;
     }
-    if (_selectedGroupId != null && _totalSharePercentDelta().abs() > 0.01) {
+    final selectedGroup = _selectedGroup(
+      _ownedGroups(context.read<RecipientGroupState>()),
+    );
+    final selectedGroupId = selectedGroup?.id.toInt();
+    if (selectedGroupId != null && _totalSharePercentDelta().abs() > 0.01) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(l10n.sharesMustAddTo100)));
@@ -564,12 +581,12 @@ class _BillCreationSectionState extends State<BillCreationSection> {
       description: _descriptionController.text,
       amountOwed: amount,
       currency: _currency ?? 'EUR',
-      recipientId: _selectedGroupId,
+      recipientId: selectedGroupId,
       notes: _notesController.text,
-      ownerSharePercent: _selectedGroupId == null
+      ownerSharePercent: selectedGroupId == null
           ? null
           : (_sharePercents[_ownerShareKey] ?? 0),
-      recipientShares: _selectedGroupId == null
+      recipientShares: selectedGroupId == null
           ? const []
           : _sharePercents.entries
                 .where((entry) => entry.key != _ownerShareKey)

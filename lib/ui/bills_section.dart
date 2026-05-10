@@ -18,32 +18,54 @@ Future<void> showBillDetailModal(
   required BillListState state,
   required bool isDesktop,
 }) {
-  Widget buildContent() {
-    return ListenableBuilder(
-      listenable: state,
-      builder: (context, child) {
-        final currentReceipt = state.receipts.firstWhere(
-          (candidate) => candidate.id == receipt.id,
-          orElse: () => receipt,
-        );
-        return _BillDetailPanel(receipt: currentReceipt, state: state);
-      },
-    );
-  }
+  var showFilePreviews = true;
+
+  Widget buildContent(StateSetter setModalState) => ListenableBuilder(
+    listenable: state,
+    builder: (context, child) {
+      final currentReceipt = state.receipts.firstWhere(
+        (candidate) => candidate.id == receipt.id,
+        orElse: () => receipt,
+      );
+      return _BillDetailPanel(
+        receipt: currentReceipt,
+        state: state,
+        showFilePreviews: showFilePreviews,
+        onShowPayments: (receipt, amountFormat) async {
+          setModalState(() {
+            showFilePreviews = false;
+          });
+          await _showReceiptPaymentsDialog(
+            context,
+            state,
+            receipt,
+            amountFormat,
+          );
+          if (context.mounted) {
+            setModalState(() {
+              showFilePreviews = true;
+            });
+          }
+        },
+      );
+    },
+  );
 
   if (isDesktop) {
     return showDialog<void>(
       context: context,
-      builder: (dialogContext) => Dialog(
-        insetPadding: const EdgeInsets.all(28),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxWidth: 820,
-            maxHeight: MediaQuery.of(dialogContext).size.height * 0.9,
-          ),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(18),
-            child: buildContent(),
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setModalState) => Dialog(
+          insetPadding: const EdgeInsets.all(28),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: 820,
+              maxHeight: MediaQuery.of(dialogContext).size.height * 0.9,
+            ),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(18),
+              child: buildContent(setModalState),
+            ),
           ),
         ),
       ),
@@ -53,15 +75,17 @@ Future<void> showBillDetailModal(
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    builder: (sheetContext) => DraggableScrollableSheet(
-      expand: false,
-      initialChildSize: 0.9,
-      minChildSize: 0.5,
-      maxChildSize: 0.95,
-      builder: (_, scrollController) => SingleChildScrollView(
-        controller: scrollController,
-        padding: const EdgeInsets.all(18),
-        child: buildContent(),
+    builder: (sheetContext) => StatefulBuilder(
+      builder: (context, setModalState) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.9,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (_, scrollController) => SingleChildScrollView(
+          controller: scrollController,
+          padding: const EdgeInsets.all(18),
+          child: buildContent(setModalState),
+        ),
       ),
     ),
   );
@@ -954,10 +978,18 @@ class _ReceiptAmountMetric extends StatelessWidget {
 }
 
 class _BillDetailPanel extends StatelessWidget {
-  const _BillDetailPanel({required this.receipt, required this.state});
+  const _BillDetailPanel({
+    required this.receipt,
+    required this.state,
+    required this.showFilePreviews,
+    required this.onShowPayments,
+  });
 
   final Receipt receipt;
   final BillListState state;
+  final bool showFilePreviews;
+  final Future<void> Function(Receipt receipt, NumberFormat amountFormat)
+  onShowPayments;
 
   @override
   Widget build(BuildContext context) {
@@ -1026,18 +1058,30 @@ class _BillDetailPanel extends StatelessWidget {
           ),
           if (isOwner) ...[
             const SizedBox(height: 14),
-            OutlinedButton.icon(
-              key: ValueKey('receipt-payments-${receipt.id}'),
-              onPressed: state.isMutating
-                  ? null
-                  : () => _showReceiptPaymentsDialog(
-                      context,
-                      state,
-                      receipt,
-                      amountFormat,
-                    ),
-              icon: const Icon(Icons.payments_rounded),
-              label: Text(l10n.payments),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                OutlinedButton.icon(
+                  key: ValueKey('receipt-payments-${receipt.id}'),
+                  onPressed: state.isMutating
+                      ? null
+                      : () => onShowPayments(receipt, amountFormat),
+                  icon: const Icon(Icons.payments_rounded),
+                  label: Text(l10n.payments),
+                ),
+                OutlinedButton.icon(
+                  key: ValueKey('receipt-delete-${receipt.id}'),
+                  onPressed: state.isMutating
+                      ? null
+                      : () => _confirmDeleteReceipt(context, state, receipt),
+                  icon: const Icon(Icons.delete_outline_rounded),
+                  label: Text(l10n.deleteBill),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Theme.of(context).colorScheme.error,
+                  ),
+                ),
+              ],
             ),
           ],
           if (receipt.hasSplit()) ...[
@@ -1076,12 +1120,61 @@ class _BillDetailPanel extends StatelessWidget {
               ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 10),
-            _ReceiptFilesDetail(receipt: receipt, state: state),
+            _ReceiptFilesDetail(
+              receipt: receipt,
+              state: state,
+              showPreviews: showFilePreviews,
+            ),
           ],
         ],
       ),
     );
   }
+}
+
+Future<void> _confirmDeleteReceipt(
+  BuildContext context,
+  BillListState state,
+  Receipt receipt,
+) async {
+  final l10n = AppLocalizations.of(context);
+  final messenger = ScaffoldMessenger.maybeOf(context);
+  final navigator = Navigator.of(context);
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: Text(l10n.deleteBillQuestion),
+      content: Text(l10n.deleteBillContent(receipt.title)),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(false),
+          child: Text(l10n.cancel),
+        ),
+        FilledButton.icon(
+          key: const ValueKey('receipt-confirm-delete-button'),
+          onPressed: () => Navigator.of(dialogContext).pop(true),
+          icon: const Icon(Icons.delete_outline_rounded),
+          label: Text(l10n.delete),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true) {
+    return;
+  }
+
+  final deleted = await state.deleteReceipt(receipt);
+  if (!context.mounted) {
+    return;
+  }
+  if (deleted) {
+    navigator.pop();
+    messenger?.showSnackBar(SnackBar(content: Text(l10n.billDeleted)));
+    return;
+  }
+  messenger?.showSnackBar(
+    SnackBar(content: Text(state.errorMessage ?? l10n.couldNotDeleteBill)),
+  );
 }
 
 Future<void> _showReceiptPaymentsDialog(
@@ -1451,10 +1544,15 @@ class _ReceiptSplitShareRow extends StatelessWidget {
 }
 
 class _ReceiptFilesDetail extends StatelessWidget {
-  const _ReceiptFilesDetail({required this.receipt, required this.state});
+  const _ReceiptFilesDetail({
+    required this.receipt,
+    required this.state,
+    required this.showPreviews,
+  });
 
   final Receipt receipt;
   final BillListState state;
+  final bool showPreviews;
 
   @override
   Widget build(BuildContext context) {
@@ -1466,7 +1564,7 @@ class _ReceiptFilesDetail extends StatelessWidget {
               child: _ReceiptFileDetailTile(
                 file: file,
                 state: state,
-                showPreview: true,
+                showPreview: showPreviews,
               ),
             ),
           )

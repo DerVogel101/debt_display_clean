@@ -391,6 +391,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get save => 'Save';
 
   @override
+  String get deleteBill => 'Delete bill';
+
+  @override
+  String get deleteBillQuestion => 'Delete bill?';
+
+  @override
+  String deleteBillContent(Object title) {
+    return 'Delete \"$title\" permanently.';
+  }
+
+  @override
+  String get billDeleted => 'Bill deleted.';
+
+  @override
+  String get couldNotDeleteBill => 'Could not delete bill.';
+
+  @override
   String get open => 'Open';
 
   @override

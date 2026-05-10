@@ -693,7 +693,7 @@ async def create_receipt_route(request: Request, session: AsyncSession = Depends
                 authorization.ResourceType.RECIPIENT,
                 "recipient_id",
                 proto_req,
-                authorization.AccessPolicy.READ,
+                authorization.AccessPolicy.MUTATE,
             )
         receipt = await create_receipt(
             session=session,

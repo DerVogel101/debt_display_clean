@@ -166,6 +166,16 @@
   },
   "cancel": "Cancel",
   "save": "Save",
+  "deleteBill": "Delete bill",
+  "deleteBillQuestion": "Delete bill?",
+  "deleteBillContent": "Delete \"{title}\" permanently.",
+  "@deleteBillContent": {
+    "placeholders": {
+      "title": {}
+    }
+  },
+  "billDeleted": "Bill deleted.",
+  "couldNotDeleteBill": "Could not delete bill.",
   "open": "Open",
   "previewUnavailable": "Preview unavailable",
   "couldNotOpenFile": "Could not open file.",
