@@ -15,9 +15,11 @@ import 'package:debt_display/state/chart_state.dart';
 import 'package:debt_display/state/home_bill_state.dart';
 import 'package:debt_display/state/language_state.dart';
 import 'package:debt_display/state/navigation_state.dart';
+import 'package:debt_display/state/privacy_consent_state.dart';
 import 'package:debt_display/state/recipient_group_state.dart';
 import 'package:debt_display/state/theme_state.dart';
 import 'package:debt_display/ui/app_shell.dart';
+import 'package:debt_display/ui/privacy_policy.dart';
 import 'package:debt_display/l10n/generated/app_localizations.dart';
 
 Future<void> main() async {
@@ -37,11 +39,19 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => NavigationState()),
         ChangeNotifierProvider(create: (_) => ThemeState()..load()),
         ChangeNotifierProvider(create: (_) => LanguageState()..load()),
-        ChangeNotifierProvider(
+        ChangeNotifierProvider(create: (_) => PrivacyConsentState()..load()),
+        ChangeNotifierProxyProvider<PrivacyConsentState, AuthSessionState>(
           create: (_) => AuthSessionState(
             auth0Service: Auth0Service(),
             authBackendService: AuthBackendService(),
-          )..initialize(),
+          ),
+          update: (_, privacyConsentState, authSessionState) {
+            final state = authSessionState!;
+            if (privacyConsentState.hasAcceptedCurrentVersion) {
+              unawaited(state.initialize());
+            }
+            return state;
+          },
         ),
         ChangeNotifierProxyProvider<AuthSessionState, BillListState>(
           create: (_) =>
@@ -169,7 +179,7 @@ class _AppRootState extends State<_AppRoot> {
       themeMode: themeMode,
       theme: lightTheme,
       darkTheme: darkTheme,
-      home: const MainView(),
+      home: const PrivacyConsentGate(child: MainView()),
     );
   }
 }

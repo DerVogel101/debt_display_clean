@@ -12,6 +12,7 @@ import 'package:debt_display/state/chart_state.dart';
 import 'package:debt_display/state/home_bill_state.dart';
 import 'package:debt_display/state/language_state.dart';
 import 'package:debt_display/state/navigation_state.dart';
+import 'package:debt_display/state/privacy_consent_state.dart';
 import 'package:debt_display/state/recipient_group_state.dart';
 import 'package:debt_display/state/theme_state.dart';
 import 'package:debt_display/theme/app_themes.dart';
@@ -19,6 +20,7 @@ import 'package:debt_display/ui/app_sections.dart';
 import 'package:debt_display/ui/bills_section.dart';
 import 'package:debt_display/ui/charts_section.dart';
 import 'package:debt_display/ui/app_shell.dart';
+import 'package:debt_display/ui/privacy_policy.dart';
 import 'package:debt_display/services/debt_backend_service.dart';
 import 'package:debt_display/services/file_viewer_io.dart';
 import 'package:dio/dio.dart';
@@ -340,6 +342,48 @@ void main() {
     );
   });
 
+  testWidgets('privacy gate blocks app content until accepted', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    _setTestSurfaceSize(tester, width: 430, height: 900);
+    final privacyConsentState = PrivacyConsentState.test(
+      hasAcceptedCurrentVersion: false,
+    );
+
+    await tester.pumpWidget(
+      _buildPrivacyGateTestApp(
+        privacyConsentState: privacyConsentState,
+        child: const Text('Protected app content'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Privacy policy'), findsOneWidget);
+    expect(find.text('Protected app content'), findsNothing);
+
+    await _tapVisible(
+      tester,
+      find.byKey(const ValueKey('privacy-accept-button')),
+    );
+
+    expect(privacyConsentState.hasAcceptedCurrentVersion, isTrue);
+    expect(find.text('Protected app content'), findsOneWidget);
+  });
+
+  testWidgets('saved privacy consent skips the gate', (tester) async {
+    _setTestSurfaceSize(tester, width: 430, height: 900);
+
+    await tester.pumpWidget(
+      _buildPrivacyGateTestApp(
+        privacyConsentState: PrivacyConsentState.test(),
+        child: const Text('Protected app content'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Protected app content'), findsOneWidget);
+    expect(find.text('Accept and continue'), findsNothing);
+  });
+
   testWidgets('menu section includes charts navigation action', (tester) async {
     final navigationState = NavigationState()
       ..selectDestination(AppDestination.menu);
@@ -361,6 +405,67 @@ void main() {
     await _tapVisible(tester, find.text('Charts'));
 
     expect(navigationState.selectedDestination, AppDestination.charts);
+  });
+
+  testWidgets('menu exposes privacy policy and source code actions', (
+    tester,
+  ) async {
+    final navigationState = NavigationState()
+      ..selectDestination(AppDestination.menu);
+    _setTestSurfaceSize(tester, width: 430, height: 1100);
+
+    await tester.pumpWidget(
+      _buildResponsiveShellTestApp(
+        authState: _TestAuthSessionState(),
+        navigationState: navigationState,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Privacy policy'), findsOneWidget);
+    expect(find.text('Source code'), findsOneWidget);
+    expect(find.byKey(const ValueKey('source-code-menu-tile')), findsOneWidget);
+
+    final privacyTile = find.byKey(const ValueKey('menu-privacyPolicy-tile'));
+    await tester.ensureVisible(privacyTile);
+    await tester.pump();
+    await tester.tap(privacyTile);
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump();
+
+    expect(navigationState.selectedDestination, AppDestination.privacyPolicy);
+    expect(
+      find.byKey(const ValueKey('privacy-source-code-button')),
+      findsNothing,
+    );
+    expect(find.byKey(const ValueKey('privacy-revoke-button')), findsOneWidget);
+  });
+
+  testWidgets('privacy policy screen can revoke consent and show gate', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    _setTestSurfaceSize(tester, width: 430, height: 900);
+    final privacyConsentState = PrivacyConsentState.test();
+
+    await tester.pumpWidget(
+      _buildPrivacyGateTestApp(
+        privacyConsentState: privacyConsentState,
+        child: const SingleChildScrollView(child: PrivacyPolicySection()),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    final revokeButton = find.byKey(const ValueKey('privacy-revoke-button'));
+    await tester.ensureVisible(revokeButton);
+    await tester.pump();
+    await tester.tap(revokeButton);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(privacyConsentState.hasAcceptedCurrentVersion, isFalse);
+    expect(find.byKey(const ValueKey('privacy-accept-button')), findsOneWidget);
   });
 
   testWidgets('menu section includes bills navigation action', (tester) async {
@@ -2840,6 +2945,22 @@ Widget _buildResponsiveShellTestApp({
         ),
       ],
       child: const ResponsiveShell(),
+    ),
+  );
+}
+
+Widget _buildPrivacyGateTestApp({
+  required PrivacyConsentState privacyConsentState,
+  required Widget child,
+}) {
+  return MaterialApp(
+    locale: const Locale('en', 'US'),
+    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    supportedLocales: _supportedLocales,
+    theme: buildLightTheme(),
+    home: ChangeNotifierProvider<PrivacyConsentState>.value(
+      value: privacyConsentState,
+      child: PrivacyConsentGate(child: child),
     ),
   );
 }

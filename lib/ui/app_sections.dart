@@ -1,6 +1,7 @@
 import 'package:auth0_flutter/auth0_flutter.dart';
 import 'package:debt_display/generated/debt.pb.dart';
 import 'package:debt_display/l10n/generated/app_localizations.dart';
+import 'package:debt_display/services/external_link.dart';
 import 'package:debt_display/state/auth_session_state.dart';
 import 'package:debt_display/state/bill_list_state.dart';
 import 'package:debt_display/state/home_bill_state.dart';
@@ -13,6 +14,7 @@ import 'package:debt_display/ui/bill_creation_section.dart';
 import 'package:debt_display/ui/bills_section.dart';
 import 'package:debt_display/ui/charts_section.dart';
 import 'package:debt_display/ui/app_shared.dart';
+import 'package:debt_display/ui/privacy_policy.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -172,6 +174,8 @@ class _AppSectionsState extends State<AppSections> {
         return const RecipientGroupsSection(key: ValueKey('recipient-groups'));
       case AppDestination.profile:
         return const ProfileSection(key: ValueKey('profile'));
+      case AppDestination.privacyPolicy:
+        return const PrivacyPolicySection(key: ValueKey('privacy-policy'));
       case AppDestination.menu:
         return const MenuSection(key: ValueKey('menu'));
     }
@@ -518,6 +522,12 @@ class MenuSection extends StatelessWidget {
         icon: Icons.person_rounded,
         destination: AppDestination.profile,
       ),
+      (
+        title: l10n.destinationPrivacyPolicy,
+        body: l10n.menuPrivacyPolicyDescription,
+        icon: Icons.privacy_tip_rounded,
+        destination: AppDestination.privacyPolicy,
+      ),
     ];
 
     return Column(
@@ -546,6 +556,7 @@ class MenuSection extends StatelessWidget {
                 (item) => Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: _MenuActionTile(
+                    key: ValueKey('menu-${item.destination.name}-tile'),
                     title: item.title,
                     body: item.body,
                     icon: item.icon,
@@ -555,6 +566,20 @@ class MenuSection extends StatelessWidget {
                       );
                     },
                   ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _MenuActionTile(
+                  key: const ValueKey('source-code-menu-tile'),
+                  title: l10n.sourceCodeTitle,
+                  body: l10n.sourceCodeDescription,
+                  icon: Icons.code_rounded,
+                  onTap: () {
+                    openExternalLink(
+                      'https://github.com/DerVogel101/debt_display_clean',
+                    );
+                  },
                 ),
               ),
               const SizedBox(height: 12),
@@ -1250,6 +1275,7 @@ class _ProfileInfoTable extends StatelessWidget {
 
 class _MenuActionTile extends StatelessWidget {
   const _MenuActionTile({
+    super.key,
     required this.title,
     required this.body,
     required this.icon,

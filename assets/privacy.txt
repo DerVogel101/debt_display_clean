@@ -1,0 +1,186 @@
+Datenschutzerklärung / Privacy Policy
+
+Version: 2026-05-10
+
+Dieses Dokument ist zweisprachig. Der deutsche Text steht zuerst, danach folgt die englische Fassung.
+
+
+DEUTSCH
+
+
+1. Verantwortlicher und Kontakt
+
+Debt Display ist eine private, nur auf Einladung erreichbare Website für Familie und enge Freunde. Verantwortlicher Kontakt für Datenschutzanfragen ist:
+
+adminosaurus@dervogel101.de
+
+Diese Datenschutzerklärung ist als praktische Information für diese private Anwendung gedacht und ersetzt keine individuelle Rechtsberatung.
+
+
+2. Zweck der Verarbeitung
+
+Debt Display hilft eingeladenen Personen, gemeinsame Rechnungen, Belege, Schuldenanteile und Zahlungen innerhalb kleiner privater Gruppen zu verwalten. Die Verarbeitung erfolgt, um die Anmeldung, die Anzeige der eigenen Daten, das Erstellen und Teilen von Rechnungen, das Verwalten von Empfängergruppen und das Hochladen oder Anzeigen von Belegdateien bereitzustellen.
+
+
+3. Verarbeitete Daten in der Anwendung
+
+Die Anwendung kann folgende Daten speichern und verarbeiten:
+
+Benutzerkonto: Auth0-Benutzer-ID (Subject), lokale Benutzer-ID, E-Mail-Adresse, Anzeigename, Spitzname und Avatar-URL.
+
+Rechnungen und Belege: Titel, Beschreibung, Betrag, Währung, Fälligkeit, Zahlungsstatus, Zahlungsbeträge, Notizen, Erstellungs- und Änderungszeitpunkte.
+
+Gemeinsame Nutzung: Empfängergruppen, Gruppenname, Gruppenbeschreibung, Mitglieder, Rollen als Besitzer oder Teilnehmer, Aufteilungen und Zahlungsanteile.
+
+Tags: Tag-Text, Symbol und Farbe.
+
+Dateien: hochgeladene Belegdateien, Originaldateiname, Inhaltstyp, Dateigröße, Erstellungszeitpunkt und SHA-256-Hash.
+
+Technische Daten: HTTP-Anfragen, IP-Adressen, Browser- und Geräteinformationen, Sicherheits- und Netzwerkereignisse, soweit diese durch Hosting, Cloudflare, Auth0 oder das lokale Netzwerk anfallen.
+
+
+4. Rechtsgrundlagen der Verarbeitung
+
+Anmeldung und Speicherung von Profildaten (Name, E-Mail, Avatar, Auth0-ID): Art. 6 Abs. 1 lit. b DSGVO — Vertragserfüllung / Bereitstellung des eingeladenen Dienstes.
+
+Rechnungen, Empfängergruppen, Dateien und Tags: Art. 6 Abs. 1 lit. b DSGVO — Kernfunktion des Dienstes.
+
+Cloudflare-Proxy, Zugriffsprotokoll, Unifi Dream Machine: Art. 6 Abs. 1 lit. f DSGVO — berechtigtes Interesse an Sicherheit und Verfügbarkeit.
+
+Gravatar- / Auth0-CDN-Bildabruf: Art. 6 Abs. 1 lit. f DSGVO — berechtigtes Interesse an der Anzeige von Profilbildern.
+
+
+5. Anmeldung mit Auth0
+
+Die Anmeldung erfolgt über Auth0 in einem EU-Tenant. Auth0 verarbeitet Anmelde- und Profildaten, insbesondere die Auth0-Benutzer-ID, E-Mail-Adresse, Name oder Anzeigename, Token-Informationen und gegebenenfalls Profilbilddaten. Die Anwendung verwendet Auth0-Zugriffstoken, um geschützte Backend-Funktionen aufzurufen. Das Backend prüft Tokens gegen Auth0-Schlüssel und kann bei Bedarf Auth0-/userinfo-Daten abrufen, um fehlende Profildaten zu ergänzen.
+
+Profilbilder können von externen Auth0-bezogenen Domains geladen werden, insbesondere cdn.auth0.com, s.gravatar.com und i2.wp.com/cdn.auth0.com/avatars/... . Dabei können technische Zugriffsdaten an diese Anbieter übertragen werden.
+
+Datenschutzerklärung Auth0: https://auth0.com/privacy
+
+
+6. Cloudflare, Netzwerk und Sicherheit
+
+Cloudflare wird als Proxy vor der Website verwendet. Cloudflare kann technische Zugriffsdaten wie IP-Adresse, Zeitstempel, URL, Header, Sicherheitsereignisse und ähnliche Verbindungsdaten verarbeiten, um die Website auszuliefern, zu beschleunigen und zu schützen.
+
+Im lokalen Netzwerk des Betreibers wird eine Unifi Dream Machine verwendet. Sie kann Netzwerk- und Sicherheitsprotokolle verarbeiten, zum Beispiel Verbindungsmetadaten, IP-Adressen, Firewall- oder IDS-Ereignisse und Zeitstempel.
+
+Datenschutzerklärung Cloudflare: https://www.cloudflare.com/privacypolicy/
+
+
+7. Lokaler Browser-Speicher
+
+Die Website verwendet lokalen Browser-Speicher. Auth0 speichert die Web-Session im local storage, damit eine Anmeldung zwischen Besuchen erhalten bleibt. Die Anwendung speichert außerdem Spracheinstellung, Theme-Einstellung und die Annahme dieser Datenschutzerklärung lokal im Browser. Die Zustimmung wird nicht an das Backend synchronisiert.
+
+Wer lokalen Browser-Speicher löscht oder einen anderen Browser verwendet, muss die Datenschutzerklärung erneut akzeptieren und sich gegebenenfalls erneut anmelden.
+
+
+8. Empfänger und Zugriff
+
+Daten sind nur für eingeladene, angemeldete Benutzer sichtbar, soweit sie an denselben Rechnungen, Gruppen oder Belegen beteiligt sind oder diese besitzen. Technische Dienstleister wie Auth0 und Cloudflare können Daten im Rahmen der Bereitstellung ihrer Dienste verarbeiten. Hochgeladene Belege können personenbezogene Daten enthalten; Benutzer sollten nur Belege hochladen, die für den privaten Zweck dieser Anwendung erforderlich sind.
+
+Profilbilder können über Gravatar bereitgestellt werden. Datenschutzerklärung Gravatar / Automattic: https://automattic.com/privacy/
+
+
+9. Speicherdauer und Löschung
+
+App-Daten werden gespeichert, solange das Konto bzw. der private Nutzungszweck besteht, bis einzelne Objekte gelöscht werden oder bis eine Lösch- oder Anonymisierungsanfrage bearbeitet wird. Beim Löschen eines Benutzers werden Profildaten anonymisiert, eigene Rechnungen, eigene Gruppen und zugehörige verwaltete Dateien entfernt; historische Verweise können als "Gelöschter Benutzer" erhalten bleiben, damit andere Teilnehmer ihre verbleibenden privaten Rechnungsdaten weiter verstehen können.
+
+Eine Datenlöschung nach DSGVO kann per E-Mail an adminosaurus@dervogel101.de angefordert werden. Bitte gib die Benutzer-ID aus deinem Profil an, damit das Konto eindeutig gefunden werden kann.
+
+
+10. Rechte betroffener Personen
+
+Je nach anwendbarem Recht kannst du Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung, Datenübertragbarkeit und Widerspruch verlangen. Du kannst außerdem eine erteilte Einwilligung mit Wirkung für die Zukunft widerrufen. Du hast das Recht, dich bei einer zuständigen Datenschutzaufsichtsbehörde zu beschweren.
+
+
+***
+
+
+ENGLISH
+
+
+1. Controller and contact
+
+Debt Display is a private, invite-only website for family and close friends. The privacy contact is:
+
+adminosaurus@dervogel101.de
+
+This privacy policy is practical information for this private application and is not a substitute for individual legal advice.
+
+
+2. Purpose of processing
+
+Debt Display helps invited people manage shared bills, receipts, debt shares, and payments inside small private groups. Processing is used to provide sign-in, display personal app data, create and share bills, manage recipient groups, and upload or view receipt files.
+
+
+3. Data processed by the application
+
+The application may store and process:
+
+Account data: Auth0 user ID (subject), local user ID, email address, display name, nickname, and avatar URL.
+
+Bills and receipts: title, description, amount, currency, due date, payment status, payment amounts, notes, creation timestamps, and update timestamps.
+
+Sharing data: recipient groups, group name, group description, members, owner or participant roles, splits, and payment shares.
+
+Tags: tag text, icon, and color.
+
+Files: uploaded receipt files, original filename, content type, file size, creation timestamp, and SHA-256 hash.
+
+Technical data: HTTP requests, IP addresses, browser and device information, security events, and network events where generated by hosting, Cloudflare, Auth0, or the local network.
+
+
+4. Legal basis for processing
+
+Sign-in and storage of profile data (name, email, avatar, Auth0 ID): Art. 6(1)(b) GDPR — performance of the service you have been invited to use.
+
+Bills, recipient groups, files, and tags: Art. 6(1)(b) GDPR — core functionality of the service.
+
+Cloudflare proxy, access logs, Unifi Dream Machine: Art. 6(1)(f) GDPR — legitimate interest in security and availability.
+
+Gravatar / Auth0 CDN image loading: Art. 6(1)(f) GDPR — legitimate interest in displaying profile images.
+
+
+5. Authentication with Auth0
+
+Authentication is provided through Auth0 using an EU tenant. Auth0 processes sign-in and profile data, especially the Auth0 user ID, email address, name or display name, token information, and possibly profile image data. The application uses Auth0 access tokens to call protected backend features. The backend verifies tokens against Auth0 keys and may request Auth0 /userinfo data when needed to complete missing profile fields.
+
+Profile images may be loaded from external Auth0-related domains, especially cdn.auth0.com, s.gravatar.com, and i2.wp.com/cdn.auth0.com/avatars/... . Technical access data may be transferred to those providers when images are loaded.
+
+Auth0 privacy policy: https://auth0.com/privacy
+
+
+6. Cloudflare, network, and security
+
+Cloudflare is used as a proxy in front of the website. Cloudflare may process technical access data such as IP address, timestamp, URL, headers, security events, and similar connection data to deliver, accelerate, and protect the website.
+
+The operator's local network uses a Unifi Dream Machine. It may process network and security logs, such as connection metadata, IP addresses, firewall or IDS events, and timestamps.
+
+Cloudflare privacy policy: https://www.cloudflare.com/privacypolicy/
+
+
+7. Local browser storage
+
+The website uses local browser storage. Auth0 stores the web session in local storage so sign-in can persist between visits. The application also stores language preference, theme preference, and acceptance of this privacy policy locally in the browser. Consent is not synchronized to the backend.
+
+If local browser storage is cleared or another browser is used, the privacy policy must be accepted again and sign-in may be required again.
+
+
+8. Recipients and access
+
+Data is visible only to invited, signed-in users where they are involved in or own the same bills, groups, or receipts. Technical service providers such as Auth0 and Cloudflare may process data while providing their services. Uploaded receipts may contain personal data; users should upload only receipts needed for the private purpose of this application.
+
+Profile images may be provided via Gravatar. Gravatar / Automattic privacy policy: https://automattic.com/privacy/
+
+
+9. Retention and deletion
+
+App data is kept while the account or private use case exists, until individual objects are deleted, or until an erasure or anonymization request is handled. When a user is deleted, profile data is anonymized, owned bills, owned groups, and associated managed files are removed; historical references may remain as "Deleted User" so other participants can still understand their remaining private bill data.
+
+GDPR erasure can be requested by email to adminosaurus@dervogel101.de. Please include the user ID shown in your profile so the account can be identified.
+
+
+10. Data subject rights
+
+Depending on applicable law, you may request access, rectification, erasure, restriction of processing, data portability, and objection. You may also withdraw consent with effect for the future. You have the right to lodge a complaint with a competent data protection supervisory authority.

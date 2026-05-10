@@ -152,6 +152,12 @@ abstract class AppLocalizations {
   /// **'Profile'**
   String get destinationProfile;
 
+  /// No description provided for @destinationPrivacyPolicy.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy policy'**
+  String get destinationPrivacyPolicy;
+
   /// No description provided for @destinationMenu.
   ///
   /// In en, this message translates to:
@@ -421,6 +427,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Review the synced account profile and active session details.'**
   String get menuProfileLoggedInDescription;
+
+  /// No description provided for @menuPrivacyPolicyDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Read the privacy policy and stored consent details.'**
+  String get menuPrivacyPolicyDescription;
+
+  /// No description provided for @privacyPolicyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy policy'**
+  String get privacyPolicyTitle;
+
+  /// No description provided for @privacyPolicyIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Please read and accept the privacy policy before using Debt Display.'**
+  String get privacyPolicyIntro;
+
+  /// No description provided for @privacyPolicyLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load the privacy policy.'**
+  String get privacyPolicyLoadFailed;
+
+  /// No description provided for @acceptPrivacyPolicy.
+  ///
+  /// In en, this message translates to:
+  /// **'Accept and continue'**
+  String get acceptPrivacyPolicy;
+
+  /// No description provided for @revokePrivacyConsent.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoke consent'**
+  String get revokePrivacyConsent;
+
+  /// No description provided for @sourceCodeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Source code'**
+  String get sourceCodeTitle;
+
+  /// No description provided for @sourceCodeDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Open the public GitHub repository for this application.'**
+  String get sourceCodeDescription;
 
   /// No description provided for @loginToContinue.
   ///

@@ -12,6 +12,7 @@ enum AppDestination {
   createBill(Icons.add_circle_rounded),
   recipientGroups(Icons.groups_rounded),
   profile(Icons.person_rounded),
+  privacyPolicy(Icons.privacy_tip_rounded),
   menu(Icons.menu_rounded);
 
   const AppDestination(this.icon);
@@ -27,6 +28,7 @@ extension AppDestinationLocalizations on AppDestination {
     AppDestination.createBill => l10n.destinationCreateBill,
     AppDestination.recipientGroups => l10n.destinationRecipientGroups,
     AppDestination.profile => l10n.destinationProfile,
+    AppDestination.privacyPolicy => l10n.destinationPrivacyPolicy,
     AppDestination.menu => l10n.destinationMenu,
   };
 }
